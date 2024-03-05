@@ -9,17 +9,17 @@
 # autonamed chroot directory. Can rename.
 DATESTAMP=`date +%Y%m%d-%H%M%S`
 NAO_CHROOT="/opt/nethack/chroot"
-NETHACK_GIT="/home/build/NetHack37"
+NETHACK_GIT="/home/build/nethackathon-nethack"
 # the user & group from dgamelaunch config file.
 USRGRP="games:games"
 # COMPRESS from include/config.h; the compression binary to copy. leave blank to skip.
 COMPRESSBIN="/bin/gzip"
 # fixed data to copy (leave blank to skip)
-NH_GIT="/home/build/NetHack37"
+NH_GIT="/home/build/nethackathon-nethack"
 # HACKDIR from include/config.h; aka nethack subdir inside chroot
-NHSUBDIR="nh370.101-hdf"
+NHSUBDIR="nethackathon"
 # VAR_PLAYGROUND from include/unixconf.h
-NH_VAR_PLAYGROUND="/nh370.101-hdf/var/"
+NH_VAR_PLAYGROUND="/nethackathon/var/"
 # END OF CONFIG
 ##############################################################################
 
@@ -44,10 +44,10 @@ set -e
 umask 022
 
 echo "Creating inprogress and extrainfo directories"
-mkdir -p "$NAO_CHROOT/dgldir/inprogress-nh370.101-hdf"
-chown "$USRGRP" "$NAO_CHROOT/dgldir/inprogress-nh370.101-hdf"
-mkdir -p "$NAO_CHROOT/dgldir/extrainfo-nh370"
-chown "$USRGRP" "$NAO_CHROOT/dgldir/extrainfo-nh370"
+mkdir -p "$NAO_CHROOT/dgldir/inprogress-nethackathon"
+chown "$USRGRP" "$NAO_CHROOT/dgldir/inprogress-nethackathon"
+mkdir -p "$NAO_CHROOT/dgldir/extrainfo-nhthon"
+chown "$USRGRP" "$NAO_CHROOT/dgldir/extrainfo-nhthon"
 
 echo "Making $NAO_CHROOT/$NHSUBDIR"
 mkdir -p "$NAO_CHROOT/$NHSUBDIR"

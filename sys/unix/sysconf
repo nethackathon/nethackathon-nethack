@@ -49,7 +49,7 @@ CHECK_PLNAME=1
 # but number of different players is not limited.
 # Setting this to any other value constructs the lock files with
 # letter and "lock" (eg. alock, block, ...)
-MAXPLAYERS=0
+MAXPLAYERS=1
 
 # If not null, added to string "To get local support, " in the support
 # information help.
@@ -134,12 +134,12 @@ LIVELOG=0x0FFF
 #   %D current time, YYYYMMDDhhmmss format
 #   %n player name
 #   %N first character of player name
-DUMPLOGFILE=/dgldir/userdata/%N/%n/nethack/dumplog/%t.nh.txt
+DUMPLOGFILE=/dgldir/userdata/%N/%n/nethackathon/dumplog/%t.nhthon.txt
 
 # End of game HTML dump.
 # Only available if NetHack was compiled with DUMPHTML
 # Allows placeholders as above.
-DUMPHTMLFILE=/dgldir/userdata/%N/%n/nethack/dumplog/%t.nh.html
+DUMPHTMLFILE=/dgldir/userdata/%N/%n/nethackathon/dumplog/%t.nhthon.html
 
 # Number of bones file pools.
 # The pool you belong to is determined at game start. You will
@@ -200,5 +200,6 @@ OPTIONS=msg_window:reversed
 OPTIONS=number_pad:0
 OPTIONS=sortloot:full
 OPTIONS=time
+OPTIONS=!tutorial
 
 #eof

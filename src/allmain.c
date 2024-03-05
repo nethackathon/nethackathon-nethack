@@ -14,7 +14,7 @@
 
 static void moveloop_preamble(boolean);
 static void u_calc_moveamt(int);
-static void maybe_do_tutorial(void);
+/*static void maybe_do_tutorial(void);*/
 #ifdef POSITIONBAR
 static void do_positionbar(void);
 #endif
@@ -532,6 +532,7 @@ moveloop_core(void)
     }
 }
 
+#if 0
 static void
 maybe_do_tutorial(void)
 {
@@ -551,14 +552,15 @@ maybe_do_tutorial(void)
         iflags.nofollowers = FALSE;
     }
 }
+#endif /* #if 0 */
 
 void
 moveloop(boolean resuming)
 {
     moveloop_preamble(resuming);
 
-    if (!resuming)
-        maybe_do_tutorial();
+    /*if (!resuming)
+        maybe_do_tutorial();*/
 
     for (;;) {
         moveloop_core();

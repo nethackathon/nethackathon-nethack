@@ -1236,6 +1236,11 @@ dump_everything(
 
     init_symbols(); /* revert to default symbol set */
 
+    /* let folks know this was a nethackathon game */
+    Sprintf(pbuf, "NetHackathon, Spring 2024");
+    putstr(0, ATR_SUBHEAD, pbuf);
+    putstr(NHW_DUMPTXT, 0, "");
+
     /* one line version ID, which includes build date+time;
        it's conceivable that the game started with a different
        build date+time or even with an older nethack version,
