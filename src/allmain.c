@@ -12,15 +12,9 @@
 #include <signal.h>
 #endif
 
-<<<<<<< HEAD
-static void moveloop_preamble(boolean);
-static void u_calc_moveamt(int);
-/*static void maybe_do_tutorial(void);*/
-=======
 staticfn void moveloop_preamble(boolean);
 staticfn void u_calc_moveamt(int);
-staticfn void maybe_do_tutorial(void);
->>>>>>> ba7af36bfca6282f6fee8c2c14236417236e7b6c
+/*staticfn void maybe_do_tutorial(void);*/
 #ifdef POSITIONBAR
 staticfn void do_positionbar(void);
 #endif
@@ -544,12 +538,8 @@ moveloop_core(void)
     }
 }
 
-<<<<<<< HEAD
 #if 0
-static void
-=======
 staticfn void
->>>>>>> ba7af36bfca6282f6fee8c2c14236417236e7b6c
 maybe_do_tutorial(void)
 {
     s_level *sp = find_level("tut-1");
