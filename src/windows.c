@@ -81,9 +81,6 @@ staticfn void dump_add_menu(winid, const glyph_info *, const ANY_P *, char,
 staticfn void dump_end_menu(winid, const char *);
 staticfn int dump_select_menu(winid, int, MENU_ITEM_P **);
 staticfn void dump_putstr(winid, int, const char *);
-staticfn void dump_headers(void);
-staticfn void dump_footers(void);
-staticfn void dump_set_color_attr(int, int, boolean);
 #ifdef DUMPHTML
 staticfn void html_write_tags(FILE *, int, boolean);
 staticfn void html_dump_char(FILE *, char);
