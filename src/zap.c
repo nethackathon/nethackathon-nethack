@@ -5372,8 +5372,16 @@ fracture_rock(struct obj *obj) /* no texts here! */
             (void) breakobj(obj, x, y, TRUE, FALSE);
         }
     }
-    if (by_you && obj->otyp == BOULDER)
-        sokoban_guilt();
+    if (by_you && obj->otyp == BOULDER) {
+        if (Sokoban) {
+            struct obj *pick = carrying(PICK_AXE);
+            if (pick) {
+              You_feel("ashamed.");
+              pick = oname(pick, artiname(ART_PICK_AXE_OF_SHAME), ONAME_VIA_NAMING | ONAME_KNOW_ARTI);
+            }
+            sokoban_guilt();
+        }
+    }
 
     obj->otyp = ROCK;
     obj->oclass = GEM_CLASS;
