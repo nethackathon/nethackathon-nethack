@@ -81,6 +81,7 @@ staticfn boolean rob_shop(struct monst *);
 staticfn void deserted_shop(char *);
 staticfn boolean special_stock(struct obj *, struct monst *, boolean);
 staticfn const char *cad(boolean);
+static int u_have_designer_bag(void);
 
 /*
         invariants: obj->unpaid iff onbill(obj) [unless bp->useup]
@@ -90,6 +91,16 @@ staticfn const char *cad(boolean);
 static const char *const angrytexts[] = {
     "quite upset", "ticked off", "furious"
 };
+
+int u_have_designer_bag(void)
+{
+    register struct obj *otmp;
+
+    for (otmp = gi.invent; otmp; otmp = otmp->nobj)
+        if (otmp->otyp == DESIGNER_BAG)
+            return 1;
+    return 0;
+}
 
 /*
  *  Transfer money from inventory to monster when paying
@@ -2394,6 +2405,8 @@ get_cost(
     else if ((Role_if(PM_TOURIST) && u.ulevel < (MAXULEV / 2))
              || (uarmu && !uarm && !uarmc)) /* touristy shirt visible */
         multiplier *= 4L, divisor *= 3L;
+    else if (u_have_designer_bag() == 1)
+            multiplier *= 4L, divisor *= 3L; /* designer handbag visible */
 
     if (ACURR(A_CHA) > 18)
         divisor *= 2L;
@@ -2601,6 +2614,8 @@ set_cost(struct obj *obj, struct monst *shkp)
     else if ((Role_if(PM_TOURIST) && u.ulevel < (MAXULEV / 2))
              || (uarmu && !uarm && !uarmc)) /* touristy shirt visible */
         divisor *= 3L;
+    else if (u_have_designer_bag() == 1)
+            divisor *= 3L; /* designer handbag visible */
     else
         divisor *= 2L;
 

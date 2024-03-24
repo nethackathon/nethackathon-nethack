@@ -60,7 +60,7 @@ extern int amii_numcolors;
 
 #include "display.h"
 
-#define Is_IceBox(o) ((o)->otyp == ICE_BOX ? TRUE : FALSE)
+#define Is_IceBox(o) ( ((o)->otyp == ICE_BOX || (o)->otyp == COOLER_BAG) ? TRUE : FALSE)
 
 /* third arg passed to mread() should be 'unsigned' but most calls use
    sizeof so are attempting to pass 'size_t'; mread()'s prototype results
@@ -578,7 +578,7 @@ restgamestate(NHFILE *nhfp)
         /* savefile has wizard or explore mode, but player is no longer
            authorized to access either; can't downgrade mode any further, so
            fail restoration. */
-        u.uhp = 0; 
+        u.uhp = 0;
     }
 
     if (nhfp->structlevel)

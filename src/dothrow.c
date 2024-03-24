@@ -1239,6 +1239,9 @@ harmless_missile(struct obj *obj)
     case SACK:
     case OILSKIN_SACK:
     case BAG_OF_HOLDING:
+    case DESIGNER_BAG:
+    case BAG_OF_BAGS:
+    case COOLER_BAG:
         return !Has_contents(obj);
     default:
         if (obj->oclass == SCROLL_CLASS) /* scrolls but not all paper objs */
@@ -2071,7 +2074,7 @@ thitmonst(
                 /* ...or any special item, if you've made him angry */
                 || !mon->mpeaceful) {
                 /* give an explanation for keeping the item only if leader is
-                   not doing it out of anger */ 
+                   not doing it out of anger */
                 if (mon->mpeaceful && !Deaf) {
                     /* just in case, identify the object so its name will
                        appear in the message */
@@ -2087,7 +2090,7 @@ thitmonst(
                 (void) mpickobj(mon, obj);
             } else {
                 /* under normal circumstances, leader will say something and
-                   then return the item to the hero */ 
+                   then return the item to the hero */
                 boolean next2u = monnear(mon, u.ux, u.uy);
 
                 finish_quest(obj); /* acknowledge quest completion */
@@ -2389,6 +2392,21 @@ hero_breaks(
     return breakobj(obj, x, y, TRUE, from_invent);
 }
 
+/* Scatter contents of Faberge egg around.
+   Copied from boh explosion routine.
+ */
+static void
+do_faberge_explosion(struct obj *boh, coordxy x, coordxy y)
+{
+    struct obj *otmp, *nobj;
+
+    for (otmp = boh->cobj; otmp; otmp = nobj) {
+        nobj = otmp->nobj;
+        otmp->ox = x, otmp->oy = y;
+        (void) scatter(x, y, 4, MAY_HIT | MAY_DESTROY, otmp);
+    }
+}
+
 /*
  * The object is going to break for a reason other than the hero doing
  * something to it.
@@ -2444,6 +2462,9 @@ breakobj(
                           EF_DESTROY | EF_VERBOSE) == ER_DESTROYED);
 
     switch (obj->oclass == POTION_CLASS ? POT_WATER : obj->otyp) {
+    case FABERGE_EGG:
+        do_faberge_explosion(obj, x, y);
+        break;
     case MIRROR:
         if (hero_caused)
             change_luck(-2);
@@ -2567,13 +2588,14 @@ breakmsg(struct obj *obj, boolean in_view)
 
     to_pieces = "";
     switch (obj->oclass == POTION_CLASS ? POT_WATER : obj->otyp) {
-    default: /* glass or crystal wand */
-        if (obj->oclass != WAND_CLASS)
+    default: /* glass or crystal wand or faberge egg */
+        if (obj->oclass != WAND_CLASS && obj->otyp != FABERGE_EGG)
             impossible("breaking odd object (%d)?", obj->otyp);
         /*FALLTHRU*/
     case LENSES:
     case MIRROR:
     case CRYSTAL_BALL:
+    case FABERGE_EGG:
     case EXPENSIVE_CAMERA:
         to_pieces = " into a thousand pieces";
     /*FALLTHRU*/

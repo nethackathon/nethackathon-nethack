@@ -533,6 +533,26 @@ doread(void)
                    "became literate by reading the divine signature of Odin");
 
         return ECMD_TIME;
+    } else if (otyp == COOLER_BAG) {
+        if (Blind) {
+            You_cant(find_any_braille);
+            return ECMD_OK;
+        }
+        pline("The bag reads: YETI");
+        if (!u.uconduct.literate++)
+            livelog_printf(LL_CONDUCT,
+                           "became literate by reading a bag");
+        return ECMD_TIME;
+    } else if (otyp == DESIGNER_BAG) {
+        if (Blind) {
+            You_cant(find_any_braille);
+            return ECMD_OK;
+        }
+        pline("The bag reads: GUCCI");
+        if (!u.uconduct.literate++)
+            livelog_printf(LL_CONDUCT,
+                           "became literate by reading a handbag");
+        return ECMD_TIME;
     } else if (otyp == CANDY_BAR) {
         const char *wrapper = candy_wrapper_text(scroll);
 
