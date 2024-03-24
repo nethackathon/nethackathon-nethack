@@ -98,86 +98,21 @@ char *
 tshirt_text(struct obj *tshirt, char *buf)
 {
     static const char *const shirt_msgs[] = {
-        /* Scott Bigham */
-      "I explored the Dungeons of Doom and all I got was this lousy T-shirt!",
-        "Is that Mjollnir in your pocket or are you just happy to see me?",
-      "It's not the size of your sword, it's how #enhance'd you are with it.",
-        "Madame Elvira's House O' Succubi Lifetime Customer",
-        "Madame Elvira's House O' Succubi Employee of the Month",
-        "Ludios Vault Guards Do It In Small, Dark Rooms",
-        "Yendor Military Soldiers Do It In Large Groups",
-        "I survived Yendor Military Boot Camp",
-        "Ludios Accounting School Intra-Mural Lacrosse Team",
-        "Oracle(TM) Fountains 10th Annual Wet T-Shirt Contest",
-        "Hey, black dragon!  Disintegrate THIS!",
-        "I'm With Stupid -->",
-        "Don't blame me, I voted for Izchak!",
-        "Don't Panic", /* HHGTTG */
-        "Furinkan High School Athletic Dept.",                /* Ranma 1/2 */
-        "Hel-LOOO, Nurse!",                                   /* Animaniacs */
-        "=^.^=",
-        "100% goblin hair - do not wash",
-        "Aberzombie and Fitch",
-        "cK -- Cockatrice touches the Kop",
-        "Don't ask me, I only adventure here",
-        "Down with pants!",
-        "d, your dog or a killer?",
-        "FREE PUG AND NEWT!",
-        "Go team ant!",
-        "Got newt?",
-        "Hello, my darlings!", /* Charlie Drake */
-        "Hey!  Nymphs!  Steal This T-Shirt!",
-        "I <3 Dungeon of Doom",
-        "I <3 Maud",
-        /* note: there is a similarly worded apron (alchemy smock) slogan */
-        "I am a Valkyrie.  If you see me running, try to keep up.",
-        "I am not a pack rat - I am a collector",
-        "I bounced off a rubber tree",         /* Monkey Island */
-        "Plunder Island Brimstone Beach Club", /* Monkey Island */
-        "If you can read this, I can hit you with my polearm",
-        "I'm confused!",
-        "I scored with the princess",
-        "I want to live forever or die in the attempt.",
-        "Lichen Park",
-        "LOST IN THOUGHT - please send search party",
-        "Meat is Mordor",
-        "Minetown Better Business Bureau",
-        "Minetown Watch",
-        /* Discworld riff; unfortunately long */
-        ("Ms. Palm's House of Negotiable Affection--A Very Reputable"
-            " House Of Disrepute"),
-        "Protection Racketeer",
-        "Real men love Crom",
-        "Somebody stole my Mojo!",
-        "The Hellhound Gang",
-        "The Werewolves",
-        "They Might Be Storm Giants",
-        "Weapons don't kill people, I kill people",
-        "White Zombie",
-        "You're killing me!",
-        "Anhur State University - Home of the Fighting Fire Ants!",
-        "FREE HUGS",
-        "Serial Ascender",
-        "Real men are valkyries",
-        "Young Men's Cavedigging Association",
-        "Occupy Fort Ludios",
-        "I couldn't afford this T-shirt so I stole it!",
-        "Mind flayers suck",
-        "I'm not wearing any pants",
-        "Down with the living!",
-        "Pudding farmer",
-        "Vegetarian",
-        "Hello, I'm War!",
-        "It is better to light a candle than to curse the darkness",
-        "It is easier to curse the darkness than to light a candle",
-        /* expanded "rock--paper--scissors" featured in TV show "Big Bang
-           Theory" although they didn't create it (and an actual T-shirt
-           with pentagonal diagram showing which choices defeat which) */
-        "rock--paper--scissors--lizard--Spock!",
-        /* "All men must die -- all men must serve" challenge and response
-           from book series _A_Song_of_Ice_and_Fire_ by George R.R. Martin,
-           TV show "Game of Thrones" (probably an actual T-shirt too...) */
-        "/Valar morghulis/ -- /Valar dohaeris/",
+        "I participated in NetHackathon Fall 2023, and all I got was this lousy t-shirt!",
+        "NetHackathon VI: Fully Loaded",
+        "75% polyester, 25% chickatrice feather, do not hand wash",
+        "Property of theyflower",
+        "Not ashamed of breaking boulders!",
+        "Everything I learned about defusing active landmines, I learned from NetHack",
+        "World's wisest NetHacker",
+        "Yendorian Trust Fund",
+        "Gandalf's Illegal Fireworks",
+        "The Splendor of Yendor",
+        "Order of the Cockatrice",
+        "Size: Medium",
+        "Elbereth Spelling Bee Champion",
+        "Orctown Chamber of Commerce",
+        "Protection Racket SUCKS",
     };
 
     Strcpy(buf, shirt_msgs[tshirt->o_id % SIZE(shirt_msgs)]);
