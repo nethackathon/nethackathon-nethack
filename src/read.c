@@ -1180,11 +1180,8 @@ seffect_enchant_armor(struct obj **sobjp)
     s = scursed ? -otmp->spe : otmp->spe;
     if (s > (special_armor ? 5 : 3) && rn2(s)) {
         otmp->in_use = TRUE;
-        pline("%s violently %s%s%s for a while, then %s.", Yname2(otmp),
-              otense(otmp, Blind ? "vibrate" : "glow"),
-              (!Blind && !same_color) ? " " : "",
-              (Blind || same_color) ? "" : hcolor(scursed ? NH_BLACK
-                                                  : NH_SILVER),
+        pline("%s violently %s for a while, then %s.", Yname2(otmp),
+              otense(otmp, "spazm"),
               otense(otmp, "evaporate"));
         remove_worn_item(otmp, FALSE);
         useup(otmp);
