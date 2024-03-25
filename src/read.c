@@ -113,6 +113,8 @@ tshirt_text(struct obj *tshirt, char *buf)
         "Elbereth Spelling Bee Champion",
         "Orctown Chamber of Commerce",
         "Protection Racket SUCKS",
+        "Fort Ludios Zookeeper",
+        "Cockatrice Aphrodisiacs Co. -- We'll get you rock hard!",
     };
 
     Strcpy(buf, shirt_msgs[tshirt->o_id % SIZE(shirt_msgs)]);
