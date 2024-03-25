@@ -135,24 +135,18 @@ X11_print_glyph(
         special = glyphinfo->gm.glyphflags;
         ch = glyph_char(glyphinfo);
 
-        if (glyphinfo->gm.nhcolor != 0) {
-            if ((glyphinfo->gm.nhcolor & NH_BASIC_COLOR) != 0) {
+        if (glyphinfo->gm.customcolor != 0) {
+            if ((glyphinfo->gm.customcolor & NH_BASIC_COLOR) != 0) {
                 /* NH_BASIC_COLOR */
-                color = COLORVAL(glyphinfo->gm.nhcolor);
-#if 0
+                color = COLORVAL(glyphinfo->gm.customcolor);
             } else if (iflags.colorcount == 256
                        && (X11_procs.wincap2 & WC2_EXTRACOLORS) != 0
-                       && (glyphinfo->gm.nhcolor & NH_BASIC_COLOR) == 0) {
-                int clr256idx;
-                uint32 closecolor = 0;
-
-                if (closest_color(COLORVAL(glyphinfo->gm.nhcolor),
-                    &closecolor, &clr256idx))
-                    nhcolor = COLORVAL(closecolor);
-#endif
+                       && (glyphinfo->gm.customcolor & NH_BASIC_COLOR) == 0) {
+                uint32 closecolor = get_nhcolor_from_256_index(glyphinfo->gm.color256idx);
+                nhcolor = COLORVAL(closecolor);
             } else {
                 /* 24-bit color, NH_BASIC_COLOR == 0 */
-                nhcolor = COLORVAL(glyphinfo->gm.nhcolor);
+                nhcolor = COLORVAL(glyphinfo->gm.customcolor);
             }
         }
         if (special != map_info->tile_map.glyphs[y][x].glyphflags) {

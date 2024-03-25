@@ -1566,12 +1566,12 @@ see_traps(void)
 }
 
 /*  glyph, ttychar, framecolor,
-    { glyphflags, { NO_COLOR, sym.symidx }, nhcolor, tileidx, u } */
+    { glyphflags, { NO_COLOR, sym.symidx }, customcolor, color256idx, tileidx, u } */
 static glyph_info no_ginfo = {
     NO_GLYPH, ' ', NO_COLOR,
     { MG_BADXY, { NO_COLOR, 0 },
     0,
-    0
+    0U, 0U
 #ifdef ENHANCED_SYMBOLS
       , 0
 #endif
@@ -1602,7 +1602,7 @@ const glyph_info nul_glyphinfo = {
             MG_UNEXPL,
             { NO_COLOR, SYM_UNEXPLORED + SYM_OFF_X },
               0,
-              0
+              0U, 0U
 #ifdef ENHANCED_SYMBOLS
                , 0
 #endif
@@ -1616,7 +1616,7 @@ extern glyph_map glyphmap[MAX_GLYPH]; /* from tile.c */
 glyph_map glyphmap[MAX_GLYPH] = {
     { 0U, { NO_COLOR, 0 },
       0,
-      0
+      0U, 0U
 #ifdef ENHANCED_SYMBOLS
        , 0
 #endif
@@ -1974,7 +1974,7 @@ show_glyph(coordxy x, coordxy y, int glyph)
            but that triggers full redraw so doesn't matter here); still,
            be thorough and check everything */
         || gg.gbuf[y][x].glyphinfo.ttychar != glyphinfo.ttychar
-        || gg.gbuf[y][x].glyphinfo.gm.nhcolor != glyphinfo.gm.nhcolor
+        || gg.gbuf[y][x].glyphinfo.gm.customcolor != glyphinfo.gm.customcolor
         || gg.gbuf[y][x].glyphinfo.gm.glyphflags != glyphinfo.gm.glyphflags
         || gg.gbuf[y][x].glyphinfo.gm.sym.color != glyphinfo.gm.sym.color
         || gg.gbuf[y][x].glyphinfo.gm.tileidx != glyphinfo.gm.tileidx
@@ -2029,7 +2029,7 @@ static gbuf_entry nul_gbuf = {
         /* glyphinfo.gm */
         { MG_UNEXPL, { NO_COLOR, 0 },
           0,
-          0
+          0U, 0U
 #ifdef ENHANCED_SYMBOLS
             , 0
 #endif
@@ -2058,12 +2058,12 @@ clear_glyph_buffer(void)
                      || giptr->gm.sym.color != nul_gbuf.glyphinfo.gm.sym.color
                      || giptr->gm.glyphflags
                         != nul_gbuf.glyphinfo.gm.glyphflags
-                     || giptr->gm.nhcolor != nul_gbuf.glyphinfo.gm.nhcolor
+                     || giptr->gm.customcolor != nul_gbuf.glyphinfo.gm.customcolor
                      || giptr->gm.tileidx != nul_gbuf.glyphinfo.gm.tileidx)
 #else
     nul_gbuf.gnew = (giptr->ttychar != ' '
                      || giptr->gm.sym.color != NO_COLOR
-                     || giptr->gm.nhcolor != 0
+                     || giptr->gm.customcolor != 0
                      || (giptr->gm.glyphflags & ~MG_UNEXPL) != 0)
 #endif
                          ? 1 : 0;
@@ -2099,12 +2099,12 @@ row_refresh(coordxy start, coordxy stop, coordxy y)
     force = (giptr->ttychar != nul_gbuf.glyphinfo.ttychar
                  || giptr->gm.sym.color != nul_gbuf.glyphinfo.gm.sym.color
                  || giptr->gm.glyphflags != nul_gbuf.glyphinfo.gm.glyphflags
-                 || giptr->gm.nhcolor != nul_gbuf.glyphinfo.gm.nhcolor
+                 || giptr->gm.customcolor != nul_gbuf.glyphinfo.gm.customcolor
                  || giptr->gm.tileidx != nul_gbuf.glyphinfo.gm.tileidx)
 #else
     force = (giptr->ttychar != ' '
                  || giptr->gm.sym.color != NO_COLOR
-                 || giptr->gm.gm.nhcolor != 0
+                 || giptr->gm.gm.customcolor != 0
                  || (giptr->gm.glyphflags & ~MG_UNEXPL) != 0)
 #endif
                  ? 1 : 0;
@@ -2114,7 +2114,7 @@ row_refresh(coordxy start, coordxy stop, coordxy y)
         get_bkglyph_and_framecolor(x, y, &bkglyphinfo.glyph,
                                    &bkglyphinfo.framecolor);
         if (force || glyph != GLYPH_UNEXPLORED
-            || bkglyphinfo.gm.nhcolor != NO_COLOR) {
+            || bkglyphinfo.framecolor != NO_COLOR) {
             print_glyph(WIN_MAP, x, y,
                         Glyphinfo_at(x, y, glyph), &bkglyphinfo);
         }
