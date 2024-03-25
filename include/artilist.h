@@ -111,6 +111,10 @@ static NEARDATA struct artifact artilist[] = {
     A("Sting", ELVEN_DAGGER, (SPFX_WARN | SPFX_DFLAG2), 0, M2_ORC,
       PHYS(5, 0), NO_DFNS, NO_CARY, 0, A_CHAOTIC, NON_PM, PM_ELF, 800L,
       CLR_BRIGHT_BLUE, STING),
+
+    A("Pick-axe of Shame", PICK_AXE, (SPFX_WARN | SPFX_DFLAG2), 0, M2_IS_STONE, PHYS(5, 0),
+      NO_DFNS, NO_CARY, 0, A_NONE, PM_ARCHEOLOGIST, NON_PM, 800L, CLR_RED,
+      PICK_AXE_OF_SHAME),
     /*
      *      Magicbane is a bit different!  Its magic fanfare
      *      unbalances victims in addition to doing some damage.

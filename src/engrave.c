@@ -57,7 +57,8 @@ random_engraving(char *outbuf)
     if (!rn2(4) || !(rumor = getrumor(0, outbuf, TRUE)) || !*rumor)
         (void) get_rnd_text(ENGRAVEFILE, outbuf, rn2, MD_PAD_RUMORS);
 
-    wipeout_text(outbuf, (int) (strlen(outbuf) / 4), 0);
+    // Because we have custom engravings for NetHackathon we don't want to obscure them
+    // wipeout_text(outbuf, (int) (strlen(outbuf) / 4), 0);
     return outbuf;
 }
 

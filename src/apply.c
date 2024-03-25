@@ -4152,7 +4152,11 @@ doapply(void)
     case LARGE_BOX:
     case CHEST:
     case ICE_BOX:
+    case COOLER_BAG:
     case SACK:
+    case BAG_OF_BAGS:
+    case DESIGNER_BAG:
+    case FABERGE_EGG:
     case BAG_OF_HOLDING:
     case OILSKIN_SACK:
         res = use_container(&obj, TRUE, FALSE);

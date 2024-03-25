@@ -3905,6 +3905,7 @@ static const struct {
     { "tool shop", TOOLSHOP },
     { "book shop", BOOKSHOP },
     { "health food shop", FODDERSHOP },
+    { "bag shop", BAGSHOP },
     { "candle shop", CANDLESHOP },
     { 0, 0 }
 };

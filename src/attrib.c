@@ -26,8 +26,8 @@ static const struct innate {
     long *ability;
     const char *gainstr, *losestr;
 } arc_abil[] = { { 1, &(HSearching), "", "" },
+                 { 1, &(HFast), "quick", "slow" },
                  { 5, &(HStealth), "stealthy", "" },
-                 { 10, &(HFast), "quick", "slow" },
                  { 0, 0, 0, 0 } },
 
   bar_abil[] = { { 1, &(HPoison_resistance), "", "" },

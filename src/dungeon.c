@@ -3444,6 +3444,9 @@ shop_string(int rtype)
     case FODDERSHOP:
         str = "health food store";
         break;
+    case BAGSHOP:
+        str = "bag shop";
+        break;
     case CANDLESHOP:
         str = "lighting shop";
         break;

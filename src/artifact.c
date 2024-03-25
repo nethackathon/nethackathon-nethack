@@ -2204,7 +2204,8 @@ Sting_effects(int orc_count) /* new count (warn_obj_cnt is old count); -1 is a f
 {
     if (u_wield_art(ART_STING)
         || u_wield_art(ART_ORCRIST)
-        || u_wield_art(ART_GRIMTOOTH)) {
+        || u_wield_art(ART_GRIMTOOTH)
+        || u_wield_art(ART_PICK_AXE_OF_SHAME)) {
         int oldstr = glow_strength(gw.warn_obj_cnt),
             newstr = glow_strength(orc_count);
 

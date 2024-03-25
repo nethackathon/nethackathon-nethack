@@ -187,6 +187,11 @@ static const char *const shkhealthfoods[] = {
     "=Zennia",  "=Zoe",      "=Zora",    0
 };
 
+static const char *const shkbagshop[] = {
+    /* Bag shopkeeper names */
+    "Holden",   "Carrie",   "Baggins",  0
+};
+
 /*
  * To add new shop types, all that is necessary is to edit the shtypes[]
  * array.  See mkroom.h for the structure definition.  Typically, you'll
@@ -201,7 +206,7 @@ static const char *const shkhealthfoods[] = {
  * *_CLASS enum value) or a specific object enum value.
  * In the latter case, prepend it with a unary minus so the code can know
  * (by testing the sign) whether to use mkobj() or mksobj().
- * shtypes[] is externally referenced from mkroom.c, mon.c and shk.c. 
+ * shtypes[] is externally referenced from mkroom.c, mon.c and shk.c.
  */
 const struct shclass shtypes[] = {
     { "general store",
@@ -217,7 +222,7 @@ const struct shclass shtypes[] = {
       shkgeneral },
     { "used armor dealership",
       ARMOR_CLASS,
-      14,
+      12,
       D_SHOP,
       { { 90, ARMOR_CLASS },
         { 10, WEAPON_CLASS },
@@ -323,6 +328,19 @@ const struct shclass shtypes[] = {
         { 2, -SCR_FOOD_DETECTION },
         { 1, -LUMP_OF_ROYAL_JELLY } },
       shkhealthfoods },
+    { "bag store",
+      TOOL_CLASS,
+      2,
+      D_SHOP,
+      { { 30, -SACK },
+        { 20, -DESIGNER_BAG },
+        { 10, -OILSKIN_SACK },
+        { 10, -BAG_OF_TRICKS },
+        { 10, -BAG_OF_BAGS },
+        { 10, -BAG_OF_HOLDING },
+        { 5, -COOLER_BAG },
+        { 5, -FABERGE_EGG } },
+      shkbagshop },
     /* Shops below this point are "unique".  That is they must all have a
      * probability of zero.  They are only created via the special level
      * loader.

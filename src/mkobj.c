@@ -311,6 +311,12 @@ mkbox_cnts(struct obj *box)
     case ICE_BOX:
         n = 20;
         break;
+    case COOLER_BAG:
+        n = 7;
+        break;
+    case BAG_OF_BAGS:
+        n = 7;
+        break;
     case CHEST:
         n = box->olocked ? 7 : 5;
         break;
@@ -325,6 +331,8 @@ mkbox_cnts(struct obj *box)
             break;
         }
         /*FALLTHRU*/
+    case DESIGNER_BAG:
+    case FABERGE_EGG:
     case BAG_OF_HOLDING:
         n = 1;
         break;
@@ -333,7 +341,11 @@ mkbox_cnts(struct obj *box)
         break;
     }
 
-    for (n = rn2(n + 1); n > 0; n--) {
+    int n_objects = rn2(n + 1);
+    if (box->otyp == BAG_OF_BAGS) {
+      n_objects = n_objects + 1;
+    }
+    for (n = n_objects; n > 0; n--) {
         if (box->otyp == ICE_BOX) {
             otmp = mksobj(CORPSE, TRUE, FALSE);
             /* Note: setting age to 0 is correct.  Age has a different
@@ -345,6 +357,58 @@ mkbox_cnts(struct obj *box)
                 (void) stop_timer(REVIVE_MON, obj_to_any(otmp));
                 (void) stop_timer(SHRINK_GLOB, obj_to_any(otmp));
             }
+        } else if (box->otyp == COOLER_BAG) {
+            int item_n = rn2(100);
+            int item_type;
+            if (item_n < 10) {
+              item_type = POT_FRUIT_JUICE;
+            } else if (item_n < 20) {
+              item_type = POT_BOOZE;
+            } else if (item_n < 30) {
+              item_type = APPLE;
+            } else if (item_n < 40) {
+                item_type = ORANGE;
+            } else if (item_n < 50) {
+                item_type = BANANA;
+            } else if (item_n < 60) {
+                item_type = EGG;
+            } else if (item_n < 70) {
+                item_type = CREAM_PIE;
+            } else if (item_n < 80) {
+                item_type = CANDY_BAR;
+            } else if (item_n < 90) {
+                item_type = FOOD_RATION;
+            } else {
+                item_type = CARROT;
+            }
+            otmp = mksobj(item_type, TRUE, FALSE);
+            otmp->age = 0L;
+            if (otmp->timed) {
+                (void) stop_timer(ROT_CORPSE, obj_to_any(otmp));
+                (void) stop_timer(REVIVE_MON, obj_to_any(otmp));
+                (void) stop_timer(SHRINK_GLOB, obj_to_any(otmp));
+            }
+        } else if (box->otyp == BAG_OF_BAGS) {
+            int bag_n = rn2(100);
+            int bag_type;
+            if (bag_n < 70) {
+                bag_type = SACK;
+            } else if (bag_n < 76) {
+                bag_type = DESIGNER_BAG;
+            } else if (bag_n < 82) {
+                bag_type = OILSKIN_SACK;
+            } else if (bag_n < 88) {
+                bag_type = COOLER_BAG;
+            } else if (bag_n < 91) {
+                bag_type = BAG_OF_BAGS;
+            } else if (bag_n < 94) {
+                bag_type = BAG_OF_TRICKS;
+            } else if (bag_n < 97) {
+                bag_type = BAG_OF_HOLDING;
+            } else {
+                bag_type = FABERGE_EGG;
+            }
+            otmp = mksobj(bag_type, TRUE, FALSE);
         } else {
             int tprob;
             const struct icp *iprobs = boxiprobs;
@@ -366,7 +430,7 @@ mkbox_cnts(struct obj *box)
                         otmp->quan = 1L;
                     otmp->owt = weight(otmp);
                 }
-            if (box->otyp == BAG_OF_HOLDING) {
+            if (box->otyp == BAG_OF_HOLDING || box->otyp == FABERGE_EGG) {
                 if (Is_mbag(otmp)) {
                     otmp->otyp = SACK;
                     otmp->spe = 0;
@@ -1001,7 +1065,11 @@ mksobj_init(struct obj *otmp, boolean artif)
             otmp->otrapped = !(rn2(10));
             /*FALLTHRU*/
         case ICE_BOX:
+        case COOLER_BAG:
         case SACK:
+        case DESIGNER_BAG:
+        case BAG_OF_BAGS:
+        case FABERGE_EGG:
         case OILSKIN_SACK:
         case BAG_OF_HOLDING:
             mkbox_cnts(otmp);
@@ -1689,7 +1757,7 @@ bless(struct obj *otmp)
     otmp->blessed = 1;
     if (carried(otmp) && confers_luck(otmp))
         set_moreluck();
-    else if (otmp->otyp == BAG_OF_HOLDING)
+    else if (otmp->otyp == BAG_OF_HOLDING || otmp->otyp == FABERGE_EGG)
         otmp->owt = weight(otmp);
     else if (otmp->otyp == FIGURINE && otmp->timed)
         (void) stop_timer(FIG_TRANSFORM, obj_to_any(otmp));
@@ -1708,7 +1776,7 @@ unbless(struct obj *otmp)
     otmp->blessed = 0;
     if (carried(otmp) && confers_luck(otmp))
         set_moreluck();
-    else if (otmp->otyp == BAG_OF_HOLDING)
+    else if (otmp->otyp == BAG_OF_HOLDING || otmp->otyp == FABERGE_EGG)
         otmp->owt = weight(otmp);
     if (otmp->lamplit)
         maybe_adjust_light(otmp, old_light);
@@ -1737,7 +1805,7 @@ curse(struct obj *otmp)
     /* some cursed items need immediate updating */
     if (carried(otmp) && confers_luck(otmp)) {
         set_moreluck();
-    } else if (otmp->otyp == BAG_OF_HOLDING) {
+    } else if (otmp->otyp == BAG_OF_HOLDING || otmp->otyp == FABERGE_EGG) {
         otmp->owt = weight(otmp);
     } else if (otmp->otyp == FIGURINE) {
         if (otmp->corpsenm != NON_PM && !dead_species(otmp->corpsenm, TRUE)
@@ -1763,7 +1831,7 @@ uncurse(struct obj *otmp)
     otmp->cursed = 0;
     if (carried(otmp) && confers_luck(otmp))
         set_moreluck();
-    else if (otmp->otyp == BAG_OF_HOLDING)
+    else if (otmp->otyp == BAG_OF_HOLDING || otmp->otyp == FABERGE_EGG)
         otmp->owt = weight(otmp);
     else if (otmp->otyp == FIGURINE && otmp->timed)
         (void) stop_timer(FIG_TRANSFORM, obj_to_any(otmp));
@@ -1882,7 +1950,7 @@ weight(struct obj *obj)
          *  The macro DELTA_CWT in pickup.c also implements these
          *  weight equations.
          */
-        if (obj->otyp == BAG_OF_HOLDING)
+        if (obj->otyp == BAG_OF_HOLDING || obj->otyp == FABERGE_EGG)
             cwt = obj->cursed ? (cwt * 2)
                   : obj->blessed ? ((cwt + 3) / 4)
                     : ((cwt + 1) / 2); /* uncursed */

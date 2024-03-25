@@ -3309,6 +3309,17 @@ static const struct alt_spellings {
     { "accuracy", RIN_INCREASE_ACCURACY },
     /* if we ever add other sizes, move this to o_ranges[] with "bag" */
     { "box", LARGE_BOX },
+    { "designer bag", DESIGNER_BAG },
+    { "designer handbag", DESIGNER_BAG },
+    { "fancy bag", DESIGNER_BAG },
+    { "fancy handbag", DESIGNER_BAG },
+    { "gucci bag", DESIGNER_BAG },
+    { "gucci handbag", DESIGNER_BAG },
+    { "handbag", DESIGNER_BAG },
+    { "cooler bag", COOLER_BAG },
+    { "fur-lined bag", COOLER_BAG },
+    { "cool bag", COOLER_BAG },
+    { "insulated bag", COOLER_BAG },
     /* normally we wouldn't have to worry about unnecessary <space>, but
        " stone" will get stripped off, preventing a wishymatch; that actually
        lets "flint stone" be a match, so we also accept bogus "flintstone" */
