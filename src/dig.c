@@ -526,7 +526,7 @@ furniture_handled(coordxy x, coordxy y, boolean madeby_u)
     if (IS_FOUNTAIN(lev->typ)) {
         dogushforth(FALSE);
         SET_FOUNTAIN_WARNED(x, y); /* force dryup */
-        dryup(x, y, madeby_u);
+        dryup(x, y, madeby_u, FALSE);
     } else if (IS_SINK(lev->typ)) {
         breaksink(x, y);
     } else if (lev->typ == DRAWBRIDGE_DOWN

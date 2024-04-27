@@ -47,13 +47,24 @@ staticfn boolean water_turbulence(coordxy *, coordxy *);
 
 /* XXX: if more sources of water walking than just boots are added,
    cause_known(insight.c) should be externified and used for this */
-#define Known_wwalking \
+/* I looked at following this advice for Fountainbane but cause_known
+    assumes the item giving water walking is worn */
+#define WW_BOOTS_KNOWN \
     (uarmf && uarmf->otyp == WATER_WALKING_BOOTS \
-     && objects[WATER_WALKING_BOOTS].oc_name_known \
-     && !u.usteed)
+     && objects[WATER_WALKING_BOOTS].oc_name_known)
+
+#define FOUNTAINBANE_HELD \
+    (uwep && is_art(uwep, ART_FOUNTAINBANE))
+
+#define Known_wwalking \
+    ((WW_BOOTS_KNOWN || \
+       FOUNTAINBANE_HELD) \
+       && !u.usteed)
+
 #define Known_lwalking \
-    (Known_wwalking && Fire_resistance \
-     && uarmf->oerodeproof && uarmf->rknown)
+    (((WW_BOOTS_KNOWN && uarmf->oerodeproof && uarmf->rknown) \
+     || FOUNTAINBANE_HELD) \
+     && Fire_resistance)
 
 /* mode values for findtravelpath() */
 #define TRAVP_TRAVEL 0
@@ -2158,6 +2169,17 @@ domove_fight_empty(coordxy x, coordxy y)
                 /* should we dig? */
                 && !glyph_is_invisible(glyph) && !glyph_is_monster(glyph)) {
                 (void) use_pick_axe2(uwep);
+                return TRUE;
+            }
+
+            /* Fountainbane can dry up water walls and fountains by force attacking them */
+            if (gc.context.forcefight && uwep && is_art(uwep, ART_FOUNTAINBANE)
+                && (IS_WATERWALL(levl[x][y].typ) || IS_FOUNTAIN(levl[x][y].typ))) {
+                boolean isfountain = IS_FOUNTAIN(levl[x][y].typ);
+                levl[x][y].typ = ROOM, levl[x][y].flags = 0;
+                newsym(x, y);
+                pline("You strike the %s with Fountainbane... the %s dries up!", isfountain ? "fountain" : "wall of water",
+                                  isfountain ? "fountain" : "wall");
                 return TRUE;
             }
         }

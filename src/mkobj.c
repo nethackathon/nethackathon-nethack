@@ -929,6 +929,7 @@ mksobj_init(struct obj *otmp, boolean artif)
 
     switch (let) {
     case WEAPON_CLASS:
+        otmp->dried_up = 0; /* used to track # of fountains dried up, for Fountainbane */
         otmp->quan = is_multigen(otmp) ? (long) rn1(6, 6) : 1L;
         if (!rn2(11)) {
             otmp->spe = rne(3);

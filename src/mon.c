@@ -696,7 +696,7 @@ make_corpse(struct monst *mtmp, unsigned int corpseflags)
     case PM_FIRE_ANT: case PM_GIANT_BEETLE: case PM_QUEEN_BEE:
 
     case PM_QUIVERING_BLOB: case PM_ACID_BLOB: case PM_GELATINOUS_CUBE:
-    case PM_CHICKATRICE: case PM_COCKATRICE: case PM_PYROLISK: 
+    case PM_CHICKATRICE: case PM_COCKATRICE: case PM_PYROLISK:
 
     case PM_JACKAL: case PM_FOX: case PM_COYOTE: case PM_WEREJACKAL:
     case PM_LITTLE_DOG: case PM_DINGO: case PM_DOG: case PM_LARGE_DOG:
@@ -764,7 +764,7 @@ make_corpse(struct monst *mtmp, unsigned int corpseflags)
 
     case PM_GNOME: case PM_GNOME_LEADER: case PM_GNOMISH_WIZARD:
     case PM_GNOME_RULER:
-    case PM_GIANT: case PM_STONE_GIANT: case PM_HILL_GIANT: 
+    case PM_GIANT: case PM_STONE_GIANT: case PM_HILL_GIANT:
     case PM_FIRE_GIANT: case PM_FROST_GIANT: case PM_ETTIN:
     case PM_STORM_GIANT: case PM_TITAN:
 
@@ -946,7 +946,7 @@ minliquid_core(struct monst *mtmp)
      */
     if (mtmp->data == &mons[PM_GREMLIN] && (inpool || infountain) && rn2(3)) {
         if (split_mon(mtmp, (struct monst *) 0))
-            dryup(mtmp->mx, mtmp->my, FALSE);
+            dryup(mtmp->mx, mtmp->my, FALSE, FALSE);
         if (inpool)
             water_damage_chain(mtmp->minvent, FALSE);
         return 0;

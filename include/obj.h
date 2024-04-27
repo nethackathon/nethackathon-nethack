@@ -121,6 +121,8 @@ struct obj {
 #define opoisoned otrapped /* object (weapon) is coated with poison */
 
     Bitfield(recharged, 3); /* number of times it's been recharged */
+    Bitfield(dried_up, 4); /* number of times a longsword has dried up */
+                           /* a fountain, tracked for Fountainbane creation */
 #define on_ice recharged    /* corpse on ice */
     Bitfield(lamplit, 1);   /* a light-source -- can be lit */
     Bitfield(globby, 1);    /* combines with like types on adjacent squares */

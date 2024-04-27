@@ -197,11 +197,11 @@ watchman_warn_fountain(struct monst *mtmp)
     return FALSE;
 }
 
-void
-dryup(coordxy x, coordxy y, boolean isyou)
+staticfn boolean
+dryup(coordxy x, coordxy y, boolean isyou, boolean isfountainbane)
 {
     if (IS_FOUNTAIN(levl[x][y].typ)
-        && (!rn2(3) || FOUNTAIN_IS_WARNED(x, y))) {
+        && (!rn2(3) || FOUNTAIN_IS_WARNED(x, y) || isfountainbane)) {
         if (isyou && in_town(x, y) && !FOUNTAIN_IS_WARNED(x, y)) {
             struct monst *mtmp;
 
@@ -211,11 +211,11 @@ dryup(coordxy x, coordxy y, boolean isyou)
             /* You can see or hear this effect */
             if (!mtmp)
                 pline_The("flow reduces to a trickle.");
-            return;
+            return FALSE;
         }
         if (isyou && wizard) {
             if (y_n("Dry up fountain?") == 'n')
-                return;
+                return FALSE;
         }
         /* FIXME: sight-blocking clouds should use block_point() when
            being created and unblock_point() when going away, then this
@@ -235,7 +235,9 @@ dryup(coordxy x, coordxy y, boolean isyou)
         newsym(x, y);
         if (isyou && in_town(x, y))
             (void) angry_guards(FALSE);
+        return TRUE;
     }
+    return FALSE;
 }
 
 /* quaff from a fountain when standing on its location */
@@ -383,7 +385,7 @@ drinkfountain(void)
             break;
         }
     }
-    dryup(u.ux, u.uy, TRUE);
+    dryup(u.ux, u.uy, TRUE, FALSE);
 }
 
 /* Monty Python and the Holy Grail ;) */
@@ -551,7 +553,26 @@ dipfountain(struct obj *obj)
         break;
     }
     update_inventory();
-    dryup(u.ux, u.uy, TRUE);
+    boolean isfountainbane = is_art(obj, ART_FOUNTAINBANE);
+    boolean dried_up = dryup(u.ux, u.uy, TRUE, isfountainbane);
+    if (obj->otyp == LONG_SWORD && dried_up) {
+      obj->dried_up++;
+      if (obj->dried_up >= 10 && obj->quan == 1L && !obj->oartifact
+              && !exist_artifact(LONG_SWORD, artiname(ART_FOUNTAINBANE)))
+      {
+        pline(
+          "From the murky depths, a tentacle slithers up to bless the sword.");
+        // pline("As the tentacle retreats, the fountain dries up!");
+        obj = oname(obj, artiname(ART_FOUNTAINBANE),
+                    ONAME_VIA_DIP | ONAME_KNOW_ARTI);
+        discover_artifact(ART_FOUNTAINBANE);
+        bless(obj);
+        obj->oeroded = obj->oeroded2 = 0;
+        obj->oerodeproof = TRUE;
+        exercise(A_WIS, TRUE);
+        livelog_printf(LL_ARTIFACT, "%s", "endured failing to dip to Excalibur many, many, times, and now wields Fountainbane");
+      }
+    }
 }
 
 /* dipping '-' in fountain, pool, or sink */
