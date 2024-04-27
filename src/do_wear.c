@@ -842,6 +842,11 @@ dragon_armor_handling(
             ESlow_digestion &= ~W_ARM;
         }
         break;
+    case SHIMMERING_DRAGON_SCALES:
+    case SHIMMERING_DRAGON_SCALE_MAIL:
+        You_feel("that monsters%s have difficulty pinpointing your location.",
+                 puton ? "" : " no longer");
+        break;
     default:
         break;
     }
