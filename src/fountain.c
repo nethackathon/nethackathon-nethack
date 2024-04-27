@@ -570,7 +570,7 @@ dipfountain(struct obj *obj)
         obj->oeroded = obj->oeroded2 = 0;
         obj->oerodeproof = TRUE;
         exercise(A_WIS, TRUE);
-        livelog_printf(LL_ARTIFACT, "%s", "endured failing to dip to Excalibur many, many, times, and now wields Fountainbane");
+        livelog_printf(LL_ARTIFACT, "%s", "endured failing to dip for Excalibur many, many, times, and now wields Fountainbane");
       }
     }
 }
