@@ -3229,7 +3229,6 @@ extern const char * trapname(int, boolean);
 extern void ignite_items(struct obj *) NO_NNARGS;
 extern void trap_ice_effects(coordxy x, coordxy y, boolean ice_is_melting);
 extern void trap_sanity_check(void);
-extern int trapeffect_pit(struct monst *, struct trap *, unsigned);
 
 /* ### u_init.c ### */
 

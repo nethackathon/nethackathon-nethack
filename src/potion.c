@@ -4,7 +4,6 @@
 /* NetHack may be freely redistributed.  See license for details. */
 
 #include "hack.h"
-extern int trapeffect_pit(struct monst *, struct trap *, unsigned); /* from trap.c */
 
 staticfn long itimeout(long);
 staticfn long itimeout_incr(long, int);
@@ -2320,7 +2319,7 @@ dodip(void)
                     if (is_pool) {
                         levl[u.ux][u.uy].typ = ROOM, levl[u.ux][u.uy].flags = 0;
                         t = maketrap(u.ux, u.uy, PIT);
-                        trapeffect_pit(&gy.youmonst, t, 0);
+                        dotrap(t, NO_TRAP_FLAGS);
                         newsym(u.ux, u.uy);
                         pline("The %s dries up!", pooltype);
                     } else {

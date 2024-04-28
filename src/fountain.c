@@ -562,7 +562,6 @@ dipfountain(struct obj *obj)
       {
         pline(
           "From the murky depths, a tentacle slithers up to bless the sword.");
-        // pline("As the tentacle retreats, the fountain dries up!");
         obj = oname(obj, artiname(ART_FOUNTAINBANE),
                     ONAME_VIA_DIP | ONAME_KNOW_ARTI);
         discover_artifact(ART_FOUNTAINBANE);
