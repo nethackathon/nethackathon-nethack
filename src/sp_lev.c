@@ -4826,6 +4826,7 @@ lspo_feature(lua_State *L)
     case TREE:
         l_table_getset_feature_flag(L, x, y, "looted", TREE_LOOTED);
         l_table_getset_feature_flag(L, x, y, "swarm", TREE_SWARM);
+        l_table_getset_feature_flag(L, x, y, "swarm", TREE_RACCOON);
         break;
     }
 

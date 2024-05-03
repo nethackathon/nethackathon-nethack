@@ -729,7 +729,7 @@ make_corpse(struct monst *mtmp, unsigned int corpseflags)
     case PM_SEWER_RAT: case PM_GIANT_RAT: case PM_RABID_RAT:
     case PM_WERERAT:
 
-    case PM_ROCK_MOLE: case PM_WOODCHUCK:
+    case PM_ROCK_MOLE: case PM_WOODCHUCK: case PM_RACCOON:
     case PM_CAVE_SPIDER: case PM_CENTIPEDE: case PM_GIANT_SPIDER:
     case PM_SCORPION:
     case PM_LURKER_ABOVE: case PM_TRAPPER:
@@ -3513,7 +3513,9 @@ xkilled(
     }
     if ((mtmp->mpeaceful && !rn2(2)) || mtmp->mtame)
         change_luck(-1);
-    if (is_unicorn(mdat) && sgn(u.ualign.type) == sgn(mdat->maligntyp)) {
+    // Killing raccoons is as bad as killing aligned unicorns
+    if ((is_unicorn(mdat) && sgn(u.ualign.type) == sgn(mdat->maligntyp))
+        || (mdat == &mons[PM_RACCOON])) {
         change_luck(-5);
         You_feel("guilty...");
     }

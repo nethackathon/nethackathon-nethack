@@ -932,6 +932,16 @@
         /* In reality, they tunnel instead of cutting lumber.  Oh, well. */
         M2_WANDER | M2_HOSTILE, M3_INFRAVISIBLE,
         4, CLR_BROWN, WOODCHUCK),
+    MON(NAM("raccoon"), S_RODENT,
+        LVL(3, 12, 6, 0, 0), (G_NOGEN | G_GENO),
+        A(ATTK(AT_CLAW, AD_SITM, 0, 0), ATTK(AT_BITE, AD_PHYS, 1, 3),
+          NO_ATTK, NO_ATTK, NO_ATTK, NO_ATTK),
+        SIZ(250, 250, MS_GROWL, MZ_SMALL), 0, 0,
+        M1_HUMANOID | M1_SWIM | M1_OMNIVORE,
+        M2_WANDER | M2_PEACEFUL | M2_COLLECT | M2_MAGIC, M3_INFRAVISIBLE,
+        4, CLR_BLACK, RACCOON),
+
+
     /*
      * spiders & scorpions (keep webmaker() in sync if new critters are added)
      */
