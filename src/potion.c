@@ -2232,6 +2232,7 @@ dodip(void)
 {
     static const char Dip_[] = "Dip ";
     struct obj *potion, *obj;
+    struct trap *t;
     char qbuf[QBUFSZ], obuf[QBUFSZ];
     const char *shortestname; /* last resort obj name for prompt */
     uchar here = levl[u.ux][u.uy].typ;
@@ -2313,6 +2314,17 @@ dodip(void)
                     if (!is_hands)
                         obj->pickup_prev = 0;
                     (void) wash_hands();
+                } else if (is_art(obj, ART_FOUNTAINBANE)) {
+                    int is_pool = (SURFACE_AT(u.ux, u.uy) == POOL);
+                    if (is_pool) {
+                        levl[u.ux][u.uy].typ = ROOM, levl[u.ux][u.uy].flags = 0;
+                        t = maketrap(u.ux, u.uy, PIT);
+                        dotrap(t, NO_TRAP_FLAGS);
+                        newsym(u.ux, u.uy);
+                        pline("The %s dries up!", pooltype);
+                    } else {
+                        pline("Some of the %s dries up, but quickly fills in.", pooltype);
+                    }
                 } else {
                     obj->pickup_prev = 0;
                     if (obj->otyp == POT_ACID)

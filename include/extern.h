@@ -1081,7 +1081,7 @@ extern void livelog_add(long ll_type, const char *) NONNULLARG2;
 
 extern void floating_above(const char *) NONNULLARG1;
 extern void dogushforth(int);
-extern void dryup(coordxy, coordxy, boolean);
+extern boolean dryup(coordxy, coordxy, boolean, boolean);
 extern void drinkfountain(void);
 extern void dipfountain(struct obj *) NONNULLARG1;
 extern int wash_hands(void);

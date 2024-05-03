@@ -1180,6 +1180,22 @@ kick_nondoor(coordxy x, coordxy y, int avrg_attrib)
                 You("smell stale honey.");
             gm.maploc->looted |= TREE_SWARM;
             return ECMD_TIME;
+        } else if (!(gm.maploc->looted & TREE_RACCOON)) {
+            coord mm;
+
+            int made = 0;
+            mm.x = x;
+            mm.y = y;
+            if (enexto(&mm, mm.x, mm.y, &mons[PM_RACCOON])
+                && makemon(&mons[PM_RACCOON], mm.x, mm.y,
+                           MM_NOMSG))
+              made++;
+            if (made)
+              pline("A fat raccoon falls out of the tree!");
+            else
+              pline("The tree seems to be deserted.");
+            gm.maploc->looted |= TREE_RACCOON;
+            return ECMD_TIME;
         }
         kick_ouch(x, y, "");
         return ECMD_TIME;

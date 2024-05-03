@@ -932,6 +932,16 @@
         /* In reality, they tunnel instead of cutting lumber.  Oh, well. */
         M2_WANDER | M2_HOSTILE, M3_INFRAVISIBLE,
         4, CLR_BROWN, WOODCHUCK),
+    MON(NAM("raccoon"), S_RODENT,
+        LVL(3, 12, 6, 0, 0), (G_NOGEN | G_GENO),
+        A(ATTK(AT_CLAW, AD_SITM, 0, 0), ATTK(AT_BITE, AD_PHYS, 1, 3),
+          NO_ATTK, NO_ATTK, NO_ATTK, NO_ATTK),
+        SIZ(250, 250, MS_GROWL, MZ_SMALL), 0, 0,
+        M1_HUMANOID | M1_SWIM | M1_OMNIVORE,
+        M2_WANDER | M2_PEACEFUL | M2_COLLECT | M2_MAGIC, M3_INFRAVISIBLE,
+        4, CLR_BLACK, RACCOON),
+
+
     /*
      * spiders & scorpions (keep webmaker() in sync if new critters are added)
      */
@@ -1360,8 +1370,6 @@
         M1_FLY | M1_THICK_HIDE | M1_NOHANDS | M1_CARNIVORE,
         M2_HOSTILE | M2_STRONG | M2_GREEDY | M2_JEWELS, 0,
         13, DRAGON_SILVER, BABY_SILVER_DRAGON),
-#if 0 /* DEFERRED */
-    /* [see "shimmering dragon" below] */
     MON(NAM("baby shimmering dragon"), S_DRAGON,
         LVL(12, 9, 2, 10, 0), G_GENO,
         A(ATTK(AT_BITE, AD_PHYS, 2, 6),
@@ -1370,7 +1378,6 @@
         M1_FLY | M1_THICK_HIDE | M1_NOHANDS | M1_CARNIVORE,
         M2_HOSTILE | M2_STRONG | M2_GREEDY | M2_JEWELS, 0,
         13, CLR_CYAN, BABY_SHIMMERING_DRAGON),
-#endif
     MON(NAM("baby red dragon"), S_DRAGON,
         LVL(12, 9, 2, 10, 0), G_GENO,
         A(ATTK(AT_BITE, AD_PHYS, 2, 6),
@@ -1461,11 +1468,6 @@
         M2_HOSTILE | M2_STRONG | M2_NASTY | M2_GREEDY | M2_JEWELS | M2_MAGIC,
         0,
         20, DRAGON_SILVER, SILVER_DRAGON),
-#if 0 /* DEFERRED */
-    /* shimmering scales/scale-mail would confer displacement when worn by
-       the hero, so shimmering dragon ought to be displaced (hero who can
-       see one might misjudge its location) but monster displacement hasn't
-       been implemented so we don't include it */
     MON(NAM("shimmering dragon"), S_DRAGON,
         LVL(15, 9, -1, 20, 4), (G_GENO | 1),
         A(ATTK(AT_BREA, AD_MAGM, 4, 6), ATTK(AT_BITE, AD_PHYS, 3, 8),
@@ -1477,7 +1479,6 @@
         M2_HOSTILE | M2_STRONG | M2_NASTY | M2_GREEDY | M2_JEWELS | M2_MAGIC,
         0,
         20, CLR_CYAN, SHIMMERING_DRAGON),
-#endif
     /* red dragon has infravision and can be seen via infravision */
     MON(NAM("red dragon"), S_DRAGON,
         LVL(15, 9, -1, 20, -4), (G_GENO | 1),

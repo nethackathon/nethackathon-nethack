@@ -174,6 +174,7 @@ enum levl_typ_types {
  */
 #define TREE_LOOTED 1
 #define TREE_SWARM 2
+#define TREE_RACCOON 4
 
 /*
  * Fountains have limits, and special warnings.

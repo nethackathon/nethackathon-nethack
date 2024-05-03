@@ -5116,7 +5116,7 @@ zap_over_floor(
             if (see_it)
                 pline("Steam billows from the fountain.");
             rangemod -= 1;
-            dryup(x, y, type > 0);
+            dryup(x, y, type > 0, FALSE);
         }
         break; /* ZT_FIRE */
 

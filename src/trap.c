@@ -59,6 +59,8 @@ staticfn void reward_untrap(struct trap *, struct monst *);
 staticfn int disarm_holdingtrap(struct trap *);
 staticfn int disarm_landmine(struct trap *);
 staticfn int unsqueak_ok(struct obj *);
+staticfn int dryup_ok(struct obj *);
+staticfn int disarm_rust_trap(struct trap *);
 staticfn int disarm_squeaky_board(struct trap *);
 staticfn int disarm_shooting_trap(struct trap *, int);
 staticfn void clear_conjoined_pits(struct trap *);
@@ -5401,6 +5403,22 @@ unsqueak_ok(struct obj *obj)
     return GETOBJ_EXCLUDE;
 }
 
+/* getobj callback for object to disarm a rust trap with */
+staticfn int
+dryup_ok(struct obj *obj)
+{
+    if (!obj)
+        return GETOBJ_EXCLUDE;
+
+    if (obj->otyp == TOWEL)
+        return GETOBJ_SUGGEST;
+
+    if (is_art(obj, ART_FOUNTAINBANE))
+        return GETOBJ_SUGGEST;
+
+    return GETOBJ_EXCLUDE;
+}
+
 /* it may not make much sense to use grease on floor boards, but so what? */
 staticfn int
 disarm_squeaky_board(struct trap *ttmp)
@@ -5428,6 +5446,38 @@ disarm_squeaky_board(struct trap *ttmp)
         makeknown(POT_OIL);
     }
     You("repair the squeaky board."); /* no madeby_u */
+    deltrap(ttmp);
+    newsym(u.ux + u.dx, u.uy + u.dy);
+    more_experienced(1, 5);
+    newexplevel();
+    return 1;
+}
+
+/* A side benefit of Fountainbane, you can use it to disarm rust traps! */
+/* While we're at it, let's also let people disarm rust traps with a towel */
+staticfn int
+disarm_rust_trap(struct trap *ttmp)
+{
+    struct obj *obj;
+    boolean bad_tool;
+    int fails;
+
+    obj = getobj("untrap with", dryup_ok, GETOBJ_PROMPT);
+    if (!obj)
+        return 0;
+
+    bad_tool = ((!is_art(obj, ART_FOUNTAINBANE))
+                 && obj->otyp != TOWEL);
+    fails = try_disarm(ttmp, bad_tool);
+    if (fails < 2)
+        return fails;
+
+    /* successfully used Fountainbane or a towel to disarm a rust trap */
+    if (obj->otyp == TOWEL) {
+        // wet the towel
+        water_damage(obj, NULL, FALSE);
+    }
+    You("dry up the rust trap.");
     deltrap(ttmp);
     newsym(u.ux + u.dx, u.uy + u.dy);
     more_experienced(1, 5);
@@ -5729,6 +5779,8 @@ untrap(
                     return disarm_holdingtrap(ttmp);
                 case LANDMINE:
                     return disarm_landmine(ttmp);
+                case RUST_TRAP:
+                    return disarm_rust_trap(ttmp);
                 case SQKY_BOARD:
                     return disarm_squeaky_board(ttmp);
                 case DART_TRAP:

@@ -695,6 +695,14 @@ set_artifact_intrinsic(struct obj *otmp, boolean on, long wp_mask)
         else
             ESearching &= ~wp_mask;
     }
+
+    if (spfx & SPFX_WW) {
+        if (on)
+            EWwalking |= wp_mask;
+        else
+            EWwalking &= ~wp_mask;
+    }
+
     if (spfx & SPFX_HALRES) {
         /* make_hallucinated must (re)set the mask itself to get
          * the display right */
@@ -2127,6 +2135,7 @@ abil_to_spfx(long *abil)
         long *abil;
         unsigned long spfx;
     } abil2spfx[] = {
+        { &EWwalking, SPFX_WW },
         { &ESearching, SPFX_SEARCH },
         { &EHalluc_resistance, SPFX_HALRES },
         { &ETelepat, SPFX_ESP },

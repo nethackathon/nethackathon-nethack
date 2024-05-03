@@ -901,7 +901,7 @@ domonability(void)
     else if (u.umonnum == PM_GREMLIN) {
         if (IS_FOUNTAIN(levl[u.ux][u.uy].typ)) {
             if (split_mon(&gy.youmonst, (struct monst *) 0))
-                dryup(u.ux, u.uy, TRUE);
+                dryup(u.ux, u.uy, TRUE, FALSE);
         } else
             There("is no fountain here.");
     } else if (is_unicorn(uptr)) {

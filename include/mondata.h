@@ -154,6 +154,9 @@
 #define infravision(ptr) (((ptr)->mflags3 & M3_INFRAVISION))
 #define infravisible(ptr) (((ptr)->mflags3 & M3_INFRAVISIBLE))
 #define is_displacer(ptr) (((ptr)->mflags3 & M3_DISPLACES) != 0L)
+#define is_displaced(ptr) ((ptr) == &mons[PM_DISPLACER_BEAST] \
+                            || (ptr) == &mons[PM_SHIMMERING_DRAGON] \
+                            || (ptr) == &mons[PM_BABY_SHIMMERING_DRAGON])
 #define is_mplayer(ptr) \
     (((ptr) >= &mons[PM_ARCHEOLOGIST]) && ((ptr) <= &mons[PM_WIZARD]))
 #define is_watch(ptr) \
@@ -251,14 +254,17 @@
    dogs and cats can be tamed by anything they like to eat and are
    pacified by any other food;
    horses can be tamed by always-veggy food or lichen corpses but
-   not tamed or pacified by other corpses or tins of veggy critters */
-#define befriend_with_obj(ptr, obj) \
+   not tamed or pacified by other corpses or tins of veggy critters
+   raccoons can be tamed with anything
+ */
+#define befriend_with_obj(ptr, obj)                                      \
     (((ptr) == &mons[PM_MONKEY] || (ptr) == &mons[PM_APE])               \
-     ? (obj)->otyp == BANANA                                             \
-     : (is_domestic(ptr) && (obj)->oclass == FOOD_CLASS                  \
+     && ((obj)->otyp == BANANA))                                         \
+     || ((ptr) == &mons[PM_RACCOON] && (obj)->oclass == FOOD_CLASS)      \
+     || (is_domestic(ptr) && (obj)->oclass == FOOD_CLASS                 \
         && ((ptr)->mlet != S_UNICORN                                     \
             || objects[(obj)->otyp].oc_material == VEGGY                 \
-            || ((obj)->otyp == CORPSE && (obj)->corpsenm == PM_LICHEN))))
+            || ((obj)->otyp == CORPSE && (obj)->corpsenm == PM_LICHEN)))
 
 #define is_bones_monster(ptr) \
     ((ptr) == &mons[PM_GHOST] || (ptr) == &mons[PM_GHOUL]        \
