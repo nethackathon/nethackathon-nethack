@@ -1,4 +1,4 @@
-/* NetHack 3.7	shknam.c	$NHDT-Date: 1596498209 2020/08/03 23:43:29 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.57 $ */
+/* NetHack 3.7	shknam.c	$NHDT-Date: 1715203028 2024/05/08 21:17:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.78 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2011. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -209,7 +209,7 @@ static const char *const shkbagshop[] = {
  * shtypes[] is externally referenced from mkroom.c, mon.c and shk.c.
  */
 const struct shclass shtypes[] = {
-    { "general store",
+    { "general store", NULL,
       RANDOM_CLASS,
       42,
       D_SHOP,
@@ -220,7 +220,7 @@ const struct shclass shtypes[] = {
         { 0, 0 },
         { 0, 0 } },
       shkgeneral },
-    { "used armor dealership",
+    { "used armor dealership", "armor shop",
       ARMOR_CLASS,
       12,
       D_SHOP,
@@ -231,7 +231,7 @@ const struct shclass shtypes[] = {
         { 0, 0 },
         { 0, 0 } },
       shkarmors },
-    { "second-hand bookstore",
+    { "second-hand bookstore", "scroll shop",
       SCROLL_CLASS,
       10,
       D_SHOP,
@@ -242,7 +242,7 @@ const struct shclass shtypes[] = {
         { 0, 0 },
         { 0, 0 } },
       shkbooks },
-    { "liquor emporium",
+    { "liquor emporium", "potion shop",
       POTION_CLASS,
       10,
       D_SHOP,
@@ -253,7 +253,7 @@ const struct shclass shtypes[] = {
         { 0, 0 },
         { 0, 0 } },
       shkliquors },
-    { "antique weapons outlet",
+    { "antique weapons outlet", "weapon shop",
       WEAPON_CLASS,
       5,
       D_SHOP,
@@ -264,7 +264,7 @@ const struct shclass shtypes[] = {
         { 0, 0 },
         { 0, 0 } },
       shkweapons },
-    { "delicatessen",
+    { "delicatessen", NULL,
       FOOD_CLASS,
       5,
       D_SHOP,
@@ -275,7 +275,7 @@ const struct shclass shtypes[] = {
         { 3, -ICE_BOX },
         { 0, 0 } },
       shkfoods },
-    { "jewelers",
+    { "jewelers", NULL,
       RING_CLASS,
       3,
       D_SHOP,
@@ -286,7 +286,7 @@ const struct shclass shtypes[] = {
         { 0, 0 },
         { 0, 0 } },
       shkrings },
-    { "quality apparel and accessories",
+    { "quality apparel and accessories", "wand shop",
       WAND_CLASS,
       3,
       D_SHOP,
@@ -295,7 +295,7 @@ const struct shclass shtypes[] = {
         { 5, -ELVEN_CLOAK },
         { 0, 0 } },
       shkwands },
-    { "hardware store",
+    { "hardware store", NULL,
       TOOL_CLASS,
       3,
       D_SHOP,
@@ -306,7 +306,7 @@ const struct shclass shtypes[] = {
         { 0, 0 },
         { 0, 0 } },
       shktools },
-    { "rare books",
+    { "rare books", "bookstore",
       SPBOOK_CLASS,
       3,
       D_SHOP,
@@ -317,7 +317,7 @@ const struct shclass shtypes[] = {
         { 0, 0 },
         { 0, 0 } },
       shkbooks },
-    { "health food store",
+    { "health food store", NULL,
       FOOD_CLASS,
       2,
       D_SHOP,
@@ -345,7 +345,7 @@ const struct shclass shtypes[] = {
      * probability of zero.  They are only created via the special level
      * loader.
      */
-    { "lighting store",
+    { "lighting store", "lighting shop",
       TOOL_CLASS,
       0,
       D_SHOP,
@@ -360,7 +360,7 @@ const struct shclass shtypes[] = {
         { 1, -SPE_LIGHT } },
       shklight },
     /* sentinel */
-    { (char *) 0,
+    { (char *) 0, NULL,
       0,
       0,
       0,
@@ -932,5 +932,7 @@ is_izchak(struct monst *shkp, boolean override_hallucination)
         ++shknm;
     return (boolean) !strcmp(shknm, "Izchak");
 }
+
+#undef VEGETARIAN_CLASS
 
 /*shknam.c*/

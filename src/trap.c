@@ -5643,6 +5643,8 @@ untrap_box(
                 } else {
                     You("disarm it!");
                     box->otrapped = 0;
+                    more_experienced(8, 0);
+                    newexplevel();
                 }
                 exercise(A_DEX, TRUE);
             } else {
@@ -5888,6 +5890,8 @@ untrap(
             } else {
                 You("disarm it!");
                 levl[x][y].doormask &= ~D_TRAPPED;
+                more_experienced(8, 0);
+                newexplevel();
             }
         } else
             pline("This door was not trapped.");

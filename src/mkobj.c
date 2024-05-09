@@ -1,4 +1,4 @@
-/* NetHack 3.7	mkobj.c	$NHDT-Date: 1704316444 2024/01/03 21:14:04 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.282 $ */
+/* NetHack 3.7	mkobj.c	$NHDT-Date: 1715109575 2024/05/07 19:19:35 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.296 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Derek S. Ray, 2015. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -2727,14 +2727,19 @@ container_weight(struct obj *object)
 }
 
 /*
- * Mark object to be deallocated.  _All_ objects should be run through here for
- * them to be deallocated.
+ * Mark object to be deallocated.  _All_ objects should be run through here
+ * for them to be deallocated.
  */
 void
 dealloc_obj(struct obj *obj)
 {
-    if (obj->where != OBJ_FREE && obj->where != OBJ_LUAFREE)
-        panic("dealloc_obj: obj not free");
+    if (obj->where == OBJ_DELETED) {
+        impossible("dealloc_obj: obj already deleted (type=%d)", obj->otyp);
+        return;
+    } else if (obj->where != OBJ_FREE && obj->where != OBJ_LUAFREE) {
+        panic("dealloc_obj: obj not free (type=%d, where=%d)",
+              obj->otyp, obj->where);
+    }
     if (obj->nobj)
         panic("dealloc_obj with nobj");
     if (obj->cobj)
@@ -2797,7 +2802,7 @@ dealloc_obj_real(struct obj *obj)
 void
 dobjsfree(void)
 {
-    struct obj *otmp = go.objs_deleted;
+    struct obj *otmp;
 
     while (go.objs_deleted) {
         otmp = go.objs_deleted->nobj;
@@ -2963,6 +2968,7 @@ obj_sanity_check(void)
     objlist_sanity(gm.migrating_objs, OBJ_MIGRATING, "migrating sanity");
     objlist_sanity(gl.level.buriedobjlist, OBJ_BURIED, "buried sanity");
     objlist_sanity(gb.billobjs, OBJ_ONBILL, "bill sanity");
+    objlist_sanity(go.objs_deleted, OBJ_DELETED, "deleted object sanity");
 
     mon_obj_sanity(fmon, "minvent sanity");
     mon_obj_sanity(gm.migrating_mons, "migrating minvent sanity");
@@ -3201,12 +3207,18 @@ mon_obj_sanity(struct monst *monlist, const char *mesg)
 staticfn void
 insane_obj_bits(struct obj *obj, struct monst *mon)
 {
-    unsigned o_in_use = obj->in_use, o_bypass = obj->bypass,
-             /* having obj->nomerge be set might be intentional */
-             o_nomerge = (obj->nomerge && !nomerge_exception(obj)),
-             /* next_boulder is only for object name formatting when
-                pushing boulders and should be reset by next sanity check */
-             o_boulder = (obj->otyp == BOULDER && obj->next_boulder);
+    unsigned o_in_use, o_bypass, o_nomerge, o_boulder;
+
+    if (obj->where == OBJ_DELETED)
+        return; /* skip bit checking for deleted objects */
+
+    o_in_use = obj->in_use;
+    o_bypass = obj->bypass;
+    /* having obj->nomerge be set might be intentional */
+    o_nomerge = (obj->nomerge && !nomerge_exception(obj));
+    /* next_boulder is only for object name formatting when pushing
+       boulders and should be reset by time of next sanity check */
+    o_boulder = (obj->otyp == BOULDER && obj->next_boulder);
 
     if (o_in_use || o_bypass || o_nomerge || o_boulder) {
         char infobuf[QBUFSZ];
