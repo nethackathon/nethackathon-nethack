@@ -1932,6 +1932,7 @@ static const ttable timeout_funcs[NUM_TIME_FUNCS] = {
     TTAB(hatch_egg, (timeout_proc) 0, "hatch_egg"),
     TTAB(fig_transform, (timeout_proc) 0, "fig_transform"),
     TTAB(shrink_glob, (timeout_proc) 0, "shrink_glob"),
+    TTAB(regrow_liver, (timeout_proc) 0, "regrow_liver"),
     /* level timers */
     TTAB(melt_ice_away, (timeout_proc) 0, "melt_ice_away"),
     /* currently no monster or global timers */

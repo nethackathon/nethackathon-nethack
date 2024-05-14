@@ -1673,6 +1673,17 @@ shrink_glob(
     }
 }
 
+void
+regrow_liver(anything *arg, long timeout)
+{
+    (void)timeout;
+    struct obj *obj = arg->a_obj;
+    obj->oeaten = 0;
+    container_weight(obj);
+    if (carried(obj))
+        update_inventory();
+}
+
 /* a glob has shrunk away to nothing; handle owornmask, then delete glob */
 staticfn void
 shrinking_glob_gone(struct obj *obj)

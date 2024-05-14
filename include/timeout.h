@@ -43,6 +43,7 @@ enum timeout_types {
     HATCH_EGG,
     FIG_TRANSFORM,
     SHRINK_GLOB,
+    REGROW_LIVER,
     MELT_ICE_AWAY,
 
     NUM_TIME_FUNCS

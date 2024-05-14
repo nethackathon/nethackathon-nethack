@@ -349,7 +349,8 @@ adj_victual_nutrition(void)
     } else if (otyp == CRAM_RATION) {
         if (maybe_polyd(is_dwarf(gy.youmonst.data), Race_if(PM_DWARF)))
             nut += (nut + 3) / 6; /* 600 -> 700 */
-    }
+    } else if (is_art(gc.context.victual.piece, ART_LIVER_OF_AHRIMAN))
+        nut *= 3; // One bite = one soldier ration
     nut = max(nut, 1);
     return nut;
 }
@@ -2003,6 +2004,14 @@ start_eating(struct obj *otmp, boolean already_partly_eaten)
 
     Sprintf(msgbuf, "eating %s", food_xname(otmp, TRUE));
     set_occupation(eatfood, msgbuf, 0);
+
+    if (is_art(otmp, ART_LIVER_OF_AHRIMAN)) {
+        do_reset_eat();
+        gc.context.victual = zero_victual;
+        if (otmp->timed)
+            (void) stop_timer(REGROW_LIVER, obj_to_any(otmp));
+        start_timer(200 + rnd(400), TIMER_OBJECT, REGROW_LIVER, obj_to_any(otmp));
+    }
 }
 
 /* used by shrink_glob() timer routine */
@@ -2043,7 +2052,9 @@ fprefx(struct obj *otmp)
         /* [satiation message may be inaccurate if eating gets interrupted] */
         break;
     case TRIPE_RATION:
-        if (carnivorous(gy.youmonst.data) && !humanoid(gy.youmonst.data)) {
+        if (is_art(otmp, ART_LIVER_OF_AHRIMAN)) {
+            pline("This tastes like your grandma's liver pie!");
+        } else if (carnivorous(gy.youmonst.data) && !humanoid(gy.youmonst.data)) {
             pline("This tripe ration is surprisingly good!");
         } else if (maybe_polyd(is_orc(gy.youmonst.data), Race_if(PM_ORC))) {
             pline(Hallucination ? "Tastes great!  Less filling!"
@@ -2054,7 +2065,7 @@ fprefx(struct obj *otmp)
             newexplevel();
             /* not cannibalism, but we use similar criteria
                for deciding whether to be sickened by this meal */
-            if (rn2(2) && !CANNIBAL_ALLOWED())
+            if (rn2(2) && !CANNIBAL_ALLOWED() && !otmp->oartifact)
                 make_vomiting((long) rn1(gc.context.victual.reqtime, 14),
                               FALSE);
         }
@@ -2940,7 +2951,7 @@ doeat(void)
 
         gc.context.victual.reqtime = objects[otmp->otyp].oc_delay;
         if (otmp->otyp != FORTUNE_COOKIE
-            && (otmp->cursed || (!nonrotting_food(otmp->otyp)
+            && (otmp->cursed || (!nonrotting_food(otmp->otyp) && !otmp->oartifact
                                  && (gm.moves - otmp->age)
                                         > (otmp->blessed ? 50L : 30L)
                                  && (otmp->orotten || !rn2(7))))) {
@@ -3067,6 +3078,7 @@ bite(void)
     }
     gf.force_save_hs = FALSE;
     recalc_wt();
+
     return 0;
 }
 
