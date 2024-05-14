@@ -720,6 +720,18 @@ m_initinv(struct monst *mtmp)
                 otmp = oname(otmp, artiname(ART_LIVER_OF_AHRIMAN), ONAME_LEVEL_DEF);
                 (void) mpickobj(mtmp, otmp);
             }
+            otmp = mksobj(TRIPE_RATION, FALSE, FALSE);
+            otmp = oname(otmp, "Stomach of Ahriman", ONAME_NO_FLAGS);
+            (void) mpickobj(mtmp, otmp);
+            otmp = mksobj(TRIPE_RATION, FALSE, FALSE);
+            otmp = oname(otmp, "Small intestine of Ahriman", ONAME_NO_FLAGS);
+            (void) mpickobj(mtmp, otmp);
+            otmp = mksobj(TRIPE_RATION, FALSE, FALSE);
+            otmp = oname(otmp, "Large intestine of Ahriman", ONAME_NO_FLAGS);
+            (void) mpickobj(mtmp, otmp);
+            otmp = mksobj(TRIPE_RATION, FALSE, FALSE);
+            otmp = oname(otmp, "Gallbladder of Ahriman", ONAME_NO_FLAGS);
+            (void) mpickobj(mtmp, otmp);
         }
         break;
     case S_NYMPH:
