@@ -207,7 +207,7 @@ static NEARDATA struct artifact artilist[] = {
 
     A("The Liver of Ahriman", TRIPE_RATION,
       (SPFX_NOGEN | SPFX_RESTR), SPFX_NONE, 0,
-      NO_ATTK, NO_DFNS, NO_CARY, 0, A_NONE, NON_PM,
+      NO_ATTK, NO_DFNS, NO_CARY, CONFUSION, A_NONE, NON_PM,
       NON_PM, 2500L, NO_COLOR, LIVER_OF_AHRIMAN),
 
     A("The Sceptre of Might", MACE,

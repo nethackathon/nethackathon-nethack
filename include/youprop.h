@@ -81,7 +81,8 @@
 #define Stunned HStun
 
 #define HConfusion u.uprops[CONFUSION].intrinsic
-#define Confusion HConfusion
+#define EConfusion u.uprops[CONFUSION].extrinsic
+#define Confusion (HConfusion || EConfusion)
 
 /* Blindness is more complex than other properties */
 #define HBlinded u.uprops[BLINDED].intrinsic /* TIMEOUT|FROMOUTSIDE|FROMFORM */
