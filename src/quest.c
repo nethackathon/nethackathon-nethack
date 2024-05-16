@@ -274,6 +274,9 @@ finish_quest(struct obj *obj) /* quest artifact or thrown unique item or faux
         /* behave as if leader imparts sufficient info about the
            quest artifact */
         fully_identify_obj(obj);
+        for (otmp = gi.invent; otmp; otmp = otmp->nobj)
+            if (is_art(otmp, ART_LIVER_OF_AHRIMAN))
+                fully_identify_obj(otmp);
         update_inventory();
     }
 }

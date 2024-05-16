@@ -714,6 +714,24 @@ m_initinv(struct monst *mtmp)
             mkmonmoney(mtmp, (long) rn1(10, 20));
         } else if (quest_mon_represents_role(ptr, PM_MONK)) {
             (void) mongets(mtmp, rn2(11) ? ROBE : CLOAK_OF_MAGIC_RESISTANCE);
+        } else if (ptr == &mons[PM_THOTH_AMON]) {
+            if (!exist_artifact(TRIPE_RATION, artiname(ART_LIVER_OF_AHRIMAN))) {
+                otmp = mksobj(TRIPE_RATION, FALSE, FALSE);
+                otmp = oname(otmp, artiname(ART_LIVER_OF_AHRIMAN), ONAME_LEVEL_DEF);
+                (void) mpickobj(mtmp, otmp);
+            }
+            otmp = mksobj(TRIPE_RATION, FALSE, FALSE);
+            otmp = oname(otmp, "Stomach of Ahriman", ONAME_NO_FLAGS);
+            (void) mpickobj(mtmp, otmp);
+            otmp = mksobj(TRIPE_RATION, FALSE, FALSE);
+            otmp = oname(otmp, "Small intestine of Ahriman", ONAME_NO_FLAGS);
+            (void) mpickobj(mtmp, otmp);
+            otmp = mksobj(TRIPE_RATION, FALSE, FALSE);
+            otmp = oname(otmp, "Large intestine of Ahriman", ONAME_NO_FLAGS);
+            (void) mpickobj(mtmp, otmp);
+            otmp = mksobj(TRIPE_RATION, FALSE, FALSE);
+            otmp = oname(otmp, "Gallbladder of Ahriman", ONAME_NO_FLAGS);
+            (void) mpickobj(mtmp, otmp);
         }
         break;
     case S_NYMPH:

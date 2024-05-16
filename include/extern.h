@@ -1620,6 +1620,7 @@ extern long rider_revival_time(struct obj *, boolean) NONNULLARG1;
 extern void start_corpse_timeout(struct obj *) NONNULLARG1;
 extern void start_glob_timeout(struct obj *, long) NONNULLARG1;
 extern void shrink_glob(anything *, long) NONNULLARG1;
+extern void regrow_liver(anything *, long) NONNULLARG1;
 extern void maybe_adjust_light(struct obj *, int) NONNULLARG1;
 extern void bless(struct obj *) NONNULLARG1;
 extern void unbless(struct obj *) NONNULLARG1;

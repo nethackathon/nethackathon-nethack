@@ -2014,6 +2014,12 @@ arti_invoke(struct obj *obj)
             else
                 Your("body seems to unfade...");
             break;
+        case CONFUSION:
+            if (on)
+                You_feel("confused.");
+            else
+                You_feel("less confused.");
+            break;
         }
     }
 
