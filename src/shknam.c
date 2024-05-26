@@ -198,7 +198,7 @@ static const char *const shkbagshop[] = {
  * have to lower some or all of the probability fields in old entries to
  * free up some percentage for the new type.
  *
- * The placement type field is not yet used but will be in the near future.
+ * The placement type field is not yet used but might be someday.
  *
  * The iprobs array in each entry defines the probabilities for various kinds
  * of objects to be present in the given shop type.  You can associate with
@@ -207,6 +207,9 @@ static const char *const shkbagshop[] = {
  * In the latter case, prepend it with a unary minus so the code can know
  * (by testing the sign) whether to use mkobj() or mksobj().
  * shtypes[] is externally referenced from mkroom.c, mon.c and shk.c.
+ *
+ * The second, usually shorter, store type name is used in automatically
+ * generated annotations for #overview.  If Null, the first name gets used.
  */
 const struct shclass shtypes[] = {
     { "general store", NULL,
@@ -264,7 +267,7 @@ const struct shclass shtypes[] = {
         { 0, 0 },
         { 0, 0 } },
       shkweapons },
-    { "delicatessen", NULL,
+    { "delicatessen", "food shop",
       FOOD_CLASS,
       5,
       D_SHOP,
@@ -275,7 +278,7 @@ const struct shclass shtypes[] = {
         { 3, -ICE_BOX },
         { 0, 0 } },
       shkfoods },
-    { "jewelers", NULL,
+    { "jewelers", "ring shop",
       RING_CLASS,
       3,
       D_SHOP,
@@ -295,7 +298,7 @@ const struct shclass shtypes[] = {
         { 5, -ELVEN_CLOAK },
         { 0, 0 } },
       shkwands },
-    { "hardware store", NULL,
+    { "hardware store", "tool shop",
       TOOL_CLASS,
       3,
       D_SHOP,
@@ -317,7 +320,7 @@ const struct shclass shtypes[] = {
         { 0, 0 },
         { 0, 0 } },
       shkbooks },
-    { "health food store", NULL,
+    { "health food store", "vegetarian food shop",
       FOOD_CLASS,
       2,
       D_SHOP,
