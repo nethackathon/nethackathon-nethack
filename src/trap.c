@@ -1382,7 +1382,7 @@ trapeffect_sqky_board(
     } else {
         boolean in_sight = canseemon(mtmp) || (mtmp == u.usteed);
 
-        if (is_flyer(mtmp->data))
+        if (m_in_air(mtmp))
             return Trap_Effect_Finished;
         /* stepped on a squeaky board */
         if (in_sight) {
@@ -1465,7 +1465,7 @@ trapeffect_bear_trap(
         boolean in_sight = canseemon(mtmp) || (mtmp == u.usteed);
         boolean trapkilled = FALSE;
 
-        if (mptr->msize > MZ_SMALL && !amorphous(mptr) && !is_flyer(mptr)
+        if (mptr->msize > MZ_SMALL && !amorphous(mptr) && !m_in_air(mtmp)
             && !is_whirly(mptr) && !unsolid(mptr)) {
             mtmp->mtrapped = 1;
             if (in_sight) {
@@ -1716,10 +1716,11 @@ trapeffect_fire_trap(
 
             if (thitm(0, mtmp, (struct obj *) 0, num, immolate))
                 trapkilled = TRUE;
-            else
-                /* we know mhp is at least `num' below mhpmax,
-                   so no (mhp > mhpmax) check is needed here */
+            else {
                 mtmp->mhpmax -= rn2(num + 1);
+                if (mtmp->mhp > mtmp->mhpmax)
+                    mtmp->mhp = mtmp->mhpmax;
+            }
         }
         if (burnarmor(mtmp) || rn2(3)) {
             int xtradmg = destroy_items(mtmp, AD_FIRE, orig_dmg);
@@ -2466,7 +2467,6 @@ trapeffect_landmine(
     } else {
         boolean trapkilled = FALSE;
         boolean in_sight = canseemon(mtmp) || (mtmp == u.usteed);
-        struct permonst *mptr = mtmp->data;
         coordxy tx = trap->tx, ty = trap->ty;
 
         /* heavier monsters are more likely to set off a land mine; on the
@@ -2474,7 +2474,7 @@ trapeffect_landmine(
 #define MINE_TRIGGER_WT (WT_ELF / 2U)
         if (rn2(mtmp->data->cwt + 1) < (int) MINE_TRIGGER_WT)
             return Trap_Effect_Finished;
-        if (is_flyer(mptr)) {
+        if (m_in_air(mtmp)) {
             boolean already_seen = trap->tseen;
 
             if (in_sight && !already_seen) {
@@ -2543,9 +2543,7 @@ trapeffect_rolling_boulder_trap(
             pline("Fortunately for you, no boulder was released.");
         }
     } else {
-        struct permonst *mptr = mtmp->data;
-
-        if (!is_flyer(mptr)) {
+        if (!m_in_air(mtmp)) {
             boolean in_sight = (mtmp == u.usteed
                                 || (cansee(mtmp->mx, mtmp->my)
                                     && canspotmon(mtmp)));
@@ -2608,8 +2606,7 @@ trapeffect_vibrating_square(
             if (in_sight) {
                 char buf[BUFSZ], *p, *monnm = mon_nam(mtmp);
 
-                if (nolimbs(mtmp->data)
-                    || is_floater(mtmp->data) || is_flyer(mtmp->data)) {
+                if (nolimbs(mtmp->data) || m_in_air(mtmp)) {
                     /* just "beneath <mon>" */
                     Strcpy(buf, monnm);
                 } else {
@@ -3049,8 +3046,9 @@ blow_up_landmine(struct trap *trap)
         /* if under the portcullis, the bridge is adjacent */
         if (find_drawbridge(&dbx, &dby))
             destroy_drawbridge(dbx, dby);
-        trap = t_at(x, y); /* expected to be null after destruction */
     }
+    trap = t_at(x, y); /* expected to be null after destruction */
+    /* or could be null if scatter blew up oil which melted ice */
     /* convert landmine into pit */
     if (trap) {
         if (Is_waterlevel(&u.uz) || Is_airlevel(&u.uz)) {
@@ -3821,13 +3819,14 @@ float_up(void)
     return;
 }
 
+/* a boulder fills a pit or a hole at x,y */
 void
 fill_pit(coordxy x, coordxy y)
 {
     struct obj *otmp;
     struct trap *t;
 
-    if ((t = t_at(x, y)) != 0 && is_pit(t->ttyp)
+    if ((t = t_at(x, y)) != 0 && (is_pit(t->ttyp) || is_hole(t->ttyp))
         && (otmp = sobj_at(BOULDER, x, y)) != 0) {
         obj_extract_self(otmp);
         (void) flooreffects(otmp, x, y, "settle");
@@ -4988,6 +4987,9 @@ drown(void)
         /* avoid "drowned in [a] water" */
         if (!strcmp(pool_of_water, "water"))
             pool_of_water = "deep water", gk.killer.format = KILLED_BY;
+        /* avoid "drowned in _a_ limitless water" on Plane of Water */
+        else if (!strcmp(pool_of_water, "limitless water"))
+            gk.killer.format = KILLED_BY;
         Strcpy(gk.killer.name, pool_of_water);
         done(DROWNING);
         /* oops, we're still alive.  better get out of the water. */

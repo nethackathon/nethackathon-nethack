@@ -24,6 +24,7 @@ staticfn boolean m_sees_sleepy_soldier(struct monst *);
 staticfn void m_tele(struct monst *, boolean, boolean, int);
 staticfn boolean m_next2m(struct monst *);
 staticfn void reveal_trap(struct trap *, boolean);
+staticfn int mon_escape(struct monst *, boolean);
 staticfn boolean linedup_chk_corpse(coordxy, coordxy);
 staticfn void m_use_undead_turning(struct monst *, struct obj *);
 staticfn boolean hero_behind_chokepoint(struct monst *);
@@ -756,6 +757,28 @@ reveal_trap(struct trap *t, boolean seeit)
         seetrap(t);
 }
 
+/* Monsters without the Amulet escape the dungeon and
+ * are gone for good when they leave up the up stairs.
+ * A monster with the Amulet would leave it behind
+ * (mongone -> mdrop_special_objs) but we force any
+ * monster who manages to acquire it or the invocation
+ * tools to stick around instead of letting it escape.
+ * Don't let the Wizard escape even when not carrying
+ * anything of interest unless there are more than 1
+ * of him.
+ */
+staticfn int
+mon_escape(struct monst *mtmp, boolean vismon)
+{
+    if (mon_has_special(mtmp)
+        || (mtmp->iswiz && gc.context.no_of_wizards < 2))
+        return 0;
+    if (vismon)
+        pline("%s escapes the dungeon!", Monnam(mtmp));
+    mongone(mtmp);
+    return 2;
+}
+
 /* Perform a defensive action for a monster.  Must be called immediately
  * after find_defensive().  Return values are 0: did something, 1: died,
  * 2: did something and can't attack again (i.e. teleported).
@@ -899,6 +922,7 @@ use_defensive(struct monst *mtmp)
                 pline("%s has made a pit in the %s.", Monnam(mtmp),
                       surface(mtmp->mx, mtmp->my));
             }
+            fill_pit(mtmp->mx, mtmp->my);
             return (mintrap(mtmp, FORCEBUNGLE) == Trap_Killed_Mon) ? 1 : 2;
         }
         t = maketrap(mtmp->mx, mtmp->my, HOLE);
@@ -915,6 +939,7 @@ use_defensive(struct monst *mtmp)
             You_hear("%s crash through the %s.", something,
                      surface(mtmp->mx, mtmp->my));
         }
+        fill_pit(mtmp->mx, mtmp->my);
         /* we made sure that there is a level for mtmp to go to */
         migrate_to_level(mtmp, ledger_no(&u.uz) + 1, MIGR_RANDOM,
                          (coord *) 0);
@@ -1012,7 +1037,8 @@ use_defensive(struct monst *mtmp)
         if (!stway)
             return 0;
         if (ledger_no(&u.uz) == 1)
-            goto escape; /* impossible; level 1 upstairs are SSTAIRS */
+            /* impossible; level 1 upstairs are SSTAIRS */
+            return mon_escape(mtmp, vismon);
         if (Inhell && mon_has_amulet(mtmp) && !rn2(4)
             && (dunlev(&u.uz) < dunlevs_in_dungeon(&u.uz) - 3)) {
             if (vismon)
@@ -1068,24 +1094,7 @@ use_defensive(struct monst *mtmp)
         if (!stway)
             return 0;
         if (ledger_no(&u.uz) == 1) {
- escape:
-            /* Monsters without the Amulet escape the dungeon and
-             * are gone for good when they leave up the up stairs.
-             * A monster with the Amulet would leave it behind
-             * (mongone -> mdrop_special_objs) but we force any
-             * monster who manages to acquire it or the invocation
-             * tools to stick around instead of letting it escape.
-             * Don't let the Wizard escape even when not carrying
-             * anything of interest unless there are more than 1
-             * of him.
-             */
-            if (mon_has_special(mtmp)
-                || (mtmp->iswiz && gc.context.no_of_wizards < 2))
-                return 0;
-            if (vismon)
-                pline("%s escapes the dungeon!", Monnam(mtmp));
-            mongone(mtmp);
-            return 2;
+            return mon_escape(mtmp, vismon);
         }
         if (vismon)
             pline("%s escapes %sstairs!", Monnam(mtmp),

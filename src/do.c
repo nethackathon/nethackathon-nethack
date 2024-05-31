@@ -83,7 +83,8 @@ boulder_hits_pool(
                will be dead here; killing it again would yield impossible
                "dmonsfree: N removed doesn't match N+1 pending" when other
                monsters have finished their current turn */
-            if ((mtmp = m_at(rx, ry)) != 0 && !DEADMONSTER(mtmp))
+            if ((mtmp = m_at(rx, ry)) != 0 && !DEADMONSTER(mtmp)
+                && !m_in_air(mtmp))
                 mondied(mtmp);
 
             if (ttmp)
@@ -2188,6 +2189,7 @@ revive_corpse(struct obj *corpse)
                     Soundeffect(se_scratching, 50);
                     You_hear("scratching noises.");
                 }
+                fill_pit(mtmp->mx, mtmp->my);
                 break;
             }
             /*FALLTHRU*/
