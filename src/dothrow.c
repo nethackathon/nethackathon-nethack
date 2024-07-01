@@ -2456,6 +2456,7 @@ breakobj(
     boolean from_invent)
 {
     boolean fracture = FALSE;
+    boolean explosion = FALSE;
 
     if (is_crackable(obj)) /* if erodeproof, erode_obj() will say so */
         return (erode_obj(obj, armor_simple_name(obj), ERODE_CRACK,
@@ -2500,6 +2501,8 @@ breakobj(
         /* breaking your own eggs is bad luck */
         if (hero_caused && obj->spe && ismnum(obj->corpsenm))
             change_luck((schar) -min(obj->quan, 5L));
+        if (obj->corpsenm == PM_PYROLISK)
+            explosion = TRUE;
         break;
     case BOULDER:
     case STATUE:
@@ -2540,6 +2543,8 @@ breakobj(
     }
     if (!fracture)
         delobj(obj);
+    if (explosion)
+        explode(x, y, -11, d(3, 6), 0, EXPL_FIERY);
     return 1;
 }
 
