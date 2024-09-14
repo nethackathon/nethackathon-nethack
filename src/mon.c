@@ -1328,7 +1328,7 @@ meatbox(struct monst *mon, struct obj *otmp)
     }
     while ((cobj = otmp->cobj) != 0) {
         obj_extract_self(cobj);
-        if (otmp->otyp == ICE_BOX)
+        if (otmp->otyp == ICE_BOX || otmp->otyp == COOLER_BAG)
             removed_from_icebox(cobj);
         if (engulf_contents) {
             (void) mpickobj(mon, cobj);
