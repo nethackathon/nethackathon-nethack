@@ -115,6 +115,7 @@ extern void unleash_all(void);
 extern boolean leashable(struct monst *) NONNULLARG1;
 extern boolean next_to_u(void);
 extern struct obj *get_mleash(struct monst *) NONNULLARG1;
+extern struct monst *get_bagged_pet(struct obj *pet_item) NONNULLARG1;
 extern const char *beautiful(void);
 extern void check_leash(coordxy, coordxy);
 extern boolean um_dist(coordxy, coordxy, xint16);
