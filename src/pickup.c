@@ -2703,6 +2703,32 @@ ck_bag(struct obj *obj)
     return (gc.current_container && obj != gc.current_container);
 }
 
+static boolean
+unbag_pet(struct obj *content)
+{
+    struct monst *pet_mon = get_bagged_pet(content);
+    struct monst *mon;
+    if (!pet_mon)
+        return FALSE;
+
+    if (pet_mon == gm.migrating_mons)
+        gm.migrating_mons = pet_mon->nmon;
+    else
+        for (mon = gm.migrating_mons; mon; mon = mon->nmon)
+            if (mon->nmon == pet_mon) {
+                mon->nmon = pet_mon->nmon;
+                break;
+            }
+
+    // Prevent untaming and wandering off on arrival. This also prevents healing but whatever.
+    pet_mon->mlstmv = svm.moves;
+
+    mon_arrive(pet_mon, -1);
+    content->leashmon = -1;
+    obfree(content, NULL);
+    return TRUE;
+}
+
 /* Returns: -1 to stop, 1 item was removed, 0 item was not removed. */
 staticfn int
 out_container(struct obj *obj)
@@ -2738,6 +2764,8 @@ out_container(struct obj *obj)
 
     if (Icebox)
         removed_from_icebox(obj);
+    if (unbag_pet(obj))
+        return 1;
 
     if (!obj->unpaid && !carried(gc.current_container)
         && costly_spot(gc.current_container->ox, gc.current_container->oy)) {
@@ -3841,6 +3869,14 @@ tipcontainer(struct obj *box) /* or bag */
                 /* abbreviated drop format is no longer appropriate */
                 terse = FALSE;
                 continue;
+            } else if (unbag_pet(otmp)) {
+                if (!terse) {
+                    pline("%s %s to the %s.", Doname2(otmp),
+                          otense(otmp, "drop"), surface(ox, oy));
+                } else {
+                    pline("%s%c", doname(otmp), nobj ? ',' : '.');
+                    iflags.last_msg = PLNMSG_OBJNAM_ONLY;
+                }                continue;
             }
             if (maybeshopgoods) {
                 addtobill(otmp, FALSE, FALSE, TRUE);
