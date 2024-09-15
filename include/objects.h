@@ -1105,6 +1105,8 @@ FOOD("C-ration",              0,  1, 10, 0, VEGGY, 300, HI_ORGANIC, C_RATION),
    flesh; negative specifies preparation method {homemade,boiled,&c})
    and by obj->corpsenm (type of monster flesh) */
 FOOD("tin",                  75,  0, 10, 1, METAL,   0, HI_METAL, TIN),
+FOOD("little dog",            0,  1,150, 0, FLESH, 150, CLR_WHITE, BAGGED_PUPPY),
+FOOD("kitten",                0,  1,150, 0, FLESH, 150, CLR_WHITE, BAGGED_KITTEN),
 #undef FOOD
 
 /* potions ... */
