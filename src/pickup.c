@@ -37,6 +37,7 @@ staticfn int in_container(struct obj *);
 staticfn int out_container(struct obj *);
 staticfn long mbag_item_gone(boolean, struct obj *, boolean);
 staticfn int stash_ok(struct obj *);
+staticfn int bag_pet(void);
 staticfn void explain_container_prompt(boolean);
 staticfn int traditional_loot(boolean);
 staticfn int menu_loot(int, boolean);
@@ -2934,6 +2935,103 @@ stash_ok(struct obj *obj)
     return GETOBJ_SUGGEST;
 }
 
+staticfn int
+get_bagged_pet_otyp(struct monst *pet)
+{
+    if (pet->data == &mons[PM_LITTLE_DOG])
+        return BAGGED_PUPPY;
+    else if (pet->data == &mons[PM_KITTEN])
+        return BAGGED_KITTEN;
+    else
+        return STRANGE_OBJECT;
+}
+
+staticfn int
+bag_pet(void)
+{
+    struct monst *mtmp = NULL;
+    int petotyp;
+    struct obj *otmp;
+    int petx, pety;
+    int ret;
+
+    if (gc.current_container->where != OBJ_INVENT) {
+        You("need to hold this bag in your %s.", makeplural(body_part(HAND)));
+        return 0;
+    }
+
+    if (!getdir("Put in whom? (in what direction)"))
+        return 0;
+
+    petx = u.ux + u.dx;
+    pety = u.uy + u.dy;
+    if (isok(petx, pety))
+        mtmp = m_at(petx, pety);
+    if (!mtmp || mtmp->mundetected) {
+        pline("There is no one there.");
+        return 0;
+    }
+    if (!can_reach_floor(FALSE)) {
+        cant_reach_floor(petx, pety, FALSE, FALSE);
+        return 0;
+    }
+    if (!mtmp->mtame) {
+        pline("%s won't cooperate.", Monnam(mtmp));
+        return 0;
+    }
+    if (!is_domestic(mtmp->data)) {
+        pline("%s does not like bags.", Monnam(mtmp));
+        return 0;
+    }
+
+    petotyp = get_bagged_pet_otyp(mtmp);
+    if (petotyp == STRANGE_OBJECT) {
+        pline("%s won't fit into the bag.", Monnam(mtmp));
+        return 0;
+    }
+
+    if (mtmp->mleashed) {
+        pline("Cannot put %s into the bag while it's leashed.", mon_nam(mtmp));
+        return 0;
+    }
+
+    if (mtmp->meating) {
+        pline("%s is busy eating.", Monnam(mtmp));
+        return 0;
+    }
+
+    for (otmp = gc.current_container->cobj; otmp; otmp = otmp->nobj)
+        if (get_bagged_pet(otmp)) {
+            pline("There is already %s in the bag.", doname(otmp));
+            return 0;
+        }
+
+    otmp = mksobj(petotyp, FALSE, FALSE);
+    otmp->leashmon = mtmp->m_id;
+    if (has_mgivenname(mtmp))
+        oname(otmp, MGIVENNAME(mtmp), ONAME_SKIP_INVUPD);
+    addinv(otmp);
+    ret = in_container(otmp);
+    if (ret) {
+        m_into_limbo(mtmp);
+        newsym(petx, pety);
+    } else {
+        freeinv(otmp);
+        obfree(otmp, NULL);
+    }
+    return ret;
+}
+
+struct monst *
+get_bagged_pet(struct obj *pet_item)
+{
+    if ((pet_item->otyp != BAGGED_PUPPY) && (pet_item->otyp != BAGGED_KITTEN))
+        return NULL;
+    if (pet_item->leashmon < 0)
+        return NULL;
+    return find_mid(pet_item->leashmon, FM_MIGRATE);
+}
+
 int
 use_container(
     struct obj **objp,
@@ -3171,6 +3269,11 @@ use_container(
         }
     }
 
+    if (c == 'p') {
+        if (bag_pet())
+            used = 1;
+    }
+
  containerdone:
     if (used) {
         /* Not completely correct; if we put something in without knowing
@@ -3369,7 +3472,7 @@ in_or_out_menu(
     boolean more_containers)
 {
     /* underscore is not a choice; it's used to skip element [0] */
-    static const char lootchars[] = "_:oibrsnq", abc_chars[] = "_:abcdenq";
+    static const char lootchars[] = "_:oibrsnqp", abc_chars[] = "_:abcdenqp";
     winid win;
     anything any;
     menu_item *pick_list;
@@ -3412,6 +3515,12 @@ in_or_out_menu(
                  ATR_NONE, clr, buf, MENU_ITEMFLAGS_NONE);
         any.a_int = 6; /* 's' */
         Sprintf(buf, "stash one item into %s", thesimpleoname(obj));
+        add_menu(win, &nul_glyphinfo, &any, menuselector[any.a_int], 0,
+                 ATR_NONE, clr, buf, MENU_ITEMFLAGS_NONE);
+    }
+    if (obj->otyp == DESIGNER_BAG) {
+        any.a_int = 9;
+        Sprintf(buf, "Put in a pet");
         add_menu(win, &nul_glyphinfo, &any, menuselector[any.a_int], 0,
                  ATR_NONE, clr, buf, MENU_ITEMFLAGS_NONE);
     }
