@@ -2729,6 +2729,15 @@ unbag_pet(struct obj *content)
     return TRUE;
 }
 
+void
+pet_escapes_bag(struct obj *bag, struct obj *content, struct monst *pet)
+{
+    char *bagname = doname(bag);
+    obj_extract_self(content);
+    unbag_pet(content);
+    pline("%s jumps out of %s.", Monnam(pet), bagname);
+}
+
 /* Returns: -1 to stop, 1 item was removed, 0 item was not removed. */
 staticfn int
 out_container(struct obj *obj)
