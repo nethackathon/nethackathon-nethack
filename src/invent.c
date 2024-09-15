@@ -1373,10 +1373,20 @@ freeinv_core(struct obj *obj)
 void
 freeinv(struct obj *obj)
 {
+    struct obj *otmp;
+    struct monst *mtmp;
+
     extract_nobj(obj, &gi.invent);
     obj->pickup_prev = 0;
     freeinv_core(obj);
     update_inventory();
+
+    if (Is_container(obj))
+        for (otmp = obj->cobj; otmp; otmp = otmp->nobj)
+            if ((mtmp = get_bagged_pet(otmp))) {
+                pet_escapes_bag(obj, otmp, mtmp);
+                break;
+            }
 }
 
 /* drawbridge is destroying all objects at <x,y> */
