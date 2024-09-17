@@ -1735,7 +1735,7 @@ goto_level(
                fly up the stairs; fly up along the ladder */
             great_effort = (Punished && !Levitation);
             if (flags.verbose || great_effort)
-                pline("%s %s up%s the %s.",
+                pline_flip("%s %s up%s the %s.",
                       great_effort ? "With great effort, you" : "You",
                       u_locomotion("climb"),
                       (Flying && ga.at_ladder) ? " along" : "",
@@ -1753,11 +1753,11 @@ goto_level(
                 ; /* stayed on same level? (no transit effects) */
             } else if (Flying) {
                 if (flags.verbose)
-                    You("fly down %s.",
+                    pline_flip("You fly down %s.",
                         ga.at_ladder ? "along the ladder" : "the stairs");
             } else if (near_capacity() > UNENCUMBERED
                        || Punished || Fumbling) {
-                You("fall down the %s.", ga.at_ladder ? "ladder" : "stairs");
+                pline_flip("You fall down the %s.", ga.at_ladder ? "ladder" : "stairs");
                 if (Punished) {
                     drag_down();
                     if (!welded(uball))
@@ -1774,7 +1774,7 @@ goto_level(
                 selftouch("Falling, you");
             } else { /* ordinary descent */
                 if (flags.verbose)
-                    You("%s.", ga.at_ladder ? "climb down the ladder"
+                    pline_flip("You %s.", ga.at_ladder ? "climb down the ladder"
                                          : "descend the stairs");
             }
         }

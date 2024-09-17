@@ -898,6 +898,84 @@ flip_level(
     vision_reset();
 }
 
+int
+get_soko_flip(void)
+{
+    coordxy offsetx, offsety, maxx, maxy;
+    int sokodepth, sokonum;
+    int downx, downy, downxflip, downyflip;
+    int upx, upy, upxflip, upyflip;
+    int our_downx = -1, our_downy = -1, our_upx = -1, our_upy = -1;
+    const stairway *stway;
+
+    static const struct sokogeom {
+        int height, width;
+        int downx, downy;
+        int upx, upy;
+    } sokolevels[4][2] = {
+        {
+            { 18, 26, 1, 1, -1, -1 },
+            { 17, 26, 6, 15, -1, -1 },
+        },
+        {
+            { 12, 20, 6, 10, 16, 4 },
+            { 13, 20, 6, 11, 15, 6 },
+        },
+        {
+            { 12, 29, 11, 2, 23, 4 },
+            { 14, 26, 3, 1, 20, 4 },
+        },
+        {
+            { 13, 14, 6, 4, 6, 6 },
+            { 11, 15, 3, 1, 1, 1 },
+        },
+    };
+    const struct sokogeom *geom;
+
+    if (u.uz.dnum != sokoend_level.dnum)
+        return 0;
+
+    sokodepth = u.uz.dlevel - sokoend_level.dlevel;
+    if ((sokodepth < 0) || (sokodepth > 3))
+        return 0;
+
+    for (stway = gs.stairs; stway; stway = stway->next) {
+        if (stway->up) {
+            our_upx = stway->sx;
+            our_upy = stway->sy;
+        } else {
+            our_downx = stway->sx;
+            our_downy = stway->sy;
+        }
+    }
+    get_level_extends(&offsetx, &offsety, &maxx, &maxy);
+
+    for (sokonum = 0; sokonum < 2; sokonum++) {
+        geom = &sokolevels[sokodepth][sokonum];
+
+        downx = offsetx + geom->downx;
+        downy = offsety + geom->downy;
+        downxflip = offsetx + geom->width - 1 - geom->downx;
+        downyflip = offsety + geom->height - 1 - geom->downy;
+
+        upx = (geom->upx >= 0) ? offsetx + geom->upx : -1;
+        upy = (geom->upy >= 0) ? offsety + geom->upy : -1;
+        upxflip = (geom->upx >= 0) ? offsetx + geom->width - 1 - geom->upx : -1;
+        upyflip = (geom->upy >= 0) ? offsety + geom->height - 1 - geom->upy : -1;
+
+        if ((our_upx == upx) && (our_upy == upy) && (our_downx == downx) && (our_downy == downy))
+            return 0;
+        if ((our_upx == upx) && (our_upy == upyflip) && (our_downx == downx) && (our_downy == downyflip))
+            return 1;
+        if ((our_upx == upxflip) && (our_upy == upy) && (our_downx == downxflip) && (our_downy == downy))
+            return 2;
+        if ((our_upx == upxflip) && (our_upy == upyflip) && (our_downx == downxflip) && (our_downy == downyflip))
+            return 3;
+    }
+
+    return 0;
+}
+
 /* for #wizfliplevel, flip guard's egd data; not needed for level creation */
 staticfn void
 flip_vault_guard(
