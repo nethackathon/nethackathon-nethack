@@ -2372,6 +2372,7 @@ extern void dumplogmsg(const char *);
 extern void dumplogfreemessages(void);
 #endif
 extern void pline(const char *, ...) PRINTF_F(1, 2);
+extern void pline_flip(const char *, ...) PRINTF_F(1, 2);
 extern void pline_dir(int, const char *, ...) PRINTF_F(2, 3);
 extern void pline_xy(coordxy, coordxy, const char *, ...) PRINTF_F(3, 4);
 extern void pline_mon(struct monst *, const char *, ...) PRINTF_F(2, 3) NONNULLARG1;
@@ -2938,6 +2939,7 @@ extern boolean mapfrag_canmatch(struct mapfragment *) NONNULLARG1;
 extern const char * mapfrag_error(struct mapfragment *) NO_NNARGS;
 extern boolean mapfrag_match(struct mapfragment *, int, int) NONNULLARG1;
 extern void flip_level(int, boolean);
+extern int get_soko_flip(void);
 extern void flip_level_rnd(int, boolean);
 extern boolean check_room(coordxy *, coordxy *, coordxy *, coordxy *, boolean) NONNULLPTRS;
 extern boolean create_room(coordxy, coordxy, coordxy, coordxy,

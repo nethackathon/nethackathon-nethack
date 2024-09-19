@@ -471,7 +471,7 @@ moverock_core(coordxy sx, coordxy sy)
                 if (!u.usteed) {
                     easypush = throws_rocks(gy.youmonst.data);
                     if (givemesg)
-                        pline("With %s effort you move %s.",
+                        pline_flip("With %s effort you move %s.",
                               easypush ? "little" : "great", what);
                     if (!easypush)
                         exercise(A_STR, TRUE);

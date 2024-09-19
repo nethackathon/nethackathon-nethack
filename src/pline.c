@@ -93,6 +93,31 @@ pline(const char *line, ...)
 }
 
 void
+pline_flip(const char *line, ...)
+{
+    char buf[512];
+    va_list the_args;
+    int flip = get_soko_flip();
+    unsigned i, len;
+    char ch;
+
+    va_start(the_args, line);
+    vsnprintf(buf, sizeof(buf), line, the_args);
+    va_end(the_args);
+    len = strlen(buf);
+
+    if (flip)
+        for (i = 0; 2*i < len; i++) {
+            ch = buf[i];
+            buf[i] = buf[len - 1 - i];
+            buf[len - 1 - i] = ch;
+        }
+
+    pline("%s", buf);
+}
+
+
+void
 pline_dir(int dir, const char *line, ...)
 {
     va_list the_args;

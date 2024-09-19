@@ -388,8 +388,12 @@ describe_decor(void)
         }
         if (ltyp == ICE && flags.mention_decor)
             Norep("%s", outbuf);
-        else
-            pline("%s", outbuf);
+        else {
+            if (stairway_at(u.ux, u.uy))
+                pline_flip("%s", outbuf);
+            else
+                pline("%s", outbuf);
+        }
     } else if (!Underwater) {
         if (IS_POOL(iflags.prev_decor)
             || IS_LAVA(iflags.prev_decor)
