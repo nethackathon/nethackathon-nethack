@@ -1467,6 +1467,10 @@ when a secret corridor was discovered by wand of secret door detection or by
 	forgotten unless within range of a light source
 when poly'd into a giant, kicking a closed door always succeeds in breaking it
 reduce crystal plate mail weight
+interactively setting a status highlight for hunger with 'O' and choosing
+	'text match' could crash while setting up the menu of hunger status
+	value strings; happened for curses or if the program was built to
+	use C++ regex processing but not for tty+posixregex
 
 
 Fixes to 3.7.0-x General Problems Exposed Via git Repository
@@ -2043,8 +2047,8 @@ non-fireproof water walking boots wouldn't be burnt up if fire resistant hero
 	walked on molten lava
 1x1 poison gas clouds for green dragon and iron golem breath could be placed
 	at wall locations
-if a pile of objects had arrow(s) on top, map location classification got
-	confused and reported 'unexplore area'
+if a pile of objects had plain arrow(s) on top, map location classification
+	got confused and reported 'unexplored area'
 
 
 Fixes to 3.7.0-x Platform and/or Interface Problems Exposed Via git Repository
