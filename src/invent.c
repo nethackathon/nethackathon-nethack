@@ -1384,7 +1384,7 @@ freeinv(struct obj *obj)
     if (Is_container(obj))
         for (otmp = obj->cobj; otmp; otmp = otmp->nobj)
             if ((mtmp = get_bagged_pet(otmp))) {
-                pet_escapes_bag(obj, otmp, mtmp);
+                pet_escapes_bag(obj, otmp, mtmp, NULL);
                 break;
             }
 }

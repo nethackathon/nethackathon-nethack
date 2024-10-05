@@ -2730,12 +2730,15 @@ unbag_pet(struct obj *content)
 }
 
 void
-pet_escapes_bag(struct obj *bag, struct obj *content, struct monst *pet)
+pet_escapes_bag(struct obj *bag, struct obj *content, struct monst *pet, const char *petdesc)
 {
     char *bagname = doname(bag);
     obj_extract_self(content);
     unbag_pet(content);
-    pline("%s jumps out of %s.", Monnam(pet), bagname);
+    if (petdesc)
+        pline("%s gets %s and jumps out of %s.", Monnam(pet), petdesc, bagname);
+    else
+        pline("%s jumps out of %s.", Monnam(pet), bagname);
 }
 
 /* Returns: -1 to stop, 1 item was removed, 0 item was not removed. */
@@ -2972,7 +2975,7 @@ stash_ok(struct obj *obj)
     return GETOBJ_SUGGEST;
 }
 
-staticfn int
+int
 get_bagged_pet_otyp(struct monst *pet)
 {
     if (pet->data == &mons[PM_LITTLE_DOG])
@@ -3016,7 +3019,7 @@ bag_pet(void)
         pline("%s won't cooperate.", Monnam(mtmp));
         return 0;
     }
-    if (!is_domestic(mtmp->data)) {
+    if (!is_domestic(mtmp->data) || !EDOG(mtmp)) {
         pline("%s does not like bags.", Monnam(mtmp));
         return 0;
     }
@@ -3034,6 +3037,11 @@ bag_pet(void)
 
     if (mtmp->meating) {
         pline("%s is busy eating.", Monnam(mtmp));
+        return 0;
+    }
+
+    if (svm.moves >= EDOG(mtmp)->hungrytime) {
+        beg(mtmp);
         return 0;
     }
 
