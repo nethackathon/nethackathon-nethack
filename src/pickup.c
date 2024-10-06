@@ -3003,6 +3003,20 @@ bag_pet(void)
     if (!getdir("Put in whom? (in what direction)"))
         return 0;
 
+    if (!u.dx && !u.dy && !u.dz) {
+        pline("Exactly what are you trying to accomplish?");
+        return 0;
+    }
+
+    if (u.usteed && u.dz > 0) {
+        // Rest of the game only applies "he/she" to humanoids but here promote the likes
+        // of dragons and ki-rin from "it" to "him/her".
+        pline("%s looks at you and rolls %s %s.", Monnam(u.usteed),
+              is_animal(u.usteed->data) ? "its" : u.usteed->female ? "her" : "his",
+              makeplural(mbodypart(u.usteed, EYE)));
+        return 0;
+    }
+
     petx = u.ux + u.dx;
     pety = u.uy + u.dy;
     if (isok(petx, pety))
