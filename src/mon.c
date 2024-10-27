@@ -1434,8 +1434,9 @@ meatmetal(struct monst *mtmp)
          otmp = otmp->nexthere) {
         /* Don't eat indigestible/choking/inappropriate objects */
         if ((mtmp->data == &mons[PM_RUST_MONSTER] && !is_rustprone(otmp))
-            || (otmp->otyp == AMULET_OF_STRANGULATION)
-            || (otmp->otyp == RIN_SLOW_DIGESTION))
+            || (otmp->otyp == AMULET_OF_STRANGULATION
+                || otmp->otyp == RIN_SLOW_DIGESTION)
+            || (otmp->opoisoned && !resists_poison(mtmp)))
             continue;
         if (is_metallic(otmp) && !obj_resists(otmp, 5, 95)
             && touch_artifact(otmp, mtmp)) {
@@ -1547,6 +1548,7 @@ meatobj(struct monst* mtmp) /* for gelatinous cubes */
                       included for emphasis */
                    || (otmp->otyp == AMULET_OF_STRANGULATION
                        || otmp->otyp == RIN_SLOW_DIGESTION)
+                   || (otmp->opoisoned && !resists_poison(mtmp))
                    /* cockatrice corpses handled above; this
                       touch_petrifies() check catches eggs */
                    || (mstoning(otmp) && !resists_ston(mtmp))
@@ -4566,6 +4568,9 @@ hideunder(struct monst *mtmp)
                && (otmp = svl.level.objects[x][y]) != 0
                /* most things can be hidden under, but not all */
                && can_hide_under_obj(otmp)
+               /* pets won't hide under a cursed item or an item of any BUC
+                  state that shares a pile with one or more cursed items */
+               && (!mtmp->mtame || !cursed_object_at(x, y))
                /* aquatic creatures don't reach here; other swimmers
                   shouldn't hide beneath underwater objects */
                && !is_pool_or_lava(x, y)) {
