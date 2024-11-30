@@ -13,6 +13,8 @@
 
 staticfn void dog_starve(struct monst *);
 staticfn boolean dog_hunger(struct monst *, struct edog *);
+staticfn void bagged_pet_hunger(struct monst *pet, struct edog *edog,
+                                struct obj *contentobj, struct obj *bag) NONNULLARG123 NONNULLARG4;
 staticfn int dog_invent(struct monst *, struct edog *, int);
 staticfn int dog_goal(struct monst *, struct edog *, int, int, int);
 staticfn struct monst *find_targ(struct monst *, int, int, int);
@@ -267,8 +269,8 @@ dog_eat(struct monst *mtmp,
            <x,y> was monster's location at start of this turn;
            they might be the same but will be different when
            the monster is moving+eating on same turn */
-        boolean seeobj = cansee(mtmp->mx, mtmp->my),
-                sawpet = cansee(x, y) && mon_visible(mtmp);
+        boolean seeobj = !mon_offmap(mtmp) && cansee(mtmp->mx, mtmp->my),
+                sawpet = !mon_offmap(mtmp) && cansee(x, y) && mon_visible(mtmp);
 
         /* Observe the action if either the food location or the pet
            itself is in view.  When pet which was in view moves to an
@@ -373,6 +375,75 @@ dog_hunger(struct monst *mtmp, struct edog *edog)
         }
     }
     return FALSE;
+}
+
+staticfn void
+bagged_pet_hunger(struct monst *pet, struct edog *edog, struct obj *contentobj, struct obj *bag)
+{
+    struct obj *otmp, *food = NULL;
+    int foodtype;
+
+    for (otmp = bag->cobj; otmp; otmp = otmp->nobj) {
+        // Do not try to eat itself
+        if (get_bagged_pet(otmp))
+            continue;
+        foodtype = dogfood(pet, otmp);
+        if (foodtype < MANFOOD) {
+            if (foodtype < ACCFOOD) {
+                food = otmp;
+                break;
+            } else if (!food && (svm.moves >= edog->hungrytime))
+                food = otmp;
+        }
+    }
+
+    if (food) {
+        You_hear("munching from %s.", doname(bag));
+        if (food->quan == 1)
+            obj_extract_self(food);
+        dog_eat(pet, food, pet->mx, pet->my, FALSE);
+        finish_meating(pet);
+        if (get_bagged_pet_otyp(pet) != contentobj->otyp)
+            pet_escapes_bag(bag, contentobj, pet, NULL);
+        update_inventory();
+    } else if (svm.moves >= edog->hungrytime) {
+        pet_escapes_bag(bag, contentobj, pet, "hungry");
+        update_inventory();
+    }
+}
+
+struct monst *
+get_pet_in_bag(struct obj *bag, struct obj **pet_item)
+{
+    struct obj *otmp;
+    struct monst *mtmp;
+    if (!Is_container(bag))
+        return NULL;
+    for (otmp = bag->cobj; otmp; otmp = otmp->nobj)
+        if ((mtmp = get_bagged_pet(otmp))) {
+            if (pet_item)
+                *pet_item = otmp;
+            return mtmp;
+        }
+
+    if (pet_item)
+        *pet_item = NULL;
+    return NULL;
+}
+
+void
+bagged_pets_hunger(void)
+{
+    struct obj *bag, *pet_obj;
+    struct monst *mtmp;
+    struct edog *edog;
+
+    for (bag = gi.invent; bag; bag = bag->nobj)
+        if ((mtmp = get_pet_in_bag(bag, &pet_obj))) {
+            edog = (mtmp->mtame && has_edog(mtmp)) ? EDOG(mtmp) : NULL;
+            if (edog)
+                bagged_pet_hunger(mtmp, edog, pet_obj, bag);
+        }
 }
 
 /* do something with object (drop, pick up, eat) at current position
