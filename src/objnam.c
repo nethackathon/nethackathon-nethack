@@ -1338,7 +1338,11 @@ doname_base(
             Strcat(prefix, "uncursed ");
     }
 
-    /* "a large trapped box" would perhaps be more correct */
+    /* "a large trapped box" would perhaps be more correct; [no!]
+       what about ``(obj->tknown && !obj->otrapped)''? shouldn't that
+       yield "a non-trapped large box"? (not "an untrapped large box");
+       TODO: this should be ``(Is_box(obj) || obj->otyp == TIN) && ...''
+       but at present there's no way to set obj->tknown for tins */
     if (Is_box(obj) && obj->otrapped && obj->tknown && obj->dknown)
         Strcat(prefix,"trapped ");
     if (lknown && Is_box(obj)) {
@@ -2382,6 +2386,22 @@ Ysimple_name2(struct obj *obj)
     return s;
 }
 
+    /*
+     * FIXME:
+     *  simpleonames(), ansimpleoname(), and thesimpleoname() need to
+     *  know the beginning of the obuf[] they use so that they can
+     *  guard against buffer overflow when pluralizing (is that an
+     *  actual word?) or inserting "an" or "the".
+     *
+     *  minimal_xname() returns a call to xname() which writes into
+     *  the middle of its obuf[] then backs up to accomodate a prefix,
+     *  so BUFSZ is not a reliable limit for the length of the result.
+     *
+     *  [Overflow likely moot.  Since the formatted object name has
+     *  user-supplied name suppressed, the length is sure to be short
+     *  enough to added plural suffix or "an" or "the" prefix.]
+     */
+
 /* "scroll" or "scrolls" */
 char *
 simpleonames(struct obj *obj)
@@ -2407,8 +2427,6 @@ ansimpleoname(struct obj *obj)
     char *obufp, *simpleoname = simpleonames(obj);
     int otyp = obj->otyp;
 
-    if (strlen(simpleoname) > BUFSZ - sizeof "the ")
-        simpleoname[sizeof "the "] = '\0';
     /* prefix with "the" if a unique item, or a fake one imitating same,
        has been formatted with its actual name (we let minimal_xname() handle
        any `known' and `dknown' checking necessary) */
