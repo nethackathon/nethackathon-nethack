@@ -158,8 +158,8 @@ static NEARDATA struct artifact artilist[] = {
       0, 5, 3000L, NO_COLOR, FIRE_BRAND),
 
     A("Fountainbane", LONG_SWORD, (SPFX_RESTR | SPFX_DFLAG1 | SPFX_WW), 0, M1_AMPHIBIOUS,
-      PHYS(5, 0), NO_DFNS, NO_CARY, 0, A_NONE, NON_PM, NON_PM, 200L,
-      NO_COLOR, FOUNTAINBANE),
+      PHYS(5, 0), NO_DFNS, NO_CARY, 0, A_NONE, NON_PM, NON_PM,
+      2, 1, 200L, NO_COLOR, FOUNTAINBANE),
 
     A("Dragonbane", BROADSWORD,
       (SPFX_RESTR | SPFX_DCLAS | SPFX_REFLECT), 0, S_DRAGON,
@@ -239,7 +239,7 @@ static NEARDATA struct artifact artilist[] = {
     A("The Liver of Ahriman", TRIPE_RATION,
       (SPFX_NOGEN | SPFX_RESTR), SPFX_NONE, 0,
       NO_ATTK, NO_DFNS, NO_CARY, CONFUSION, A_NONE, NON_PM,
-      NON_PM, 2500L, NO_COLOR, LIVER_OF_AHRIMAN),
+      NON_PM, 0, 12, 2500L, NO_COLOR, LIVER_OF_AHRIMAN),
 
     A("The Sceptre of Might", MACE,
       (SPFX_NOGEN | SPFX_RESTR | SPFX_INTEL | SPFX_DALIGN), 0, 0, PHYS(5, 0),

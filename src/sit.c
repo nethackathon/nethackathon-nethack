@@ -383,7 +383,7 @@ dosit(void)
         if (Upolyd && u.umonnum == PM_GREMLIN) {
             if (split_mon(&gy.youmonst, (struct monst *) 0)) {
                 if (levl[u.ux][u.uy].typ == FOUNTAIN)
-                    dryup(u.ux, u.uy, TRUE);
+                    dryup(u.ux, u.uy, TRUE, FALSE);
             }
             /* splitting--or failing to do so--protects gear from the water */
         } else {

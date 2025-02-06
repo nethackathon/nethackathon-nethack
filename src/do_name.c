@@ -954,13 +954,14 @@ x_monnam(
     } else if (do_name && has_mgivenname(mtmp)) {
         char *name = MGIVENNAME(mtmp);
 
-    if (has_ebones(mtmp)) {
-        if (mdat == &mons[PM_GHOST]) {
-            Sprintf(eos(buf), "%s ghost", s_suffix(name));
-            name_at_start = TRUE;
-        } else if (called) {
-            Sprintf(eos(buf), "%s called %s", pm_name, name);
-            name_at_start = (boolean) type_is_pname(mdat);
+        if (has_ebones(mtmp)) {
+            if (mdat == &mons[PM_GHOST]) {
+                Sprintf(eos(buf), "%s ghost", s_suffix(name));
+                name_at_start = TRUE;
+            } else if (called) {
+                Sprintf(eos(buf), "%s called %s", pm_name, name);
+                name_at_start = (boolean) type_is_pname(mdat);
+            }
         } else if (is_mplayer(mdat) && (bp = strstri(name, " the ")) != 0) {
             /* <name> the <adjective> <invisible> <saddled> <rank> */
             char pbuf[BUFSZ];
