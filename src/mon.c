@@ -3091,8 +3091,6 @@ mondead(struct monst *mtmp)
     return;
 }
 
-RESTORE_WARNING_FORMAT_NONLITERAL
-
 /* TRUE if corpse might be dropped, magr may die if mon was swallowed */
 boolean
 corpse_chance(
