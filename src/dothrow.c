@@ -16,6 +16,7 @@ staticfn int gem_accept(struct monst *, struct obj *);
 staticfn boolean toss_up(struct obj *, boolean) NONNULLARG1;
 staticfn void sho_obj_return_to_u(struct obj * obj);
 staticfn void throwit_return(boolean);
+staticfn void swallowit(struct obj *);
 staticfn struct obj *return_throw_to_inv(struct obj *, long, boolean,
                                        struct obj *);
 staticfn void tmiss(struct obj *, struct monst *, boolean);
@@ -1459,6 +1460,15 @@ throwit_return(boolean clear_thrownobj)
         gt.thrownobj = (struct obj *) 0;
 }
 
+staticfn void
+swallowit(struct obj *obj){
+    if (obj != uball) {
+        (void) mpickobj(u.ustuck, obj); /* clears 'gt.thrownobj' */
+        throwit_return(FALSE);
+    } else
+        throwit_return(TRUE);
+}
+
 /* throw an object, NB: obj may be consumed in the process */
 void
 throwit(struct obj *obj,
@@ -1667,12 +1677,7 @@ throwit(struct obj *obj,
         if (tethered_weapon)
             tmp_at(DISP_END, 0);
     } else if (u.uswallow && !iflags.returning_missile) {
- swallowit:
-        if (obj != uball) {
-            (void) mpickobj(u.ustuck, obj); /* clears 'gt.thrownobj' */
-            throwit_return(FALSE);
-        } else
-            throwit_return(TRUE);
+        swallowit(obj);
         return;
     } else {
         /* Mjollnir must be wielded to be thrown--caller verifies this;
@@ -1718,8 +1723,10 @@ throwit(struct obj *obj,
                                KILLED_BY);
                     }
 
-                    if (u.uswallow)
-                        goto swallowit;
+                    if (u.uswallow) {
+                        swallowit(obj);
+                        return;
+                    }
                     if (!ship_object(obj, u.ux, u.uy, FALSE))
                         dropy(obj);
                 }
@@ -1737,8 +1744,10 @@ throwit(struct obj *obj,
                    capability back anyway, quivered or not shouldn't matter */
                 pline("%s to return!", Tobjnam(obj, "fail"));
 
-                if (u.uswallow)
-                    goto swallowit;
+                if (u.uswallow) {
+                    swallowit(obj);
+                    return;
+                }
                 /* continue below with placing 'obj' at target location */
             }
         }
