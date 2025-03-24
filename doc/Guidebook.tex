@@ -47,8 +47,8 @@
 %.au
 \author{Original version - Eric S. Raymond\\
 (Edited and expanded for 3.7.0 by Mike Stephenson and others)}
-%DO NOT REMOVE NH_DATESUB \date{DATE(%B %-d, %Y)}
-\date{September 13, 2024}
+%DO NOT REMOVE NH_DATESUB \date{Date(%B %-d, %Y)}
+\date{November 16, 2024}
 
 \maketitle
 
@@ -6702,6 +6702,11 @@ The syntax is the same as WIZARDS.
 \item[\ib{EXPLORERS}]
 A list of users who are allowed to use the explore mode.
 The syntax is the same as WIZARDS.
+%.lp
+\item[\ib{MSGHANDLER}]
+A path and filename of executable.  Whenever a message-window
+message is shown, NetHack runs this program.  The program will get
+the message as the only parameter.
 %.lp
 \item[\ib{MAXPLAYERS}]
 Limit the maximum number of games that can be running at the same time.

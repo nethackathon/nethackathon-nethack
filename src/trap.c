@@ -1,4 +1,4 @@
-/* NetHack 3.7	trap.c	$NHDT-Date: 1720128169 2024/07/04 21:22:49 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.602 $ */
+/* NetHack 3.7	trap.c	$NHDT-Date: 1741926700 2025/03/13 20:31:40 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.621 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2013. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -67,6 +67,7 @@ staticfn void clear_conjoined_pits(struct trap *);
 staticfn boolean adj_nonconjoined_pit(struct trap *);
 staticfn int try_lift(struct monst *, struct trap *, int, boolean);
 staticfn int help_monster_out(struct monst *, struct trap *);
+staticfn void disarm_box(struct obj *, boolean, boolean);
 staticfn void untrap_box(struct obj *, boolean, boolean);
 #if 0
 staticfn void join_adjacent_pits(struct trap *);
@@ -457,7 +458,7 @@ struct trap *
 maketrap(coordxy x, coordxy y, int typ)
 {
     static union vlaunchinfo zero_vl;
-    boolean oldplace;
+    boolean oldplace, was_ice, clear_flags;
     struct trap *ttmp;
     struct rm *lev = &levl[x][y];
 
@@ -475,10 +476,10 @@ maketrap(coordxy x, coordxy y, int typ)
                 || (u.utraptype == TT_LAVA && !is_lava(x, y))))
             reset_utrap(FALSE);
         /* old <tx,ty> remain valid */
-    } else if (!CAN_OVERWRITE_TERRAIN(lev->typ)
-               || (IS_FURNITURE(lev->typ)
-                   && (typ != PIT && typ != HOLE))
+    } else if (!CAN_OVERWRITE_TERRAIN(lev->typ) /* stairs */
                || is_pool_or_lava(x, y)
+               || (IS_FURNITURE(lev->typ) && (typ != PIT && typ != HOLE))
+               || (lev->typ == DRAWBRIDGE_UP && typ == MAGIC_PORTAL)
                || (IS_AIR(lev->typ) && typ != MAGIC_PORTAL)
                || (typ == LEVEL_TELEP && single_level_branch(&u.uz))) {
         /* no trap on top of furniture (caller usually screens the
@@ -515,6 +516,7 @@ maketrap(coordxy x, coordxy y, int typ)
     case PIT:
     case SPIKED_PIT:
         ttmp->conjoined = 0;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case HOLE:
     case TRAPDOOR:
@@ -524,24 +526,44 @@ maketrap(coordxy x, coordxy y, int typ)
             && (is_hole(typ) || IS_DOOR(lev->typ) || IS_WALL(lev->typ)))
             add_damage(x, y, /* schedule repair */
                        ((IS_DOOR(lev->typ) || IS_WALL(lev->typ))
-                        && !svc.context.mon_moving)
-                           ? SHOP_HOLE_COST
-                           : 0L);
-        lev->doormask = 0;     /* subsumes altarmask, icedpool... */
-        if (IS_ROOM(lev->typ)) /* && !IS_AIR(lev->typ) */
+                        && !svc.context.mon_moving) ? SHOP_HOLE_COST : 0L);
+
+        clear_flags = TRUE; /* assume lev->flags needs to be reset */
+        /* DRAWBRIDGE_UP passes the IS_ROOM() test so check it first;
+           it also needs to retain lev->drawbridgemask */
+        if (lev->typ == DRAWBRIDGE_UP) {
+            /* bridge is closed and we're putting a hole or pit at the span
+               spot; this trap will be deleted if/when the bridge is opened;
+               terrain becomes room floor even if it was moat, lava, or ice */
+            clear_flags = FALSE; /* keep lev->drawbridgemask */
+            was_ice = (lev->drawbridgemask & DB_UNDER) == DB_ICE;
+            lev->drawbridgemask &= ~DB_UNDER;
+            lev->drawbridgemask |= DB_FLOOR;
+            if (was_ice) {
+                /* subset of set_levltyp() after changing ice to floor;
+                   frozen corpses resume rotting, no more ice to melt away */
+                obj_ice_effects(x, y, TRUE);
+                spot_stop_timers(x, y, MELT_ICE_AWAY);
+            }
+        } else if (IS_ROOM(lev->typ)) {
             (void) set_levltyp(x, y, ROOM);
+
         /*
          * some cases which can happen when digging
          * down while phazing thru solid areas
          */
-        else if (lev->typ == STONE || lev->typ == SCORR)
+        } else if (lev->typ == STONE || lev->typ == SCORR) {
             (void) set_levltyp(x, y, CORR);
-        else if (IS_WALL(lev->typ) || lev->typ == SDOOR)
+        } else if (IS_WALL(lev->typ) || lev->typ == SDOOR) {
             (void) set_levltyp(x, y, svl.level.flags.is_maze_lev ? ROOM
                                      : svl.level.flags.is_cavernous_lev ? CORR
                                        : DOOR);
+        }
+        if (clear_flags)
+            lev->flags = 0; /* set_levltyp doesn't take care of this [yet?] */
 
         unearth_objs(x, y);
+        recalc_block_point(x, y);
         break;
     case TELEP_TRAP:
         if (isok(gl.launchplace.x, gl.launchplace.y)) {
@@ -588,6 +610,7 @@ fall_through(
     const char *dont_fall = 0;
     int newlevel;
     struct trap *t = (struct trap *) 0;
+    boolean controlled_flight = FALSE;
 
     /* we'll fall even while levitating in Sokoban; otherwise, if we
        won't fall and won't be told that we aren't falling, give up now */
@@ -633,12 +656,15 @@ fall_through(
         return;
     }
     if ((Flying || is_clinger(gy.youmonst.data))
-        && (ftflags & TOOKPLUNGE) && td && t)
+        && (ftflags & TOOKPLUNGE) && td && t) {
+        if (Flying)
+            controlled_flight = TRUE;
         You("%s down %s!",
             Flying ? "swoop" : "deliberately drop",
             (t->ttyp == TRAPDOOR)
                 ? "through the trap door"
                 : "into the gaping hole");
+    }
 
     if (*u.ushops)
         shopdig(1);
@@ -658,7 +684,9 @@ fall_through(
         }
         dist = depth(&dtmp) - depth(&u.uz);
         if (dist > 1)
-            You("fall down a %s%sshaft!", dist > 3 ? "very " : "",
+            You("%s down a %s%sshaft!",
+                controlled_flight ? "fly" : "fall",
+                dist > 3 ? "very " : "",
                 dist > 2 ? "deep " : "");
     }
     if (!td)
@@ -1109,10 +1137,13 @@ m_harmless_trap(struct monst *mtmp, struct trap *ttmp)
             return TRUE;
         break;
     case PIT:
+        FALLTHROUGH;
         /*FALLTHRU*/
     case SPIKED_PIT:
+        FALLTHROUGH;
         /*FALLTHRU*/
     case HOLE:
+        FALLTHROUGH;
         /*FALLTHRU*/
     case TRAPDOOR:
         if (is_clinger(mdat) && !Sokoban)
@@ -1553,7 +1584,7 @@ trapeffect_rust_trap(
     struct trap *trap,
     unsigned int trflags UNUSED)
 {
-    struct obj *otmp;
+    struct obj *otmp, *nextobj;
 
     if (mtmp == &gy.youmonst) {
         seetrap(trap);
@@ -1585,10 +1616,12 @@ trapeffect_rust_trap(
             pline("%s you!", A_gush_of_water_hits);
             /* note: exclude primary and secondary weapons from splashing
                because cases 1 and 2 target them [via water_damage()] */
-            for (otmp = gi.invent; otmp; otmp = otmp->nobj)
+            for (otmp = gi.invent; otmp; otmp = nextobj) {
+                nextobj = otmp->nobj;
                 if (otmp->lamplit && otmp != uwep
                     && (otmp != uswapwep || !u.twoweap))
                     (void) splash_lit(otmp);
+            }
             if (uarmc)
                 (void) water_damage(uarmc, cloak_simple_name(uarmc), TRUE);
             else if (uarm)
@@ -2003,8 +2036,6 @@ trapeffect_hole(
                 if (in_sight) {
                     pline_mon(mtmp,
                              "%s seems to be yanked down!", Monnam(mtmp));
-                    /* suppress message in mlevel_tele_trap() */
-                    in_sight = FALSE;
                     seetrap(trap);
                 }
             } else
@@ -2171,6 +2202,7 @@ trapeffect_web(
                 mtmp->mtrapped = 1;
                 break;
             }
+            FALLTHROUGH;
             /*FALLTHRU*/
         default:
             if (mptr->mlet == S_GIANT
@@ -2420,7 +2452,7 @@ trapeffect_poly_trap(
         boolean in_sight = canseemon(mtmp) || (mtmp == u.usteed);
 
         if (resists_magm(mtmp)) {
-            shieldeff(mtmp->mx, mtmp->my);
+            shieldeff_mon(mtmp);
         } else if (!resist(mtmp, WAND_CLASS, 0, NOTELL)) {
             (void) newcham(mtmp, (struct permonst *) 0, NC_SHOW_MSG);
             if (in_sight)
@@ -2702,6 +2734,7 @@ immune_to_trap(struct monst *mon, unsigned ttype)
         if (pm->msize <= MZ_SMALL
             || amorphous(pm) || is_whirly(pm) || unsolid(pm))
             return TRAP_CLEARLY_IMMUNE;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case SQKY_BOARD:
     case LANDMINE:
@@ -2790,6 +2823,7 @@ immune_to_trap(struct monst *mon, unsigned ttype)
            for monsters, only replicates fire trap, so fall through */
         if (is_you)
             return TRAP_NOT_IMMUNE;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case FIRE_TRAP: /* can always destroy items being carried */
         /* harmful if not resistant or if carrying anything that could burn */
@@ -3106,6 +3140,9 @@ blow_up_landmine(struct trap *trap)
             }
         }
     }
+    fill_pit(x, y);
+    maybe_dunk_boulders(x, y);
+    recalc_block_point(x, y);
     spot_checks(x, y, old_typ);
 }
 
@@ -3225,10 +3262,12 @@ launch_obj(
         /* use otrapped as a flag to ohitmon */
         singleobj->otrapped = 1;
         style &= ~LAUNCH_KNOWN;
+        FALLTHROUGH;
     /*FALLTHRU*/
     case ROLL:
  roll:
         delaycnt = 2;
+        FALLTHROUGH;
     /*FALLTHRU*/
     default:
         if (!delaycnt)
@@ -3333,6 +3372,7 @@ launch_obj(
                     /* if trap doesn't work, skip "disappears" message */
                     if (newlev == depth(&u.uz))
                         break;
+                    FALLTHROUGH;
                     /*FALLTHRU*/
                 case TELEP_TRAP:
                     if (cansee(x, y))
@@ -3383,7 +3423,7 @@ launch_obj(
                 const char *bmsg = " as one boulder sets another in motion";
                 coordxy fx = x + dx, fy = y + dy;
 
-                if (!isok(fx, fy) || !dist || IS_ROCK(levl[fx][fy].typ))
+                if (!isok(fx, fy) || !dist || IS_OBSTRUCTED(levl[fx][fy].typ))
                     bmsg = " as one boulder hits another";
 
                 Soundeffect(se_loud_crash, 80);
@@ -3405,7 +3445,7 @@ launch_obj(
             }
             levl[x][y].doormask = D_BROKEN;
             if (dist)
-                unblock_point(x, y);
+                recalc_block_point(x, y);
         }
 
         /* if about to hit something, do so now */
@@ -4031,6 +4071,7 @@ float_down(
         case TRAPDOOR:
             if (!Can_fall_thru(&u.uz) || u.ustuck)
                 break;
+            FALLTHROUGH;
             /*FALLTHRU*/
         default:
             if (!u.utrap) /* not already in the trap */
@@ -4766,13 +4807,14 @@ emergency_disrobe(boolean *lostsome)
     int invc = inv_cnt(TRUE);
 
     while (near_capacity() > (Punished ? UNENCUMBERED : SLT_ENCUMBER)) {
-        struct obj *obj, *otmp = (struct obj *) 0;
+        struct obj *obj, *nextobj, *otmp = (struct obj *) 0;
         int i;
 
         /* Pick a random object */
         if (invc > 0) {
             i = rn2(invc);
-            for (obj = gi.invent; obj; obj = obj->nobj) {
+            for (obj = gi.invent; obj; obj = nextobj) {
+                nextobj = obj->nobj;
                 /*
                  * Undroppables are: body armor, boots, gloves,
                  * amulets, and rings because of the time and effort
@@ -5236,6 +5278,24 @@ cnv_trap_obj(
     deltrap(ttmp);
 }
 
+/* whether moving to a trap location is moving "into" the trap or "onto" it */
+boolean
+into_vs_onto(int traptype)
+{
+    switch (traptype) {
+    case BEAR_TRAP:
+    case PIT:
+    case SPIKED_PIT:
+    case HOLE:
+    case TELEP_TRAP:
+    case LEVEL_TELEP:
+    case MAGIC_PORTAL:
+    case WEB:
+        return TRUE;
+    }
+    return FALSE;
+}
+
 /* while attempting to disarm an adjacent trap, we've fallen into it */
 staticfn void
 move_into_trap(struct trap *ttmp)
@@ -5245,9 +5305,13 @@ move_into_trap(struct trap *ttmp)
     boolean unused;
 
     bx = by = cx = cy = 0; /* lint suppression */
-    /* we know there's no monster in the way, and we're not trapped */
-    if (!Punished
-        || drag_ball(x, y, &bc, &bx, &by, &cx, &cy, &unused, TRUE)) {
+    /* we know there's no monster in the way and we're not trapped, but
+       need to make sure the move is not diagonally into or out of a
+       doorway; the sgn() calls are redundant since ttmp is adjacent */
+    if (test_move(u.ux, u.uy, sgn(x - u.ux), sgn(y - u.uy), TEST_MOVE)
+        && (!Punished
+            || drag_ball(x, y, &bc, &bx, &by, &cx, &cy, &unused, TRUE))) {
+        /* move hero and update map */
         u.ux0 = u.ux, u.uy0 = u.uy;
         /* set u.ux,u.uy and u.usteed->mx,my plus handle CLIPPING */
         u_on_newpos(x, y);
@@ -5272,6 +5336,11 @@ move_into_trap(struct trap *ttmp)
         if ((ttmp = t_at(u.ux, u.uy)) != 0)
             ttmp->tseen = 1;
         exercise(A_WIS, FALSE);
+    } else {
+        /* caller has just printed "Whoops..." so if hero is prevented from
+           moving, a followup message is needed */
+        pline("Fortunately, you don't move %s it.",
+              into_vs_onto(ttmp->ttyp) ? "into" : "onto");
     }
 }
 
@@ -5677,6 +5746,32 @@ help_monster_out(
     return 1;
 }
 
+staticfn void
+disarm_box(struct obj *box, boolean force, boolean confused)
+{
+    if (box->otrapped) {
+        int ch = ACURR(A_DEX) + u.ulevel;
+
+        if (Role_if(PM_ROGUE))
+            ch *= 2;
+        if (!force && (confused || Fumbling
+                       || rnd(75 + level_difficulty() / 2) > ch)) {
+            (void) chest_trap(box, FINGER, TRUE);
+            /* 'box' might be gone now */
+        } else {
+            You("disarm it!");
+            box->otrapped = 0;
+            box->tknown = 1;
+            more_experienced(8, 0);
+            newexplevel();
+        }
+        exercise(A_DEX, TRUE);
+    } else {
+        pline("That %s was not trapped.", xname(box));
+        box->tknown = 0;
+    }
+}
+
 /* check a particular container for a trap and optionally disarm it */
 staticfn void
 untrap_box(
@@ -5686,32 +5781,19 @@ untrap_box(
 {
     if ((box->otrapped
          && (force || (!confused && rn2(MAXULEV + 1 - u.ulevel) < 10)))
+        || box->tknown
         || (!force && confused && !rn2(3))) {
-        You("find a trap on %s!", the(xname(box)));
+        if (!(box->tknown && box->dknown))
+            You("find a trap on %s!", the(xname(box)));
+        else
+            pline("There's a trap on %s.", the(xname(box)));
+        box->tknown = 1;
+        box->dknown = 1;
         if (!confused)
             exercise(A_WIS, TRUE);
 
-        if (ynq("Disarm it?") == 'y') {
-            if (box->otrapped) {
-                int ch = ACURR(A_DEX) + u.ulevel;
-
-                if (Role_if(PM_ROGUE))
-                    ch *= 2;
-                if (!force && (confused || Fumbling
-                               || rnd(75 + level_difficulty() / 2) > ch)) {
-                    (void) chest_trap(box, FINGER, TRUE);
-                    /* 'box' might be gone now */
-                } else {
-                    You("disarm it!");
-                    box->otrapped = 0;
-                    more_experienced(8, 0);
-                    newexplevel();
-                }
-                exercise(A_DEX, TRUE);
-            } else {
-                pline("That %s was not trapped.", xname(box));
-            }
-        }
+        if (ynq("Disarm it?") == 'y')
+            disarm_box(box, force, confused);
     } else {
         You("find no traps on %s.", the(xname(box)));
     }
@@ -5874,20 +5956,28 @@ untrap(
                whether any had been found but not attempted to untrap;
                now at most one per move may be checked and we only
                continue on to door handling if they are all declined */
-            for (otmp = svl.level.objects[x][y]; otmp; otmp = otmp->nexthere)
-                if (Is_box(otmp)) {
+            for (otmp = svl.level.objects[x][y]; otmp; otmp = otmp->nexthere) {
+                if (!Is_box(otmp))
+                    continue;
+                if (otmp->tknown && otmp->dknown)
+                    (void) safe_qbuf(qbuf, "Disarm this ", NULL,
+                                     otmp, xname, ansimpleoname, "a box");
+                else
                     (void) safe_qbuf(qbuf, "There is ",
                                      " here.  Check it for traps?", otmp,
                                      doname, ansimpleoname, "a box");
-                    switch (ynq(qbuf)) {
+                switch (ynq(qbuf)) {
                     case 'q':
                         return 0;
                     case 'y':
-                        untrap_box(otmp, force, confused);
+                        if (otmp->tknown && otmp->dknown)
+                            disarm_box(otmp, force, confused);
+                        else
+                            untrap_box(otmp, force, confused);
                         return 1; /* even for 'no' at "Disarm it?" prompt */
                     }
                     /* 'n' => continue to next box */
-                }
+            }
             There("are no other chests or boxes here.");
         }
 
@@ -5971,7 +6061,7 @@ openholdingtrap(
     boolean *noticed) /* set to true iff hero notices the effect;
                        * otherwise left with its previous value intact */
 {
-    struct trap *t;
+    struct trap *t, tdummy;
     char buf[BUFSZ], whichbuf[20];
     const char *trapdescr = 0, *which = 0;
     boolean ishero = (mon == &gy.youmonst);
@@ -5984,7 +6074,15 @@ openholdingtrap(
     t = t_at(ishero ? u.ux : mon->mx, ishero ? u.uy : mon->my);
 
     if (ishero && u.utrap) { /* all u.utraptype values are holding traps */
+        /* there might not be any trap at hero's spot for tt_buriedball;
+           conversely, there might be an unrelated trap at that spot */
+        if (!t) {
+            t = &tdummy;
+            (void) memset(t, 0, sizeof *t), t->ntrap = NULL;
+            /* fallback 't' is now nonNull, t->tseen and t->madeby_u are 0 */
+        }
         which = the_your[(!t || !t->tseen || !t->madeby_u) ? 0 : 1];
+
         switch (u.utraptype) {
         case TT_LAVA:
             trapdescr = "molten lava";
@@ -6000,7 +6098,9 @@ openholdingtrap(
         case TT_BEARTRAP:
         case TT_PIT:
         case TT_WEB:
-            trapdescr = 0; /* use defsyms[].explanation */
+            trapdescr = defsyms[(u.utraptype == TT_WEB) ? S_web
+                                : (u.utraptype == TT_PIT) ? S_pit
+                                  : S_bear_trap].explanation;
             break;
         default:
             /* lint suppression in case 't' is unexpectedly Null
@@ -6012,10 +6112,9 @@ openholdingtrap(
         /* if no trap here or it's not a holding trap, we're done */
         if (!t || (t->ttyp != BEAR_TRAP && t->ttyp != WEB))
             return FALSE;
-    }
-
-    if (!trapdescr)
         trapdescr = trapname(t->ttyp, FALSE);
+    }
+    assert(t != NULL);
     if (!which)
         which = t->tseen ? the_your[t->madeby_u]
                          : strchr(vowels, *trapdescr) ? "an" : "a";
@@ -6147,7 +6246,8 @@ openfallingtrap(
     return result;
 }
 
-/* only called when the player is doing something to the chest directly */
+/* only called when the player is doing something to the chest directly;
+   returns True if chest is destroyed, False if it remains in play */
 boolean
 chest_trap(
     struct obj *obj,
@@ -6162,8 +6262,9 @@ chest_trap(
     if (get_obj_location(obj, &cc.x, &cc.y, 0)) /* might be carried */
         obj->ox = cc.x, obj->oy = cc.y;
 
+    otmp->tknown = 0;   /* for xname(); will be set to 1 below */
     otmp->otrapped = 0; /* trap is one-shot; clear flag first in case
-                           chest kills you and ends up in bones file */
+                         * chest kills you and ends up in bones file */
     You(disarm ? "set it off!" : "trigger a trap!");
     display_nhwindow(WIN_MESSAGE, FALSE);
     if (Luck > -13 && rn2(13 + Luck) > 7) { /* saved by luck */
@@ -6208,7 +6309,7 @@ chest_trap(
         case 21: {
             struct monst *shkp = 0;
             long loss = 0L;
-            boolean costly, insider;
+            boolean costly, insider, chestgone;
             coordxy ox = obj->ox, oy = obj->oy;
 
             /* the obj location need not be that of player */
@@ -6238,28 +6339,35 @@ chest_trap(
                                  && uball->ox == ox && uball->oy == oy)))
                 unpunish();
             /* destroy everything at the spot (the Amulet, the
-               invocation tools, and Rider corpses will remain intact) */
+               invocation tools, and Rider corpses will remain intact);
+               usually the chest will be destroyed along with the stuff at
+               this spot, but not if it is being carried */
+            chestgone = FALSE;
             for (otmp = svl.level.objects[ox][oy]; otmp; otmp = otmp2) {
                 otmp2 = otmp->nexthere;
                 if (costly)
                     loss += stolen_value(otmp, otmp->ox, otmp->oy,
                                          (boolean) shkp->mpeaceful, TRUE);
+                if (otmp == obj)
+                    chestgone = TRUE;
                 delobj(otmp);
             }
             wake_nearby(FALSE);
             losehp(Maybe_Half_Phys(d(6, 6)), buf, KILLED_BY_AN);
             exercise(A_STR, FALSE);
             if (costly && loss) {
-                if (insider)
+                if (insider) {
                     You("owe %ld %s for objects destroyed.", loss,
                         currency(loss));
-                else {
+                } else {
                     You("caused %ld %s worth of damage!", loss,
                         currency(loss));
                     make_angry_shk(shkp, ox, oy);
                 }
             }
-            return TRUE;
+            if (chestgone)
+                return TRUE;
+            break; /* set tknown and return False */
         } /* case 21 */
         case 20:
         case 19:
@@ -6344,6 +6452,7 @@ chest_trap(
         bot(); /* to get immediate botl re-display */
     }
 
+    otmp->tknown = 1; /* hero knows chest is no longer trapped */
     return FALSE;
 }
 
@@ -6403,7 +6512,8 @@ conjoined_pits(
     struct trap *trap1,
     boolean u_entering_trap2)
 {
-    coordxy dx, dy, diridx, adjidx;
+    coordxy dx, dy;
+    int diridx, adjidx;
 
     if (!trap1 || !trap2)
         return FALSE;
@@ -6641,7 +6751,7 @@ static const char lava_killer[] = "molten lava";
 boolean
 lava_effects(void)
 {
-    struct obj *obj, *obj2;
+    struct obj *obj, *obj2, *nextobj;
     boolean usurvive, boil_away;
     unsigned protect_oid = 0;
     int burncount = 0, burnmesgcount = 0;
@@ -6668,7 +6778,8 @@ lava_effects(void)
      * emergency save file created before item destruction.
      */
     if (!usurvive) {
-        for (obj = gi.invent; obj; obj = obj->nobj) {
+        for (obj = gi.invent; obj; obj = nextobj) {
+            nextobj = obj->nobj;
             if (obj->in_use) { /* remove_worn_item() sets in_use */
                 /* one item can be protected from burning up [accommodates
                    steal(AMULET_OF_FLYING) -> remove_worn_item() -> fall
@@ -7004,10 +7115,11 @@ trapname(
 void
 ignite_items(struct obj *objchn)
 {
-    struct obj *obj;
+    struct obj *obj, *nextobj;
     boolean bynexthere = (objchn && objchn->where == OBJ_FLOOR);
 
-    for (obj = objchn; obj; obj = bynexthere ? obj->nexthere : obj->nobj) {
+    for (obj = objchn; obj; obj = bynexthere ? obj->nexthere : nextobj) {
+        nextobj = obj->nobj;
         /* ignitable items like lamps and candles will catch fire */
         if (!obj->lamplit && !obj->in_use)
             catch_lit(obj);
@@ -7030,7 +7142,8 @@ trap_ice_effects(coordxy x, coordxy y, boolean ice_is_melting)
             int otyp = (ttmp->ttyp == LANDMINE) ? LAND_MINE : BEARTRAP;
             cnv_trap_obj(otyp, 1, ttmp, TRUE);
         } else {
-            deltrap(ttmp);
+            if (!undestroyable_trap(ttmp->ttyp))
+                deltrap(ttmp);
         }
     }
 }

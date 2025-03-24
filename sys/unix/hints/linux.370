@@ -74,6 +74,9 @@ endif  # WANT_WIN_QT5
 ifdef WANT_WIN_QT6
 #if your Qt6 is elsewhere, change this to match
 QTDIR=/usr/local/qt6
+ifeq "$(GPPGTEQ14)" "1"
+CCXXFLAGS += -Wno-template-id-cdtor
+endif    # g++ greater than or equal to 14
 endif   # WANT_WIN_QT6
 endif  # WANT_WIN_QT
 
@@ -357,10 +360,10 @@ POSTINSTALL+= sed -i -e 's;^GDBPATH=/usr/bin/gdb;\#GDBPATH=/usr/bin/gdb;' \
 		-e 's;PANICTRACE_GDB=1;PANICTRACE_GDB=0;' $(INSTDIR)/sysconf;
 endif
 
-ifeq 'USENONOSTATICFN' '1'
+ifeq '$(USE_NONOSTATICFN)' '1'
 CFLAGS += -DNONOSTATICFN
 else
-ifeq 'USE_NOSTATICFN' '1'
+ifeq '$(USE_NOSTATICFN)' '1'
 CFLAGS += -DNOSTATICFN
 endif
 endif

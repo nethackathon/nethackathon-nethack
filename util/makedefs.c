@@ -339,7 +339,7 @@ do_makedefs(char *options)
             rafile(*options);
             break;
 #if defined(OLD_MAKEDEFS_OPTIONS)
-	case 'o':
+        case 'o':
         case 'O':
             do_objs();
             break;
@@ -361,7 +361,7 @@ do_makedefs(char *options)
             do_questtxt();
             break;
 #else
-	case 'o': case 'O': case 'e': case 'E': case 'v': case 'V':
+        case 'o': case 'O': case 'e': case 'E': case 'v': case 'V':
         case 'p': case 'P': case 'q': case 'Q':
             Fprintf(stderr, "Old makedefs option.\n"
                 "Rebuild makedefs with '-DOLD_MAKEDEFS_OPTIONS'"
@@ -393,7 +393,7 @@ oldfunctionality(char sought)
         char ucoflet;
         const char *ofnam;
     } ofn[] = {
-	{ 'e', 'E', DGN_O_FILE },
+        { 'e', 'E', DGN_O_FILE },
         { 'o', 'O', ONAME_FILE },
         { 'p', 'P', MONST_FILE },
         { 'q', 'Q', QTXT_O_FILE },
@@ -482,7 +482,7 @@ getfp(const char *template, const char *tag, const char *mode, int flg)
         err = tmpfile_s(&rv);
 #if defined(MSDOS) || defined(WIN32)
         if (!err && (!strcmp(mode, WRTMODE) || !strcmp(mode, RDTMODE))) {
-           _setmode(fileno(rv), O_TEXT);
+            (void) _setmode(fileno(rv), O_TEXT);
         }
 #endif
     } else
@@ -661,15 +661,15 @@ do_ext_makedefs(int argc, char **argv)
             }
             CONTINUE;
         }
-	IS_OPTION("grep-defined"){
-	    struct grep_var *p;
+        IS_OPTION("grep-defined"){
+            struct grep_var *p;
 
-	    CONSUME;
-	    p = grepsearch(argv[0]);
-		// NB: Exit status is ready for the shell:
-		//     0=defined, 1=not defined
-	    makedefs_exit(!(p && p->is_defined));
-	}
+            CONSUME;
+            p = grepsearch(argv[0]);
+                // NB: Exit status is ready for the shell:
+                //     0=defined, 1=not defined
+            makedefs_exit(!(p && p->is_defined));
+        }
 #ifdef notyet
         IS_OPTION("help") {
         }
@@ -846,7 +846,8 @@ do_grep_control(char *buf)
         break;
     case '!': /* if not ID */
         isif = 0;
-    /* FALLTHROUGH */
+        FALLTHROUGH;
+    /* FALLTHRU */
     case '?': /* if ID */
         if (grep_sp == GREP_STACK_SIZE - 2) {
             Fprintf(stderr, "stack overflow at line %d.", grep_lineno);
@@ -1321,6 +1322,10 @@ do_data(void)
 
     /* reprocess the scratch file; 1st format an error msg, just in case */
     line = malloc(BUFSZ + MAXFNAMELEN);
+    if (!line) {
+        fprintf(stderr, "makedefs malloc() failure\n");
+        exit(EXIT_FAILURE);
+    }
     Sprintf(line, "rewind of \"%s\"", tempfile);
     if (rewind(tfp) != 0)
         goto dead_data;
@@ -2298,6 +2303,7 @@ do_objs(void)
                 n_glass_gems++;
                 break;
             }
+            FALLTHROUGH;
             /*FALLTHRU*/
         case VENOM_CLASS:
             /* fall-through from gem class is ok; objects[] used to have
@@ -2307,6 +2313,7 @@ do_objs(void)
                so strip the extra "splash of " off to keep same macros */
             if (!strncmp(objnam, "SPLASH_OF_", 10))
                 objnam += 10;
+            FALLTHROUGH;
             /*FALLTHRU*/
         default:
             Fprintf(ofp, "#define\t");

@@ -1,4 +1,4 @@
-/* NetHack 3.7	music.c	$NHDT-Date: 1702349065 2023/12/12 02:44:25 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.102 $ */
+/* NetHack 3.7	music.c	$NHDT-Date: 1736530208 2025/01/10 09:30:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.120 $ */
 /*      Copyright (c) 1989 by Jean-Christophe Collet */
 /* NetHack may be freely redistributed.  See license for details. */
 
@@ -159,7 +159,7 @@ calm_nymphs(int distance)
 
 /* Awake soldiers anywhere the level (and any nearby monster). */
 void
-awaken_soldiers(struct monst* bugler  /* monster that played instrument */)
+awaken_soldiers(struct monst *bugler  /* monster that played instrument */)
 {
     struct monst *mtmp;
     int distance, distm;
@@ -443,6 +443,7 @@ do_earthquake(int force)
                 unblock_point(x, y);
                 if (cansee(x, y))
                     pline("A secret corridor is revealed.");
+                FALLTHROUGH;
                 /*FALLTHRU*/
             case CORR:
             case ROOM:
@@ -452,6 +453,7 @@ do_earthquake(int force)
                 cvt_sdoor_to_door(&levl[x][y]); /* .typ = DOOR */
                 if (cansee(x, y))
                     pline("A secret door is revealed.");
+                FALLTHROUGH;
                 /*FALLTHRU*/
             case DOOR: /* make the door collapse */
                 /* if already doorless, treat like room or corridor */
@@ -461,7 +463,7 @@ do_earthquake(int force)
                 }
                 /* wasn't doorless, now it will be */
                 levl[x][y].doormask = D_NODOOR;
-                unblock_point(x, y);
+                recalc_block_point(x, y);
                 newsym(x, y); /* before pline */
                 if (cansee(x, y))
                     pline_The("door collapses.");
@@ -731,7 +733,7 @@ staticfn char *
 improvised_notes(boolean *same_as_last_time)
 {
     static const char notes[7] = { 'A', 'B', 'C', 'D', 'E', 'F', 'G' };
-    /* target buffer has to be in svc.context, otherwise saving game 
+    /* target buffer has to be in svc.context, otherwise saving game
      * between improvised recitals would not be able to maintain
      * the same_as_last_time context. */
 

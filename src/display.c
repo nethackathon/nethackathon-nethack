@@ -420,10 +420,13 @@ unmap_object(coordxy x, coordxy y)
         struct rm *lev = &levl[x][y];
 
         if (spot_shows_engravings(x, y)
-               && (ep = engr_at(x, y)) != 0 && !covers_traps(x, y))
+            && (ep = engr_at(x, y)) != 0 && !covers_traps(x, y)) {
+            if (cansee(x, y))
+                ep->erevealed = 1;
             map_engraving(ep, 0);
-        else
+        } else {
             map_background(x, y, 0);
+        }
 
         /* turn remembered dark room squares dark */
         if (!lev->waslit && lev->glyph == cmap_to_glyph(S_room)
@@ -443,26 +446,29 @@ unmap_object(coordxy x, coordxy y)
  * Internal to display.c, this is a #define for speed.
  */
 #define _map_location(x, y, show) \
-    do {                                                                    \
-        struct obj *obj;                                                    \
-        struct trap *trap;                                                  \
-        struct engr *ep;                                                    \
-        NhRegion *_ml_reg;                                                  \
-                                                                            \
-        if ((obj = vobj_at(x, y)) && !covers_objects(x, y))                 \
-            map_object(obj, show);                                          \
-        else if ((trap = t_at(x, y)) && trap->tseen && !covers_traps(x, y)) \
-            map_trap(trap, show);                                           \
-        else if (spot_shows_engravings(x, y)                                \
-                 && (ep = engr_at(x, y)) != 0                               \
-                 && !covers_traps(x, y))                                    \
-            map_engraving(ep, show);                                        \
-        else                                                                \
-            map_background(x, y, show);                                     \
-                                                                            \
-        update_lastseentyp(x, y);                                           \
-        if (show && !Blind && (_ml_reg = visible_region_at(x, y)) != 0)     \
-            show_region(_ml_reg, x, y);                                     \
+    do {                                                                \
+        struct obj *obj;                                                \
+        struct trap *trap;                                              \
+        struct engr *ml_ep;                                             \
+        NhRegion *_ml_reg;                                              \
+                                                                        \
+        if ((obj = vobj_at(x, y)) && !covers_objects(x, y)) {           \
+            map_object(obj, show);                                      \
+        } else if ((trap = t_at(x, y))                                  \
+                    && trap->tseen && !covers_traps(x, y)) {            \
+            map_trap(trap, show);                                       \
+        } else if (spot_shows_engravings(x, y)                          \
+                 && (ml_ep = engr_at(x, y)) != 0                        \
+                 && ml_ep->erevealed                                    \
+                 && !covers_traps(x, y)) {                              \
+            map_engraving(ml_ep, show);                                 \
+        } else {                                                        \
+            map_background(x, y, show);                                 \
+        }                                                               \
+                                                                        \
+        update_lastseentyp(x, y);                                       \
+        if (show && !Blind && (_ml_reg = visible_region_at(x, y)) != 0) \
+            show_region(_ml_reg, x, y);                                 \
     } while (0)
 
 void
@@ -528,6 +534,7 @@ display_monster(
         default:
             impossible("display_monster:  bad m_ap_type value [ = %d ]",
                        (int) mon->m_ap_type);
+            FALLTHROUGH;
             /*FALLTHRU*/
         case M_AP_NOTHING:
             show_glyph(x, y, mon_to_glyph(mon, newsym_rn2));
@@ -692,19 +699,22 @@ mon_overrides_region(
     return glyph_is_invisible(levl[mx][my].glyph) ? TRUE : FALSE;
 }
 
+#ifdef HANGUPHANDLING
+#define _suppress_map_output() \
+    (gi.in_mklev || program_state.saving || program_state.restoring     \
+     || program_state.done_hup)
+#else
+#define _suppress_map_output() \
+    (gi.in_mklev || program_state.saving || program_state.restoring)
+#endif
+
 /* map or status window might not be ready for output during level creation
    or game restoration (something like u.usteed which affects display of
    the hero and also a status condition might not be set up yet) */
 boolean
 suppress_map_output(void)
 {
-    if (gi.in_mklev || program_state.saving || program_state.restoring)
-        return TRUE;
-#ifdef HANGUPHANDLING
-    if (program_state.done_hup)
-        return TRUE;
-#endif
-    return FALSE;
+    return _suppress_map_output();
 }
 
 /*
@@ -738,9 +748,10 @@ feel_location(coordxy x, coordxy y)
     struct rm *lev;
     struct obj *boulder;
     struct monst *mon;
+    struct engr *ep;
 
     /* replicate safeguards used by newsym(); might not be required here */
-    if (suppress_map_output())
+    if (_suppress_map_output())
         return;
 
     if (!isok(x, y))
@@ -780,7 +791,7 @@ feel_location(coordxy x, coordxy y)
          *      + Room/water positions
          *      + Everything else (hallways!)
          */
-        if (IS_ROCK(lev->typ)
+        if (IS_OBSTRUCTED(lev->typ)
             || (IS_DOOR(lev->typ)
                 && (lev->doormask & (D_LOCKED | D_CLOSED)))) {
             map_background(x, y, 1);
@@ -847,6 +858,9 @@ feel_location(coordxy x, coordxy y)
                 show_glyph(x, y, lev->glyph = cmap_to_glyph(S_darkroom));
         }
     } else {
+        if ((ep = engr_at(x, y)) != 0 && engr_can_be_felt(ep))
+            ep->erevealed = 1;
+
         _map_location(x, y, 1);
 
         if (Punished) {
@@ -907,9 +921,10 @@ newsym(coordxy x, coordxy y)
     int see_it;
     boolean worm_tail;
     struct rm *lev = &(levl[x][y]);
+    struct engr *ep;
 
     /* don't try to produce map output when level is in a state of flux */
-    if (suppress_map_output())
+    if (_suppress_map_output())
         return;
 
     /* only permit updating the hero when swallowed */
@@ -945,6 +960,8 @@ newsym(coordxy x, coordxy y)
         mon = m_at(x, y);
         worm_tail = is_worm_tail(mon);
 
+        if ((ep = engr_at(x, y)) != 0)
+            ep->erevealed = 1; /* even when covered by objects or a monster */
         /*
          * Normal region shown only on accessible positions, but
          * poison clouds and steam clouds also shown above lava,
@@ -1005,8 +1022,9 @@ newsym(coordxy x, coordxy y)
                 display_warning(mon);
             } else if (glyph_is_invisible(lev->glyph)) {
                 map_invisible(x, y);
-            } else
+            } else {
                 _map_location(x, y, 1); /* map the location */
+            }
         }
 
     /* Can't see the location. */
@@ -1853,6 +1871,10 @@ show_glyph(coordxy x, coordxy y, int glyph)
     boolean show_glyph_change = FALSE;
     int oldglyph;
 
+    /* don't process map glyphs when saving, restoring, or in_mklev */
+    if (_suppress_map_output())
+        return;
+
     //if (glyph == 3972 || glyph == 3988)
     //    __debugbreak();
     /*
@@ -2183,7 +2205,7 @@ flush_screen(int cursor_on_u)
     int bkglyph;
 
     /* 3.7: don't update map, status, or perm_invent during save/restore */
-    if (suppress_map_output())
+    if (_suppress_map_output())
         return;
 
     if (cursor_on_u == -1)
@@ -2653,12 +2675,6 @@ int wallcolors[sokoban_walls + 1] = {
 #define wall_color(n) color = iflags.use_color ? wallcolors[n] : NO_COLOR
 #define altar_color(n) color = iflags.use_color ? altarcolors[n] : NO_COLOR
 
-#if 0
-#define is_objpile(x, y)                          \
-    (!Hallucination && svl.level.objects[(x)][(y)] \
-     && svl.level.objects[(x)][(y)]->nexthere)
-#endif
-
 staticfn int cmap_to_roguecolor(int);
 
 staticfn int
@@ -3100,7 +3116,8 @@ check_pos(coordxy x, coordxy y, int which)
     if (!isok(x, y))
         return which;
     type = levl[x][y].typ;
-    if (IS_ROCK(type) || type == CORR || type == SCORR)
+    /* Everything below POOL, excluding TREE */
+    if (IS_STWALL(type) || type == CORR || type == SCORR || IS_SDOOR(type))
         return which;
     return 0;
 }
@@ -3564,6 +3581,7 @@ wall_angle(struct rm *lev)
     case SDOOR:
         if (lev->horizontal)
             goto horiz;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case VWALL:
         switch (lev->wall_info & WM_MASK) {
@@ -3766,11 +3784,17 @@ fn_cmap_to_glyph(int cmap)
 #undef DETECTED
 #undef PHYSICALLY_SEEN
 #undef is_worm_tail
+#undef _suppress_map_output
 #undef TMP_AT_MAX_GLYPHS
 #undef Glyphinfo_at
 #undef reset_glyph_bbox
 #undef HAS_ROGUE_IBM_GRAPHICS
 #undef GMAP_SET
 #undef GMAP_ROGUELEVEL
+#ifndef WA_VERBOSE
+#undef more_than_one
+#endif
+#undef only
+#undef set_corner
 
 /*display.c*/

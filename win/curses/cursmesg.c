@@ -8,7 +8,6 @@
 #include "wincurs.h"
 #include "cursmesg.h"
 #include "curswins.h"
-#include <ctype.h>
 
 /* defined in sys/<foo>/<foo>tty.c or cursmain.c as last resort;
    set up by curses_init_nhwindows() */
@@ -214,8 +213,9 @@ curses_message_win_puts(const char *message, boolean recursed)
             mvwadd_wch(win, my, mx, mixed_leadin_cchar);
             ++mx;
             message_length--;
-            have_mixed_leadin = FALSE;
             mesg_mixed = 0;
+            have_mixed_leadin = FALSE;
+            nhUse(have_mixed_leadin);
         }
 #endif
         mvwprintw(win, my, mx, "%s", tmpstr), mx += (int) strlen(tmpstr);
@@ -235,8 +235,9 @@ curses_message_win_puts(const char *message, boolean recursed)
             mvwadd_wch(win, my, mx, mixed_leadin_cchar);
             ++mx;
             message_length--;
-            have_mixed_leadin = FALSE;
             mesg_mixed = 0;
+            have_mixed_leadin = FALSE;
+            nhUse(have_mixed_leadin);
         }
 #endif
         mvwprintw(win, my, mx, "%s", message), mx += message_length;
@@ -276,7 +277,8 @@ curscolor(int nhcolor, boolean *boldon)
 }
 #endif
 
-void curses_got_input(void)
+void
+curses_got_input(void)
 {
     /* if messages are being suppressed, reenable them */
     curs_mesg_suppress_seq = -1L;
@@ -941,6 +943,8 @@ mesg_add_line(const char *mline)
     } else {
         /* instead of discarding list element being forced out, reuse it */
         current_mesg = first_mesg;
+        assert(current_mesg != NULL);
+        assert(current_mesg->str != NULL);
         /* whenever new 'mline' is shorter, extra allocation size of the
            original element will be frittered away, until eventually we'll
            discard this 'str' and dupstr() a replacement; we could easily
@@ -1078,11 +1082,12 @@ curses_putmsghistory(const char *msg, boolean restoring_msghist)
            however, we aren't only called when restoring history;
            core uses putmsghistory() for other stuff during play
            and those messages should have a normal turn value */
-        if (last_mesg) /* appease static analyzer */
+        if (last_mesg) { /* appease static analyzer */
             last_mesg->turn = restoring_msghist ? (1L << 3) : gh.hero_seq;
 #ifdef DUMPLOG_CORE
-        dumplogmsg(last_mesg->str);
+            dumplogmsg(last_mesg->str);
 #endif
+        }
     } else if (stash_count) {
         nhprev_mesg *mesg;
         long mesg_turn;

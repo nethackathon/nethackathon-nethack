@@ -1,19 +1,19 @@
-/* NetHack 3.7	options.c	$NHDT-Date: 1710792444 2024/03/18 20:07:24 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.723 $ */
+/* NetHack 3.7	options.c	$NHDT-Date: 1737556914 2025/01/22 06:41:54 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.753 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Michael Allison, 2008. */
 /* NetHack may be freely redistributed.  See license for details. */
 
-#ifdef OPTION_LISTS_ONLY /* (AMIGA) external program for opt lists */
+#ifndef OPTION_LISTS_ONLY
+#include "hack.h"
+#include "tcap.h"
+#else /* OPTION_LISTS_ONLY: (AMIGA) external program for opt lists */
 #include "config.h"
 #include "objclass.h"
 #include "flag.h"
 NEARDATA struct flag flags; /* provide linkage */
 NEARDATA struct instance_flags iflags; /* provide linkage */
+NEARDATA struct accessibility_data a11y;
 #define static
-#else
-#include "hack.h"
-#include "tcap.h"
-#include <ctype.h>
 #endif
 
 #define BACKWARD_COMPAT
@@ -3451,6 +3451,9 @@ optfn_roguesymset(
     }
     if (req == do_set) {
         if (op != empty_optstr) {
+            if (gs.symset[ROGUESET].name)
+                free((genericptr_t) gs.symset[ROGUESET].name),
+                    gs.symset[ROGUESET].name = 0;
             gs.symset[ROGUESET].name = dupstr(op);
             if (!read_sym_file(ROGUESET)) {
                 clear_symsetentry(ROGUESET, TRUE);
@@ -3621,6 +3624,7 @@ optfn_scores(
                                      allopt[optidx].name);
                     return optn_silenterr;
                 }
+                FALLTHROUGH;
                 /*FALLTHRU*/
             default:
                 config_error_add("Unknown %s parameter '%s'",
@@ -3737,8 +3741,11 @@ optfn_soundlib(
          */
         if ((op = string_for_env_opt(allopt[optidx].name, opts, FALSE))
             != empty_optstr) {
+            enum soundlib_ids option_id;
 
             get_soundlib_name(soundlibbuf, WINTYPELEN);
+            option_id = soundlib_id_from_opt(op);
+            gc.chosen_soundlib = option_id;
             assign_soundlib(gc.chosen_soundlib);
         } else
             return optn_err;
@@ -4066,6 +4073,9 @@ optfn_symset(
     }
     if (req == do_set) {
         if (op != empty_optstr) {
+            if (gs.symset[PRIMARYSET].name)
+                free((genericptr_t) gs.symset[PRIMARYSET].name),
+                     gs.symset[PRIMARYSET].name = 0;
             gs.symset[PRIMARYSET].name = dupstr(op);
             if (!read_sym_file(PRIMARYSET)) {
                 clear_symsetentry(PRIMARYSET, TRUE);
@@ -5291,6 +5301,9 @@ optfn_boolean(
         case opt_rest_on_space:
             update_rest_on_space();
             break;
+        case opt_accessiblemsg:
+            a11y.msg_loc.x = a11y.msg_loc.y = 0;
+            break;
         default:
             break;
         }
@@ -5371,7 +5384,11 @@ can_set_perm_invent(void)
         iflags.perminv_mode = InvOptOn;
 
 #ifdef TTY_PERM_INVENT
-    if (WINDOWPORT(tty) && !go.opt_initial) {
+    if ((WINDOWPORT(tty)
+#ifdef WIN32
+         || WINDOWPORT(safestartup)
+#endif
+         ) && !go.opt_initial) {
         perm_invent_toggled(FALSE);
         /* perm_invent_toggled()
            -> sync_perminvent()
@@ -5387,6 +5404,20 @@ can_set_perm_invent(void)
 #endif
     return TRUE;
 }
+
+
+#ifdef TTY_PERM_INVENT
+void
+check_perm_invent_again(void)
+{
+    if (iflags.perm_invent_pending) {
+        iflags.perm_invent = FALSE;
+        if (can_set_perm_invent())
+           iflags.perm_invent = TRUE;
+        iflags.perm_invent_pending = FALSE;
+    }
+}
+#endif
 
 staticfn int
 handler_menustyle(void)
@@ -6932,6 +6963,11 @@ initoptions(void)
      */
 #endif
 #endif /* SYSCF */
+
+    /* Carry out options that got deferred from early_options */
+    if (gd.deferred_showpaths)
+        do_deferred_showpaths(0);  /* does not return */
+
     initoptions_finish();
 }
 
@@ -6945,7 +6981,7 @@ initoptions_init(void)
     int i;
     boolean have_branch = (nomakedefs.git_branch && *nomakedefs.git_branch);
 
-    go.opt_phase = builtin_opt;		// Did I need to move this here?
+    go.opt_phase = builtin_opt;    /* Did I need to move this here? */
     memcpy(allopt, allopt_init, sizeof(allopt));
     determine_ambiguities();
 
@@ -7734,7 +7770,7 @@ parse_role_opt(
     char **opp)
 {
     static char neg_opt[] = "!"; /* not 'const' but never modified */
-    char *preval, *op = *opp;
+    char *preval, *op;
     int which = (optidx == opt_role) ? RS_ROLE
                 : (optidx == opt_race) ? RS_RACE
                   : (optidx == opt_gender) ? RS_GENDER
@@ -7821,7 +7857,7 @@ parse_role_opt(
                    if it's ok, replace it with canonical form */
                 saveoptstr(optidx, op);
                 *opp = op;
-                ok = TRUE;
+                /*ok = TRUE; // redundant*/
                 /* don't return yet; value might be a list that follows
                    this with something else which might make it invalid */
             }
@@ -8162,6 +8198,28 @@ optfn_o_bind_keys(
     }
     if (req == do_handler) {
         handler_rebind_keys();
+    }
+    return optn_ok;
+}
+
+staticfn int
+optfn_o_autocomplete(
+    int optidx UNUSED, int req, boolean negated UNUSED,
+    char *opts, char *op UNUSED)
+{
+    if (req == do_init) {
+        return optn_ok;
+    }
+    if (req == do_set) {
+    }
+    if (req == get_val || req == get_cnf_val) {
+        if (!opts)
+            return optn_err;
+        Sprintf(opts, n_currently_set, count_autocompletions());
+        return optn_ok;
+    }
+    if (req == do_handler) {
+        handler_change_autocompletions();
     }
     return optn_ok;
 }
@@ -9039,7 +9097,6 @@ handle_add_list_remove(const char *optname, int numtotal)
     };
     int clr = NO_COLOR;
 
-    opt_idx = 0;
     tmpwin = create_nhwindow(NHW_MENU);
     start_menu(tmpwin, MENU_BEHAVE_STANDARD);
     any = cg.zeroany;
@@ -9559,7 +9616,7 @@ next_opt(winid datawin, const char *str)
     if (!*str) {
         s = eos(buf);
         if (s > &buf[1] && s[-2] == ',')
-            Strcpy(s - 2, "."); /* replace last ", " */
+            s[-2] = '.', s[-1] = '\0'; /* replace ending ", " with "." */
         i = COLNO;              /* (greater than COLNO - 2) */
     } else {
         i = Strlen(buf) + Strlen(str) + 2;
@@ -9801,6 +9858,16 @@ wc_set_font_name(int opttype, char *fontname)
     return;
 }
 
+static char **fgp[] = { &iflags.wcolors[wcolor_menu].fg,
+                        &iflags.wcolors[wcolor_message].fg,
+                        &iflags.wcolors[wcolor_status].fg,
+                        &iflags.wcolors[wcolor_text].fg };
+static char **bgp[] = { &iflags.wcolors[wcolor_menu].bg,
+                        &iflags.wcolors[wcolor_message].bg,
+                        &iflags.wcolors[wcolor_status].bg,
+                        &iflags.wcolors[wcolor_text].bg };
+int options_set_window_colors_flag = 0;
+
 staticfn int
 wc_set_window_colors(char *op)
 {
@@ -9808,14 +9875,7 @@ wc_set_window_colors(char *op)
      *  menu white/black message green/yellow status white/blue text
      * white/black
      */
-    static char **fgp[] = { &iflags.wcolors[wcolor_menu].fg,
-                            &iflags.wcolors[wcolor_message].fg,
-                            &iflags.wcolors[wcolor_status].fg,
-                            &iflags.wcolors[wcolor_text].fg };
-    static char **bgp[] = { &iflags.wcolors[wcolor_menu].bg,
-                            &iflags.wcolors[wcolor_message].bg,
-                            &iflags.wcolors[wcolor_status].bg,
-                            &iflags.wcolors[wcolor_text].bg };
+
     int j;
     int32 clr;
     char buf[BUFSZ];
@@ -9897,7 +9957,22 @@ wc_set_window_colors(char *op)
                              wn);
         }
     }
+    options_set_window_colors_flag = 1;
     return 1;
+}
+
+void
+options_free_window_colors(void)
+{
+    int j;
+
+    for (j = 0; j < WC_COUNT; ++j) {
+        if (*fgp[j])
+            free((genericptr_t) *fgp[j]), *fgp[j] = 0;
+        if (*bgp[j])
+            free((genericptr_t) *bgp[j]), *bgp[j] = 0;
+    }
+    options_set_window_colors_flag = 0;
 }
 
 /* set up for wizard mode if player or save file has requested it;

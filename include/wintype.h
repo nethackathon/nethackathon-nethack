@@ -55,7 +55,9 @@ enum any_types {
     ANY_ULPTR,       /* pointer to unsigned long */
     ANY_STR,         /* pointer to null-terminated char string */
     ANY_NFUNC,       /* pointer to function taking no args, returning int */
-    ANY_MASK32       /* 32-bit mask (stored as unsigned long) */
+    ANY_MASK32,      /* 32-bit mask (stored as unsigned long) */
+
+    ANY_INVALID      /* leave this last */
 };
 
 /* menu return list */
@@ -218,6 +220,7 @@ enum to_core_flags {
     too_small        = 0x002,
     prohibited       = 0x004,
     no_init_done     = 0x008,
+    too_early        = 0x010,
 };
 
 enum from_core_requests {

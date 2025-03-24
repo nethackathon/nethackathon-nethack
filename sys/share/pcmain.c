@@ -12,8 +12,6 @@
 #include <signal.h>
 #endif
 
-#include <ctype.h>
-
 #if !defined(AMIGA) && !defined(__DJGPP__)
 #include <sys\stat.h>
 #else
@@ -22,12 +20,6 @@
 
 #ifdef __DJGPP__
 #include <unistd.h> /* for getcwd() prototype */
-#endif
-
-#if defined(MICRO) || defined(OS2)
-ATTRNORETURN void nethack_exit(int) NORETURN;
-#else
-#define nethack_exit exit
 #endif
 
 char *exepath(char *);

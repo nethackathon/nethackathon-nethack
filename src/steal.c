@@ -165,12 +165,13 @@ staticfn int
 stealarm(void)
 {
     struct monst *mtmp;
-    struct obj *otmp;
+    struct obj *otmp, *nextobj;
 
     if (!gs.stealoid || !gs.stealmid)
         goto botm;
 
-    for (otmp = gi.invent; otmp; otmp = otmp->nobj) {
+    for (otmp = gi.invent; otmp; otmp = nextobj) {
+        nextobj = otmp->nobj;
         if (otmp->o_id == gs.stealoid) {
             for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
                 if (mtmp->m_id == gs.stealmid) {
@@ -649,11 +650,11 @@ mpickobj(struct monst *mtmp, struct obj *otmp)
             pline("%s out.", Tobjnam(otmp, "go"));
         snuff_otmp = TRUE;
     }
+    /* for hero owned object on shop floor, mtmp is taking possession
+       and if it's eventually dropped in a shop, shk will claim it */
+    otmp->no_charge = 0;
     /* some object handling is only done if mtmp isn't a pet */
     if (!mtmp->mtame) {
-        /* for hero owned object on shop floor, mtmp is taking possession
-           and if it's eventually dropped in a shop, shk will claim it */
-        otmp->no_charge = 0;
         /* if monst is unseen, some info hero knows about this object becomes
            lost; continual pickup and drop by pets makes this too annoying if
            it is applied to them; when engulfed (where monster can't be seen

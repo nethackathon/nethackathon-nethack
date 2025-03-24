@@ -1441,11 +1441,13 @@ spelleffects(int spell_otyp, boolean atme, boolean force)
             }
             break;
         } /* else */
+        FALLTHROUGH;
         /*FALLTHRU*/
 
     /* these spells are all duplicates of wand effects */
     case SPE_FORCE_BOLT:
         physical_damage = TRUE;
+        FALLTHROUGH;
     /*FALLTHRU*/
     case SPE_SLEEP:
     case SPE_MAGIC_MISSILE:
@@ -1507,11 +1509,12 @@ spelleffects(int spell_otyp, boolean atme, boolean force)
     case SPE_DETECT_FOOD:
     case SPE_CAUSE_FEAR:
     case SPE_IDENTIFY:
+    case SPE_CHARM_MONSTER:
         /* high skill yields effect equivalent to blessed scroll */
         if (role_skill >= P_SKILLED)
             pseudo->blessed = 1;
+        FALLTHROUGH;
     /*FALLTHRU*/
-    case SPE_CHARM_MONSTER:
     case SPE_MAGIC_MAPPING:
     case SPE_CREATE_MONSTER:
         (void) seffects(pseudo);
@@ -1526,6 +1529,7 @@ spelleffects(int spell_otyp, boolean atme, boolean force)
         /* high skill yields effect equivalent to blessed potion */
         if (role_skill >= P_SKILLED)
             pseudo->blessed = 1;
+        FALLTHROUGH;
     /*FALLTHRU*/
     case SPE_INVISIBILITY:
         (void) peffects(pseudo);
@@ -1571,7 +1575,8 @@ spelleffects(int spell_otyp, boolean atme, boolean force)
     }
 
     /* gain skill for successful cast */
-    use_skill(skill, spellev(spell));
+    if (!force)
+        use_skill(skill, spellev(spell));
 
     obfree(pseudo, (struct obj *) 0); /* now, get rid of it */
     return ECMD_TIME;

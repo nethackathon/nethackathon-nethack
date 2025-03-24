@@ -930,6 +930,8 @@ detect_obj_traps(
                 continue;
         }
         if (Is_box(otmp) && otmp->otrapped) {
+            otmp->tknown = 1;
+            otmp->dknown = 1;
             result |= u_at(x, y) ? OTRAP_HERE : OTRAP_THERE;
             if (ft) {
                 flash_glyph_at(x, y, trapglyph, FOUND_FLASH_COUNT);
@@ -1402,7 +1404,7 @@ show_map_spot(coordxy x, coordxy y, boolean cnf)
     if (!IS_FURNITURE(lev->typ)) {
         if ((t = t_at(x, y)) != 0 && t->tseen) {
             map_trap(t, 1);
-        } else if ((ep = engr_at(x, y)) != 0) {
+        } else if ((ep = engr_at(x, y)) != 0 && !cnf) {
             map_engraving(ep, 1);
         } else if (glyph_is_trap(oldglyph) || glyph_is_object(oldglyph)) {
             show_glyph(x, y, oldglyph);
@@ -1649,6 +1651,7 @@ findone(coordxy zx, coordxy zy, genericptr_t whatfound)
 
         flash_glyph_at(zx, zy, cmap_to_glyph(sym), FOUND_FLASH_COUNT);
         cvt_sdoor_to_door(lev); /* set lev->typ = DOOR */
+        recalc_block_point(zx, zy);
         magic_map_background(zx, zy, 0);
         foundone(zx, zy, back_to_glyph(zx, zy));
         found_p->num_sdoors++;
@@ -2038,6 +2041,7 @@ dosearch0(int aflag) /* intrinsic autosearch vs explicit searching */
                     if (rnl(7 - fund))
                         continue;
                     cvt_sdoor_to_door(&levl[x][y]); /* .typ = DOOR */
+                    recalc_block_point(x, y);
                     exercise(A_WIS, TRUE);
                     nomul(0);
                     feel_location(x, y); /* make sure it shows up */

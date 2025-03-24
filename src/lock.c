@@ -1,4 +1,4 @@
-/* NetHack 3.7	lock.c	$NHDT-Date: 1718745135 2024/06/18 21:12:15 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.137 $ */
+/* NetHack 3.7	lock.c	$NHDT-Date: 1741793439 2025/03/12 07:30:39 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2011. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -105,11 +105,12 @@ picklock(void)
                        : (gx.xlock.door->doormask & D_TRAPPED) != 0)
         && gx.xlock.magic_key) {
         gx.xlock.chance += 20; /* less effort needed next time */
-        /* unfortunately we don't have a 'tknown' flag to record
-           "known to be trapped" so declining to disarm and then
-           retrying lock manipulation will find it all over again */
-        if (y_n("You find a trap!  Do you want to try to disarm it?")
-            == 'y') {
+        if (!gx.xlock.door) {
+            if (!gx.xlock.box->tknown)
+                You("find a trap!");
+            gx.xlock.box->tknown = 1;
+        }
+        if (y_n("Do you want to try to disarm it?") == 'y') {
             const char *what;
             boolean alreadyunlocked;
 
@@ -120,6 +121,7 @@ picklock(void)
                 alreadyunlocked = !(gx.xlock.door->doormask & D_LOCKED);
             } else {
                 gx.xlock.box->otrapped = 0;
+                gx.xlock.box->tknown = 0;
                 what = (gx.xlock.box->otyp == CHEST) ? "chest" : "box";
                 alreadyunlocked = !gx.xlock.box->olocked;
             }
@@ -468,7 +470,8 @@ pick_lock(
 
                 if (autounlock && (flags.autounlock & AUTOUNLOCK_UNTRAP) != 0
                     && could_untrap(FALSE, TRUE)
-                    && (c = ynq(safe_qbuf(qbuf, "Check ", " for a trap?",
+                    && (c = otmp->tknown ? (otmp->otrapped ? 'y' : 'n')
+                            : ynq(safe_qbuf(qbuf, "Check ", " for a trap?",
                                           otmp, yname, ysimple_name, "this")))
                        != 'n') {
                     if (c == 'q')
@@ -878,13 +881,15 @@ doopen_indir(coordxy x, coordxy y)
                 && (unlocktool = autokey(TRUE)) != 0) {
                 res = pick_lock(unlocktool, cc.x, cc.y,
                                 (struct obj *) 0) ? ECMD_TIME : ECMD_OK;
-            } else if (!u.usteed
-                       && (flags.autounlock & AUTOUNLOCK_KICK) != 0
+            } else if ((flags.autounlock & AUTOUNLOCK_KICK) != 0
+                       && !u.usteed /* kicking is different when mounted */
                        && ynq("Kick it?") == 'y') {
                 cmdq_add_ec(CQ_CANNED, dokick);
                 cmdq_add_dir(CQ_CANNED,
                              sgn(cc.x - u.ux), sgn(cc.y - u.uy), 0);
-                res = ECMD_TIME;
+                /* this was 'ECMD_TIME', but time shouldn't elapse until
+                   the canned kick takes place */
+                res = ECMD_OK;
             }
         }
         return res;
@@ -907,7 +912,7 @@ doopen_indir(coordxy x, coordxy y)
         } else
             door->doormask = D_ISOPEN;
         feel_newsym(cc.x, cc.y); /* the hero knows she opened it */
-        unblock_point(cc.x, cc.y); /* vision: new see through there */
+        recalc_block_point(cc.x, cc.y); /* vision: new see through there */
     } else {
         exercise(A_STR, TRUE);
         set_msg_xy(cc.x, cc.y);
@@ -1228,7 +1233,7 @@ doorlock(struct obj *otmp, coordxy x, coordxy y)
             }
             sawit = cansee(x, y);
             door->doormask = D_BROKEN;
-            unblock_point(x, y);
+            recalc_block_point(x, y);
             seeit = cansee(x, y);
             newsym(x, y);
             if (flags.verbose) {

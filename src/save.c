@@ -1,4 +1,4 @@
-/* NetHack 3.7	save.c	$NHDT-Date: 1706079844 2024/01/24 07:04:04 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.214 $ */
+/* NetHack 3.7	save.c	$NHDT-Date: 1737610109 2025/01/22 21:28:29 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.232 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Michael Allison, 2009. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -17,7 +17,7 @@ int dotcnt, dotrow; /* also used in restore */
 #endif
 
 staticfn void savelevchn(NHFILE *);
-staticfn void savelevl(NHFILE *,boolean);
+staticfn void savelevl(NHFILE *, boolean);
 staticfn void savedamage(NHFILE *);
 staticfn void save_bubbles(NHFILE *, xint8);
 staticfn void save_stairs(NHFILE *);
@@ -91,6 +91,7 @@ dosave0(void)
 #endif
 
     program_state.saving++; /* inhibit status and perm_invent updates */
+    notice_mon_off();
     /* we may get here via hangup signal, in which case we want to fix up
        a few of things before saving so that they won't be restored in
        an improper state; these will be no-ops for normal save sequence */
@@ -238,6 +239,7 @@ dosave0(void)
     res = 1;
 
  done:
+    notice_mon_on();
     program_state.saving--;
     return res;
 }
@@ -704,7 +706,7 @@ savedamage(NHFILE *nhfp)
         if (nhfp->structlevel)
             bwrite(nhfp->fd, (genericptr_t) &xl, sizeof xl);
     }
-    while (xl--) {
+    while (damageptr) {
         if (perform_bwrite(nhfp)) {
             if (nhfp->structlevel)
                 bwrite(nhfp->fd, (genericptr_t) damageptr, sizeof *damageptr);
@@ -945,6 +947,13 @@ savemon(NHFILE *nhfp, struct monst *mtmp)
             if (nhfp->structlevel)
                 bwrite(nhfp->fd, (genericptr_t) EDOG(mtmp), buflen);
         }
+        buflen = EBONES(mtmp) ? (int) sizeof (struct ebones) : 0;
+        if (nhfp->structlevel)
+            bwrite(nhfp->fd, (genericptr_t) &buflen, sizeof (int));
+        if (buflen > 0) {
+            if (nhfp->structlevel)
+                bwrite(nhfp->fd, (genericptr_t) EBONES(mtmp), buflen);
+        }
         /* mcorpsenm is inline int rather than pointer to something,
            so doesn't need to be preceded by a length field */
         if (nhfp->structlevel)
@@ -1073,16 +1082,35 @@ savelevchn(NHFILE *nhfp)
         svs.sp_levchn = 0;
 }
 
+/* write "name-role-race-gend-algn" into save file for menu-based restore;
+   the first dash is actually stored as '\0' instead of '-' */
 void
 store_plname_in_file(NHFILE *nhfp)
 {
-    int plsiztmp = PL_NSIZ;
+    char hero[PL_NSIZ_PLUS]; /* [PL_NSIZ + 4*(1+3) + 1] */
+    int plsiztmp = (int) sizeof hero;
+
+    (void) memset((genericptr_t) hero, '\0', sizeof hero);
+    /* augment svp.plname[]; the gender and alignment values reflect those
+       in effect at time of saving rather than at start of game */
+    Snprintf(hero, sizeof hero, "%s-%.3s-%.3s-%.3s-%.3s",
+            svp.plname, gu.urole.filecode,
+            gu.urace.filecode, genders[flags.female].filecode,
+            aligns[1 - u.ualign.type].filecode);
+    /* replace "-role-race..." with "\0role-race..." so that we can include
+       or exclude the role-&c suffix easily, without worrying about whether
+       plname contains any dashes; but don't rely on snprintf() for this */
+    hero[strlen(svp.plname)] = '\0';
+    /* insert playmode into final slot of hero[];
+       'D','X','-' are the same characters as are used for paniclog entries */
+    assert(hero[PL_NSIZ_PLUS - 1 - 1] == '\0');
+    hero[PL_NSIZ_PLUS - 1] = wizard ? 'D' : discover ? 'X' : '-';
 
     if (nhfp->structlevel) {
         bufoff(nhfp->fd);
         /* bwrite() before bufon() uses plain write() */
         bwrite(nhfp->fd, (genericptr_t) &plsiztmp, sizeof plsiztmp);
-        bwrite(nhfp->fd, (genericptr_t) svp.plname, plsiztmp);
+        bwrite(nhfp->fd, (genericptr_t) hero, plsiztmp);
         bufon(nhfp->fd);
     }
     return;
@@ -1160,6 +1188,8 @@ free_dungeons(void)
     return;
 }
 
+extern int options_set_window_colors_flag; /* options.c */
+
 /* free a lot of allocated memory which is ordinarily freed during save */
 void
 freedynamicdata(void)
@@ -1194,7 +1224,6 @@ freedynamicdata(void)
 
     /* move-specific data */
     dmonsfree(); /* release dead monsters */
-    dobjsfree();
     alloc_itermonarr(0U); /* a request of 0 releases existing allocation */
 
     /* level-specific data */
@@ -1207,6 +1236,8 @@ freedynamicdata(void)
     free_light_sources(RANGE_GLOBAL);
     freeobjchn(gi.invent);
     freeobjchn(gm.migrating_objs);
+    if (go.objs_deleted)
+        dobjsfree(); /* really free deleted objects */
     freemonchn(gm.migrating_mons);
     freemonchn(gm.mydogs); /* ascension or dungeon escape */
     /* freelevchn();  --  [folded into free_dungeons()] */
@@ -1257,6 +1288,12 @@ freedynamicdata(void)
 #if defined(DUMPLOG) || defined(DUMPHTML)
     dumplogfreemessages();
 #endif
+
+    if (options_set_window_colors_flag)
+        options_free_window_colors();
+
+    if (glyphid_cache_status())
+        free_glyphid_cache();
 
     /* last, because it frees data that might be used by panic() to provide
        feedback to the user; conceivably other freeing might trigger panic */

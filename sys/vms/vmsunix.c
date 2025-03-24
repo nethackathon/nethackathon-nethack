@@ -29,7 +29,6 @@
 #include <stat.h>
 #undef umask
 #endif
-#include <ctype.h>
 
 extern int debuggable; /* defined in vmsmisc.c */
 
@@ -241,6 +240,7 @@ vms_define(const char *name, const char *value, int flag)
     switch (flag) {
     case ENV_JOB: /* job logical name */
         tbl_dsc.len = strlen(tbl_dsc.adr = "LNM$JOB");
+        FALLTHROUGH;
     /*FALLTHRU*/
     case ENV_SUP: /* supervisor-mode process logical name */
         result = lib$set_logical(&nam_dsc, &val_dsc, &tbl_dsc);
@@ -603,8 +603,9 @@ vmscond lib$find_file_end(void **);
 
 /* collect a list of character names from all save files for this player */
 int
-vms_get_saved_games(const char *savetemplate, /* wildcarded save file name in native VMS format */
-                    char ***outarray)
+vms_get_saved_games(
+    const char *savetemplate, /* wildcarded save name in native VMS format */
+    char ***outarray)
 {
     struct dsc in, out;
     unsigned short l;

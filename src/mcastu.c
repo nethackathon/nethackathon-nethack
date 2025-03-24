@@ -84,6 +84,7 @@ choose_magic_spell(int spellval)
     case 23:
         if (Antimagic || Hallucination)
             return MGC_PSI_BOLT;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 22:
     case 21:
@@ -138,6 +139,7 @@ choose_clerical_spell(int spellnum)
     case 14:
         if (rn2(3))
             return CLC_OPEN_WOUNDS;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 13:
         return CLC_GEYSER;
@@ -359,10 +361,9 @@ m_cure_self(struct monst *mtmp, int dmg)
 {
     if (mtmp->mhp < mtmp->mhpmax) {
         if (canseemon(mtmp))
-            pline("%s looks better.", Monnam(mtmp));
+            pline_mon(mtmp, "%s looks better.", Monnam(mtmp));
         /* note: player healing does 6d4; this used to do 1d8 */
-        if ((mtmp->mhp += d(3, 6)) > mtmp->mhpmax)
-            mtmp->mhp = mtmp->mhpmax;
+        healmon(mtmp, d(3, 6), 0);
         dmg = 0;
     }
     return dmg;
@@ -563,7 +564,7 @@ cast_wizard_spell(struct monst *mtmp, int dmg, int spellnum)
     case MGC_DISAPPEAR: /* makes self invisible */
         if (!mtmp->minvis && !mtmp->invis_blkd) {
             if (canseemon(mtmp))
-                pline("%s suddenly %s!", Monnam(mtmp),
+                pline_mon(mtmp, "%s suddenly %s!", Monnam(mtmp),
                       !See_invisible ? "disappears" : "becomes transparent");
             mon_set_minvis(mtmp);
             if (cansee(mtmp->mx, mtmp->my) && !canspotmon(mtmp))
@@ -788,7 +789,7 @@ cast_cleric_spell(struct monst *mtmp, int dmg, int spellnum)
             fmt = "%s summons %s!";
         }
         if (fmt)
-            pline(fmt, Monnam(mtmp), what);
+            pline_mon(mtmp, fmt, Monnam(mtmp), what);
 
         dmg = 0;
         break;
@@ -991,7 +992,7 @@ buzzmu(struct monst *mtmp, struct attack *mattk)
     if (lined_up(mtmp) && rn2(3)) {
         nomul(0);
         if (canseemon(mtmp))
-            pline("%s zaps you with a %s!", Monnam(mtmp),
+            pline_mon(mtmp, "%s zaps you with a %s!", Monnam(mtmp),
                   flash_str(BZ_OFS_AD(mattk->adtyp), FALSE));
         gb.buzzer = mtmp;
         buzz(BZ_M_SPELL(BZ_OFS_AD(mattk->adtyp)), (int) mattk->damn,

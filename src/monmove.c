@@ -1,4 +1,4 @@
-/* NetHack 3.7	monmove.c	$NHDT-Date: 1722116054 2024/07/27 21:34:14 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.255 $ */
+/* NetHack 3.7	monmove.c	$NHDT-Date: 1737392015 2025/01/20 08:53:35 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.266 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Michael Allison, 2006. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -295,9 +295,8 @@ onscary(coordxy x, coordxy y, struct monst *mtmp)
 void
 mon_regen(struct monst *mon, boolean digest_meal)
 {
-    if (mon->mhp < mon->mhpmax
-        && (svm.moves % 20 == 0 || regenerates(mon->data)))
-        mon->mhp++;
+    if (svm.moves % 20 == 0 || regenerates(mon->data))
+        healmon(mon, 1, 0);
     if (mon->mspec_used)
         mon->mspec_used--;
     if (digest_meal) {
@@ -408,6 +407,32 @@ bee_eat_jelly(struct monst *mon, struct obj *obj)
     }
     return -1; /* a queen is already present; ordinary bee hasn't moved yet */
 }
+
+/* gelatinous cube eats something from its inventory */
+static int
+gelcube_digests(struct monst *mtmp)
+{
+    struct obj *otmp = mtmp->minvent;
+
+    if (mtmp->meating || !mtmp->minvent)
+        return -1;
+
+    while (otmp) {
+        if (is_organic(otmp) && !otmp->oartifact
+            && !is_mines_prize(otmp) && !is_soko_prize(otmp))
+            break;
+        otmp = otmp->nobj;
+    }
+
+    if (!otmp)
+        return -1;
+
+    mtmp->meating = eaten_stat(mtmp->meating, otmp);
+    extract_from_minvent(mtmp, otmp, TRUE, TRUE);
+    m_consume_obj(mtmp, otmp);
+    return 0; /* used a move */
+}
+
 
 /* FIXME: gremlins don't flee from monsters wielding Sunsword or wearing
    gold dragon scales/mail, nor from gold dragons, only from the hero */
@@ -846,6 +871,10 @@ dochug(struct monst *mtmp)
         && (res = bee_eat_jelly(mtmp, otmp)) >= 0)
         return res;
 
+    if (mdat == &mons[PM_GELATINOUS_CUBE]
+        && (res = gelcube_digests(mtmp)) >= 0)
+        return res;
+
     /* A monster that passes the following checks has the opportunity
        to move. Movement itself is handled by the m_move() function. */
     if (!nearby || mtmp->mflee || scared || mtmp->mconf || mtmp->mstun
@@ -887,6 +916,7 @@ dochug(struct monst *mtmp)
         case MMOVE_NOMOVES:
             if (scared)
                 panicattk = TRUE;
+            FALLTHROUGH;
             /*FALLTHRU*/
         case MMOVE_NOTHING: /* no movement, but it can still attack you */
         case MMOVE_DONE: /* absolutely no movement */
@@ -910,7 +940,8 @@ dochug(struct monst *mtmp)
                 return 0;
             /* Monsters can move and then shoot on same turn;
                our hero can't.  Is that fair? */
-            if (!nearby && (ranged_attk(mdat)
+            if (!nearby
+                && (ranged_attk_available(mtmp)
                             || attacktype(mdat, AT_WEAP)
                             || find_offensive(mtmp)))
                 break;
@@ -1159,7 +1190,7 @@ m_balks_at_approaching(struct monst *mtmp)
         return TRUE;
 
     /* can attack from distance, and hp loss or attack not used */
-    if (ranged_attk(mtmp->data)
+    if (ranged_attk_available(mtmp)
         && ((mtmp->mhp < (mtmp->mhpmax+1) / 3)
             || !mtmp->mspec_used))
         return TRUE;
@@ -1173,7 +1204,7 @@ holds_up_web(coordxy x, coordxy y)
     stairway *sway;
 
     if (!isok(x, y)
-        || IS_ROCK(levl[x][y].typ)
+        || IS_OBSTRUCTED(levl[x][y].typ)
         || ((levl[x][y].typ == STAIRS || levl[x][y].typ == LADDER)
             && (sway = stairway_at(x, y)) != 0 && sway->up)
         || levl[x][y].typ == IRONBARS)
@@ -1440,6 +1471,7 @@ postmov(
             if (vamp_shift(mtmp, &mons[PM_FOG_CLOUD],
                            ((seenflgs & 1) != 0) ? TRUE : FALSE)) {
                 ptr = mtmp->data; /* update cached value */
+                nhUse(ptr);
             }
             if (seenflgs) {
                 remove_monster(omx, omy);
@@ -1470,7 +1502,7 @@ postmov(
     do {                                                        \
         (where)->doormask = (what);                             \
         newsym((who)->mx, (who)->my);                           \
-        unblock_point((who)->mx, (who)->my);                    \
+        recalc_block_point((who)->mx, (who)->my);               \
         vision_recalc(0);                                       \
         /* update cached value since it might change */         \
         canseeit = didseeit || cansee((who)->mx, (who)->my);    \
@@ -1490,9 +1522,9 @@ postmov(
                 && amorphous(ptr)) {
                 if (flags.verbose && canseemon(mtmp))
                     pline_mon(mtmp, "%s %s under the door.", YMonnam(mtmp),
-                          (ptr == &mons[PM_FOG_CLOUD]
-                           || ptr->mlet == S_LIGHT) ? "flows" : "oozes");
-            } else if (here->doormask & D_LOCKED && can_unlock) {
+                              (ptr == &mons[PM_FOG_CLOUD]
+                               || ptr->mlet == S_LIGHT) ? "flows" : "oozes");
+            } else if ((here->doormask & D_LOCKED) != 0 && can_unlock) {
                 /* like the vampshift hack, there are sequencing
                    issues when the monster is moved to the door's spot
                    first then door handling plus feedback comes after */
@@ -1531,7 +1563,7 @@ postmov(
                         }
                     }
                 }
-            } else if (here->doormask & (D_LOCKED | D_CLOSED)) {
+            } else if ((here->doormask & (D_LOCKED | D_CLOSED)) != 0) {
                 /* mfndpos guarantees this must be a doorbuster */
                 unsigned mask;
 
@@ -1718,8 +1750,8 @@ m_move(struct monst *mtmp, int after)
     if (is_covetous(ptr)) { /* [should this include
                              *  '&& mtmp->mstrategy != STRAT_NONE'?] */
         int covetousattack;
-        coordxy tx = STRAT_GOALX(mtmp->mstrategy),
-                ty = STRAT_GOALY(mtmp->mstrategy);
+        coordxy tx = mtmp->mgoal.x,
+                ty = mtmp->mgoal.y;
         struct monst *intruder = isok(tx, ty) ? m_at(tx, ty) : NULL;
         /*
          * if there's a monster on the object or in possession of it,
@@ -1757,6 +1789,7 @@ m_move(struct monst *mtmp, int after)
             break;
         default:
             impossible("unknown shk/gd/pri_move return value (%d)", xm);
+            FALLTHROUGH;
             /*FALLTHRU*/
         case 0:
         case 1:
@@ -1865,7 +1898,7 @@ m_move(struct monst *mtmp, int after)
         coord poss[9];
 
         cnt = mfndpos(mtmp, poss, info, flag);
-        if (cnt == 0) {
+        if (cnt == 0 && !is_unicorn(mtmp->data)) {
             if (find_defensive(mtmp, TRUE) && use_defensive(mtmp))
                 return MMOVE_DONE;
             return MMOVE_NOMOVES;

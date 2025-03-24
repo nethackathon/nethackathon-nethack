@@ -23,10 +23,14 @@ staticfn void gods_upset(aligntyp);
 staticfn void consume_offering(struct obj *);
 staticfn void offer_too_soon(aligntyp);
 staticfn void offer_real_amulet(struct obj *, aligntyp); /* NORETURN */
+staticfn void offer_negative_valued(boolean, aligntyp);
 staticfn void offer_fake_amulet(struct obj *, boolean, aligntyp);
 staticfn void offer_different_alignment_altar(struct obj *, aligntyp);
 staticfn void sacrifice_your_race(struct obj *, boolean, aligntyp);
-staticfn int bestow_artifact(void);
+staticfn int bestow_artifact(uchar);
+staticfn int sacrifice_value(struct obj *);
+staticfn int eval_offering(struct obj *, aligntyp);
+staticfn void offer_corpse(struct obj *, boolean, aligntyp);
 staticfn boolean pray_revive(void);
 staticfn boolean water_prayer(boolean);
 staticfn boolean blocked_boulder(int, int);
@@ -167,7 +171,7 @@ stuck_in_wall(void)
                 continue;
             y = u.uy + j;
             if (!isok(x, y)
-                || (IS_ROCK(levl[x][y].typ)
+                || (IS_OBSTRUCTED(levl[x][y].typ)
                     && (levl[x][y].typ != SDOOR && levl[x][y].typ != SCORR))
                 || (blocked_boulder(i, j) && !throws_rocks(gy.youmonst.data)))
                 ++count;
@@ -399,7 +403,8 @@ fix_worst_trouble(int trouble)
         break;
     case TROUBLE_STARVING:
         /* temporarily lost strength recovery now handled by init_uhunger() */
-        /*FALLTHRU*/
+        FALLTHROUGH;
+        /* FALLTHRU*/
     case TROUBLE_HUNGRY:
         Your("%s feels content.", body_part(STOMACH));
         init_uhunger();
@@ -741,13 +746,16 @@ angrygods(aligntyp resp_god)
             gods_angry(resp_god);
             punish((struct obj *) 0);
             break;
-        } /* else fall thru */
+        }
+        FALLTHROUGH;
+        /* FALLTHRU */
     case 4:
     case 5:
         gods_angry(resp_god);
         if (!Blind && !Antimagic)
             pline("%s glow surrounds you.", An(hcolor(NH_BLACK)));
-        rndcurse();
+        if (rn2(2) || !attrcurse())
+            rndcurse();
         break;
     case 7:
     case 8:
@@ -1123,6 +1131,7 @@ pleased(aligntyp g_align)
         switch (min(action, 5)) {
         case 5:
             pat_on_head = 1;
+            FALLTHROUGH;
             /*FALLTHRU*/
         case 4:
             do
@@ -1131,9 +1140,12 @@ pleased(aligntyp g_align)
             break;
 
         case 3:
+            /* up to 10 troubles */
             fix_worst_trouble(trouble);
+            FALLTHROUGH;
+            /*FALLTHRU*/
         case 2:
-            /* arbitrary number of tries */
+            /* up to 9 troubles */
             while ((trouble = in_trouble()) > 0 && (++tryct < 10))
                 fix_worst_trouble(trouble);
             break;
@@ -1141,6 +1153,7 @@ pleased(aligntyp g_align)
         case 1:
             if (trouble > 0)
                 fix_worst_trouble(trouble);
+            break;
         case 0:
             break; /* your god blows you off, too bad */
         }
@@ -1227,6 +1240,7 @@ pleased(aligntyp g_align)
                     break;
                 }
             }
+            FALLTHROUGH;
             /*FALLTHRU*/
         case 2:
             if (!Blind)
@@ -1266,14 +1280,15 @@ pleased(aligntyp g_align)
             disp.botl = TRUE;
             break;
         case 4: {
-            struct obj *otmp;
+            struct obj *otmp, *nextobj;
             int any = 0;
 
             if (Blind)
                 You_feel("the power of %s.", u_gname());
             else
                 You("are surrounded by %s aura.", an(hcolor(NH_LIGHT_BLUE)));
-            for (otmp = gi.invent; otmp; otmp = otmp->nobj) {
+            for (otmp = gi.invent; otmp; otmp = nextobj) {
+                nextobj = otmp->nobj;
                 if (otmp->cursed
                     && (otmp != uarmh /* [see worst_cursed_item()] */
                         || uarmh->otyp != HELM_OF_OPPOSITE_ALIGNMENT)) {
@@ -1327,6 +1342,7 @@ pleased(aligntyp g_align)
                 gcrownu();
                 break;
             }
+            FALLTHROUGH;
             /*FALLTHRU*/
         case 6:
             give_spell();
@@ -1572,6 +1588,16 @@ offer_real_amulet(struct obj *otmp, aligntyp altaralign)
 }
 
 staticfn void
+offer_negative_valued(boolean highaltar, aligntyp altaralign)
+{
+    if (altaralign != u.ualign.type && highaltar) {
+        desecrate_altar(highaltar, altaralign);
+    } else {
+        gods_upset(altaralign);
+    }
+}
+
+staticfn void
 offer_fake_amulet(
     struct obj *otmp,
     boolean highaltar,
@@ -1595,12 +1621,7 @@ offer_fake_amulet(
         change_luck(-3);
         adjalign(-1);
         u.ugangr += 3;
-        /* value = -3; */
-        if (altaralign != u.ualign.type && highaltar) {
-            desecrate_altar(highaltar, altaralign);
-        } else { /* value < 0 */
-            gods_upset(altaralign);
-        }
+        offer_negative_valued(highaltar, altaralign);
     }
 }
 
@@ -1756,17 +1777,25 @@ sacrifice_your_race(
 }
 
 staticfn int
-bestow_artifact(void)
+bestow_artifact(uchar max_giftvalue)
 {
     int nartifacts = nartifact_exist();
+    boolean do_bestow = u.ulevel > 2 && u.uluck >= 0;
+    if (do_bestow) {
+        /* you were already in pretty good standing */
+        /* The player can gain an artifact */
+        /* The chance goes down as the number of artifacts goes up */
+        if (wizard)
+            do_bestow = y_n("Gift an artifact?") == 'y';
+        else
+            do_bestow = !rn2(6 + (2 * u.ugifts * nartifacts));
+    }
 
-    /* you were already in pretty good standing */
-    /* The player can gain an artifact */
-    /* The chance goes down as the number of artifacts goes up */
-    if (u.ulevel > 2 && u.uluck >= 0
-        && !rn2(10 + (2 * u.ugifts * nartifacts))) {
+    if (do_bestow) {
         struct obj *otmp;
-        otmp = mk_artifact((struct obj *) 0, a_align(u.ux, u.uy));
+        /* mk_artifact() with NULL obj and a_align() arg can return NULL */
+        otmp = mk_artifact((struct obj *) 0, a_align(u.ux, u.uy),
+                           max_giftvalue, TRUE);
         if (otmp) {
             char buf[BUFSZ];
 
@@ -1805,6 +1834,20 @@ bestow_artifact(void)
     return FALSE;
 }
 
+staticfn int
+sacrifice_value(struct obj *otmp)
+{
+    int value = 0;
+
+    if (otmp->corpsenm == PM_ACID_BLOB
+        || (svm.moves <= peek_at_iced_corpse_age(otmp) + 50)) {
+        value = mons[otmp->corpsenm].difficulty + 1;
+        if (otmp->oeaten)
+            value = eaten_stat(value, otmp);
+    }
+    return value;
+}
+
 /* the #offer command - sacrifice something to the gods */
 int
 dosacrifice(void)
@@ -1812,7 +1855,6 @@ dosacrifice(void)
     struct obj *otmp;
     boolean highaltar;
     aligntyp altaralign = a_align(u.ux, u.uy);
-    int value = 0;
 
     if (!on_altar() || u.uswallow) {
         You("are not %s an altar.",
@@ -1843,6 +1885,82 @@ dosacrifice(void)
         return ECMD_TIME;
     } /* fake Amulet */
 
+    if (otmp->otyp == CORPSE) {
+        offer_corpse(otmp, highaltar, altaralign);
+        return ECMD_TIME;
+    }
+
+    pline1(nothing_happens);
+    return ECMD_TIME;
+}
+
+staticfn int
+eval_offering(struct obj *otmp, aligntyp altaralign)
+{
+    struct permonst *ptr;
+    int value;
+
+    value = sacrifice_value(otmp);
+
+    if (!value)
+        return 0;
+
+    ptr = &mons[otmp->corpsenm];
+
+    if (is_undead(ptr)) { /* Not demons--no demon corpses */
+        /* most undead that leave a corpse yield 'human' (or other race)
+           corpse so won't get here; the exception is wraith; give the
+           bonus for wraith to chaotics too because they are sacrificing
+           something valuable (unless hero refuses to eat such things) */
+        if (u.ualign.type != A_CHAOTIC
+            /* reaching this side of the 'or' means hero is chaotic */
+            || (ptr == &mons[PM_WRAITH] && u.uconduct.unvegetarian))
+            value += 1;
+    } else if (is_unicorn(ptr)) {
+        int unicalign = sgn(ptr->maligntyp);
+
+        if (unicalign == altaralign) {
+            /* When same as altar, always a very bad action.
+             */
+            pline("Such an action is an insult to %s!",
+                  (unicalign == A_CHAOTIC) ? "chaos"
+                     : unicalign ? "law" : "balance");
+            (void) adjattrib(A_WIS, -1, TRUE);
+            return -1;
+        } else if (u.ualign.type == altaralign) {
+            /* When different from altar, and altar is same as yours,
+             * it's a very good action.
+             */
+            if (u.ualign.record < ALIGNLIM)
+                You_feel("appropriately %s.", align_str(u.ualign.type));
+            else
+                You_feel("you are thoroughly on the right path.");
+            adjalign(5);
+            value += 3;
+        } else if (unicalign == u.ualign.type) {
+            /* When sacrificing unicorn of your alignment to altar not of
+             * your alignment, your god gets angry and it's a conversion.
+             */
+            u.ualign.record = -1;
+            value = 1;
+        } else {
+            /* Otherwise, unicorn's alignment is different from yours
+             * and different from the altar's.  It's an ordinary (well,
+             * with a bonus) sacrifice on a cross-aligned altar.
+             */
+            value += 3;
+        }
+    }
+    return value;
+}
+
+staticfn void
+offer_corpse(struct obj *otmp, boolean highaltar, aligntyp altaralign)
+{
+    int value;
+    struct permonst *ptr;
+    struct monst *mtmp;
+
     /*
      * Was based on nutritional value and aging behavior (< 50 moves).
      * Sacrificing a food ration got you max luck instantly, making the
@@ -1854,188 +1972,150 @@ dosacrifice(void)
      */
 #define MAXVALUE 24 /* Highest corpse value (besides Wiz) */
 
-    if (otmp->otyp == CORPSE) {
-        struct permonst *ptr = &mons[otmp->corpsenm];
-        struct monst *mtmp;
+    /* KMH, conduct */
+    if (!u.uconduct.gnostic++)
+        livelog_printf(LL_CONDUCT, "rejected atheism"
+                                   " by offering %s on an altar of %s",
+                       corpse_xname(otmp, (const char *) 0, CXN_ARTICLE),
+                       a_gname());
 
-        /* KMH, conduct */
-        if (!u.uconduct.gnostic++)
-            livelog_printf(LL_CONDUCT, "rejected atheism"
-                                       " by offering %s on an altar of %s",
-                           corpse_xname(otmp, (const char *) 0, CXN_ARTICLE),
-                           a_gname());
+    /* you're handling this corpse, even if it was killed upon the altar
+     */
+    feel_cockatrice(otmp, TRUE);
+    if (rider_corpse_revival(otmp, FALSE))
+        return;
 
-        /* you're handling this corpse, even if it was killed upon the altar
-         */
-        feel_cockatrice(otmp, TRUE);
-        if (rider_corpse_revival(otmp, FALSE))
-            return ECMD_TIME;
+    ptr = &mons[otmp->corpsenm];
 
-        if (otmp->corpsenm == PM_ACID_BLOB
-            || (svm.moves <= peek_at_iced_corpse_age(otmp) + 50)) {
-            value = mons[otmp->corpsenm].difficulty + 1;
-            if (otmp->oeaten)
-                value = eaten_stat(value, otmp);
-        }
+    /* same race or former pet results apply even if the corpse is
+       too old (value==0) */
+    if (your_race(ptr)) {
+        sacrifice_your_race(otmp, highaltar, altaralign);
+        return;
+    }
+    if (has_omonst(otmp)
+               && (mtmp = get_mtraits(otmp, FALSE)) != 0
+               && mtmp->mtame) {
+            /* mtmp is a temporary pointer to a tame monster's attributes,
+             * not a real monster */
+        pline("So this is how you repay loyalty?");
+        adjalign(-3);
+        HAggravate_monster |= FROMOUTSIDE;
+        offer_negative_valued(highaltar, altaralign);
+        return;
+    }
 
-        /* same race or former pet results apply even if the corpse is
-           too old (value==0) */
-        if (your_race(ptr)) {
-            sacrifice_your_race(otmp, highaltar, altaralign);
-            return ECMD_TIME;
-        } else if (has_omonst(otmp)
-                   && (mtmp = get_mtraits(otmp, FALSE)) != 0
-                   && mtmp->mtame) {
-                /* mtmp is a temporary pointer to a tame monster's attributes,
-                 * not a real monster */
-            pline("So this is how you repay loyalty?");
-            adjalign(-3);
-            value = -1;
-            HAggravate_monster |= FROMOUTSIDE;
-        } else if (!value) {
-            ; /* too old; don't give undead or unicorn bonus or penalty */
-        } else if (is_undead(ptr)) { /* Not demons--no demon corpses */
-            /* most undead that leave a corpse yield 'human' (or other race)
-               corpse so won't get here; the exception is wraith; give the
-               bonus for wraith to chaotics too because they are sacrificing
-               something valuable (unless hero refuses to eat such things) */
-            if (u.ualign.type != A_CHAOTIC
-                /* reaching this side of the 'or' means hero is chaotic */
-                || (ptr == &mons[PM_WRAITH] && u.uconduct.unvegetarian))
-                value += 1;
-        } else if (is_unicorn(ptr)) {
-            int unicalign = sgn(ptr->maligntyp);
-
-            if (unicalign == altaralign) {
-                /* When same as altar, always a very bad action.
-                 */
-                pline("Such an action is an insult to %s!",
-                      (unicalign == A_CHAOTIC) ? "chaos"
-                         : unicalign ? "law" : "balance");
-                (void) adjattrib(A_WIS, -1, TRUE);
-                value = -5;
-            } else if (u.ualign.type == altaralign) {
-                /* When different from altar, and altar is same as yours,
-                 * it's a very good action.
-                 */
-                if (u.ualign.record < ALIGNLIM)
-                    You_feel("appropriately %s.", align_str(u.ualign.type));
-                else
-                    You_feel("you are thoroughly on the right path.");
-                adjalign(5);
-                value += 3;
-            } else if (unicalign == u.ualign.type) {
-                /* When sacrificing unicorn of your alignment to altar not of
-                 * your alignment, your god gets angry and it's a conversion.
-                 */
-                u.ualign.record = -1;
-                value = 1;
-            } else {
-                /* Otherwise, unicorn's alignment is different from yours
-                 * and different from the altar's.  It's an ordinary (well,
-                 * with a bonus) sacrifice on a cross-aligned altar.
-                 */
-                value += 3;
-            }
-        }
-    } else { /* !corpse */
-        ; /* value==0 which is what we want for non-corpse */
-    } /* ?corpse */
-
+    value = eval_offering(otmp, altaralign);
     if (value == 0) {
+        /* too old; don't give undead or unicorn bonus or penalty */
         pline1(nothing_happens);
-        return ECMD_TIME;
+        return;
+    }
+    if (value < 0) {
+        offer_negative_valued(highaltar, altaralign);
+        return;
     }
 
     if (altaralign != u.ualign.type && highaltar) {
         desecrate_altar(highaltar, altaralign);
-    } else if (value < 0) { /* don't think the gods are gonna like this... */
-        gods_upset(altaralign);
-    } else if (u.ualign.type != altaralign) {
+        return;
+    }
+    if (u.ualign.type != altaralign) {
         /* Sacrificing at an altar of a different alignment */
         offer_different_alignment_altar(otmp, altaralign);
-        return ECMD_TIME;
-    } else {
+        return;
+    }
+    consume_offering(otmp);
+    /* OK, you get brownie points. */
+    if (u.ugangr) {
         int saved_anger = u.ugangr;
+        u.ugangr -= ((value * (u.ualign.type == A_CHAOTIC ? 2 : 3))
+                     / MAXVALUE);
+        if (u.ugangr < 0)
+            u.ugangr = 0;
+        if (u.ugangr != saved_anger) {
+            if (u.ugangr) {
+                pline("%s seems %s.", u_gname(),
+                      Hallucination ? "groovy" : "slightly mollified");
+
+                if ((int) u.uluck < 0)
+                    change_luck(1);
+            } else {
+                pline("%s seems %s.", u_gname(),
+                      Hallucination ? "cosmic (not a new fact)"
+                                    : "mollified");
+
+                if ((int) u.uluck < 0)
+                    u.uluck = 0;
+            }
+        } else { /* not satisfied yet */
+            if (Hallucination)
+                pline_The("gods seem tall.");
+            else
+                You("have a feeling of inadequacy.");
+        }
+    } else if (ugod_is_angry()) {
+        if (value > MAXVALUE)
+            value = MAXVALUE;
+        if (value > -u.ualign.record)
+            value = -u.ualign.record;
+        adjalign(value);
+        You_feel("partially absolved.");
+    } else if (u.ublesscnt > 0) {
         int saved_cnt = u.ublesscnt;
-        int saved_luck = u.uluck;
-
-        consume_offering(otmp);
-        /* OK, you get brownie points. */
-        if (u.ugangr) {
-            u.ugangr -= ((value * (u.ualign.type == A_CHAOTIC ? 2 : 3))
-                         / MAXVALUE);
-            if (u.ugangr < 0)
-                u.ugangr = 0;
-            if (u.ugangr != saved_anger) {
-                if (u.ugangr) {
-                    pline("%s seems %s.", u_gname(),
-                          Hallucination ? "groovy" : "slightly mollified");
-
-                    if ((int) u.uluck < 0)
-                        change_luck(1);
-                } else {
-                    pline("%s seems %s.", u_gname(),
-                          Hallucination ? "cosmic (not a new fact)"
-                                        : "mollified");
-
-                    if ((int) u.uluck < 0)
-                        u.uluck = 0;
-                }
-            } else { /* not satisfied yet */
+        u.ublesscnt -= ((value * (u.ualign.type == A_CHAOTIC ? 500 : 300))
+                        / MAXVALUE);
+        if (u.ublesscnt < 0)
+            u.ublesscnt = 0;
+        if (u.ublesscnt != saved_cnt) {
+            if (u.ublesscnt) {
                 if (Hallucination)
-                    pline_The("gods seem tall.");
+                    You("realize that the gods are not like you and I.");
                 else
-                    You("have a feeling of inadequacy.");
-            }
-        } else if (ugod_is_angry()) {
-            if (value > MAXVALUE)
-                value = MAXVALUE;
-            if (value > -u.ualign.record)
-                value = -u.ualign.record;
-            adjalign(value);
-            You_feel("partially absolved.");
-        } else if (u.ublesscnt > 0) {
-            u.ublesscnt -= ((value * (u.ualign.type == A_CHAOTIC ? 500 : 300))
-                            / MAXVALUE);
-            if (u.ublesscnt < 0)
-                u.ublesscnt = 0;
-            if (u.ublesscnt != saved_cnt) {
-                if (u.ublesscnt) {
-                    if (Hallucination)
-                        You("realize that the gods are not like you and I.");
-                    else
-                        You("have a hopeful feeling.");
-                    if ((int) u.uluck < 0)
-                        change_luck(1);
-                } else {
-                    if (Hallucination)
-                        pline("Overall, there is a smell of fried onions.");
-                    else
-                        You("have a feeling of reconciliation.");
-                    if ((int) u.uluck < 0)
-                        u.uluck = 0;
-                }
-            }
-        } else {
-            if (bestow_artifact())
-                return ECMD_TIME;
-            change_luck((value * LUCKMAX) / (MAXVALUE * 2));
-            if ((int) u.uluck < 0)
-                u.uluck = 0;
-            if (u.uluck != saved_luck) {
-                if (Blind)
-                    You("think %s brushed your %s.", something,
-                        body_part(FOOT));
+                    You("have a hopeful feeling.");
+                if ((int) u.uluck < 0)
+                    change_luck(1);
+            } else {
+                if (Hallucination)
+                    pline("Overall, there is a smell of fried onions.");
                 else
-                    You(Hallucination
-                    ? "see crabgrass at your %s.  A funny thing in a dungeon."
-                            : "glimpse a four-leaf clover at your %s.",
-                        makeplural(body_part(FOOT)));
+                    You("have a feeling of reconciliation.");
+                if ((int) u.uluck < 0)
+                    u.uluck = 0;
             }
         }
+    } else {
+        int orig_luck, luck_increase;
+
+        if (bestow_artifact(value))
+            return;
+
+        orig_luck = u.uluck;
+        luck_increase = (value * LUCKMAX) / (MAXVALUE * 2);
+
+        /* sacrificing can't increase non-bonus Luck to above the value of the
+           sacrifice; this prevents players immediately maxing their Luck as
+           soon as they find an altar and a few rations via sacrificing lots
+           of low-valued corpses, which can unbalance the early game */
+        if (orig_luck > value)
+            luck_increase = 0;
+        else if (orig_luck + luck_increase > value)
+            luck_increase = value - orig_luck;
+
+        change_luck(luck_increase);
+        if ((int) u.uluck < 0)
+            u.uluck = 0;
+        if (u.uluck != orig_luck) {
+            if (Blind)
+                You("think %s brushed your %s.", something,
+                    body_part(FOOT));
+            else
+                You(Hallucination
+                ? "see crabgrass at your %s.  A funny thing in a dungeon."
+                        : "glimpse a four-leaf clover at your %s.",
+                    makeplural(body_part(FOOT)));
+        }
     }
-    return ECMD_TIME;
 }
 
 /* determine prayer results in advance; also used for enlightenment */
@@ -2285,18 +2365,23 @@ maybe_turn_mon_iter(struct monst *mtmp)
                    than zombies. */
             case S_LICH:
                 xlev += 2;
+                FALLTHROUGH;
                 /*FALLTHRU*/
             case S_GHOST:
                 xlev += 2;
+                FALLTHROUGH;
                 /*FALLTHRU*/
             case S_VAMPIRE:
                 xlev += 2;
+                FALLTHROUGH;
                 /*FALLTHRU*/
             case S_WRAITH:
                 xlev += 2;
+                FALLTHROUGH;
                 /*FALLTHRU*/
             case S_MUMMY:
                 xlev += 2;
+                FALLTHROUGH;
                 /*FALLTHRU*/
             case S_ZOMBIE:
                 if (u.ulevel >= xlev && !resist(mtmp, '\0', 0, NOTELL)) {
@@ -2308,6 +2393,7 @@ maybe_turn_mon_iter(struct monst *mtmp)
                     }
                     break;
                 } /* else flee */
+                FALLTHROUGH;
                 /*FALLTHRU*/
             default:
                 monflee(mtmp, 0, FALSE, TRUE);
@@ -2607,6 +2693,7 @@ blocked_boulder(int dx, int dy)
         /* this is only approximate since multiple boulders might sink */
         if (is_pool_or_lava(nx, ny)) /* does its own isok() check */
             break; /* still need Sokoban check below */
+        FALLTHROUGH;
         /*FALLTHRU*/
     default:
         /* more than one boulder--blocked after they push the top one;
@@ -2618,7 +2705,7 @@ blocked_boulder(int dx, int dy)
         return TRUE;
     if (!isok(nx, ny))
         return TRUE;
-    if (IS_ROCK(levl[nx][ny].typ))
+    if (IS_OBSTRUCTED(levl[nx][ny].typ))
         return TRUE;
     if (sobj_at(BOULDER, nx, ny))
         return TRUE;

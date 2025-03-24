@@ -1,4 +1,4 @@
-.\" $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.574 $ $NHDT-Date: 1711040379 2024/03/21 16:59:39 $
+.\" $NHDT-Branch: master $:$NHDT-Revision: 1.596 $ $NHDT-Date: 1735103892 2024/12/25 00:18:12 $
 .\"
 .\" This is an excerpt from the 'roff' man page from the 'groff' package.
 .\"+--
@@ -46,8 +46,8 @@
 .ds vr NetHack 3.7.0
 .ds f0 \*(vr
 .ds f1 \" empty
-.\"DO NOT REMOVE NH_DATESUB .ds f2 DATE(%B %-d, %Y)
-.ds f2 September 13, 2024
+.\"DO NOT REMOVE NH_DATESUB .ds f2 Date(%B %-d, %Y)
+.ds f2 December 25, 2024
 .
 .\" A note on some special characters:
 .\" \(lq = left double quote
@@ -6063,6 +6063,10 @@ escape command (!).  The syntax is the same as WIZARDS.
 .lp
 EXPLORERS\ =\ A list of users who are allowed to use the explore mode.
 The syntax is the same as WIZARDS.
+.lp
+MSGHANDLER\ =\ A path and filename of executable.  Whenever a message-window
+message is shown, NetHack runs this program.  The program will get
+the message as the only parameter.
 .lp
 MAXPLAYERS\ =\ Limit the maximum number of games that can be running
 at the same time.

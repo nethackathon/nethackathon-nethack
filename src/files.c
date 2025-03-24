@@ -1,4 +1,4 @@
-/* NetHack 3.7	files.c	$NHDT-Date: 1717449127 2024/06/03 21:12:07 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.399 $ */
+/* NetHack 3.7	files.c	$NHDT-Date: 1740532826 2025/02/25 17:20:26 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.417 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Derek S. Ray, 2015. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -7,7 +7,6 @@
 
 #include "hack.h"
 #include "dlb.h"
-#include <ctype.h>
 
 #ifdef TTY_GRAPHICS
 #include "wintty.h" /* more() */
@@ -52,7 +51,6 @@ const
 #if defined(UNIX) && defined(SELECTSAVED)
 #include <sys/types.h>
 #include <dirent.h>
-#include <stdlib.h>
 #endif
 
 #if defined(UNIX) || defined(VMS) || !defined(NO_SIGNAL)
@@ -189,6 +187,7 @@ staticfn boolean cnf_line_catname(char *);
 #ifdef SYSCF
 staticfn boolean cnf_line_WIZARDS(char *);
 staticfn boolean cnf_line_SHELLERS(char *);
+staticfn boolean cnf_line_MSGHANDLER(char *);
 staticfn boolean cnf_line_EXPLORERS(char *);
 staticfn boolean cnf_line_DEBUGFILES(char *);
 staticfn boolean cnf_line_DUMPLOGFILE(char *);
@@ -248,10 +247,6 @@ staticfn void wizkit_addinv(struct obj *);
 boolean proc_wizkit_line(char *buf);
 void read_wizkit(void);  /* in extern.h; why here too? */
 staticfn FILE *fopen_sym_file(void);
-
-#ifdef SELF_RECOVER
-staticfn boolean copy_bytes(int, int);
-#endif
 staticfn NHFILE *viable_nhfile(NHFILE *);
 
 /* return a file's name without its path and optionally trailing 'type' */
@@ -371,7 +366,6 @@ fname_decode(char quotechar, char *s, char *callerbuf, int bufsz)
     sp = s;
     op = callerbuf;
     *op = '\0';
-    calc = 0;
 
     while (*sp) {
         /* Do we have room for one more character? */
@@ -745,11 +739,7 @@ clearlocks(void)
 staticfn int QSORTCALLBACK
 strcmp_wrap(const void *p, const void *q)
 {
-#if defined(UNIX) && defined(QT_GRAPHICS)
-    return strncasecmp(*(char **) p, *(char **) q, 16);
-#else
-    return strncmpi(*(char **) p, *(char **) q, 16);
-#endif
+    return strcmp(*(char **) p, *(char **) q);
 }
 #endif
 
@@ -1125,7 +1115,7 @@ set_savefile_name(boolean regularize_it)
     if (strlen(gs.SAVEF) < (SAVESIZE - 1))
         (void) strncat(gs.SAVEF, svp.plname, (SAVESIZE - strlen(gs.SAVEF)));
 #endif
-#if defined(MICRO) && !defined(VMS) && !defined(WIN32) && !defined(MSDOS)
+#if defined(MICRO) && !defined(WIN32) && !defined(MSDOS)
     if (strlen(gs.SAVEP) < (SAVESIZE - 1))
         Strcpy(gs.SAVEF, gs.SAVEP);
     else
@@ -1237,6 +1227,7 @@ create_savefile(void)
         nhfp->mode = WRITING;
         if (program_state.in_self_recover || do_historical) {
             do_historical = TRUE;       /* force it */
+            nhUse(do_historical);
             nhfp->structlevel = TRUE;
             nhfp->fieldlevel = FALSE;
             nhfp->addinfo = FALSE;
@@ -1291,6 +1282,7 @@ open_savefile(void)
         nhfp->mode = READING;
         if (program_state.in_self_recover || do_historical) {
             do_historical = TRUE;       /* force it */
+            nhUse(do_historical);
             nhfp->structlevel = TRUE;
             nhfp->fieldlevel = FALSE;
             nhfp->addinfo = FALSE;
@@ -1388,9 +1380,12 @@ check_panic_save(void)
 #if defined(SELECTSAVED)
 
 char *
-plname_from_file(const char *filename, boolean without_wait_synch_per_file)
+plname_from_file(
+    const char *filename,
+    boolean without_wait_synch_per_file)
 {
-    NHFILE *nhfp = (NHFILE *) 0;
+    NHFILE *nhfp;
+    unsigned ln;
     char *result = 0;
 
     Strcpy(gs.SAVEF, filename);
@@ -1407,67 +1402,41 @@ plname_from_file(const char *filename, boolean without_wait_synch_per_file)
     nh_uncompress(gs.SAVEF);
     if ((nhfp = open_savefile()) != 0) {
         if (validate(nhfp, filename, without_wait_synch_per_file) == 0) {
-            char tplname[PL_NSIZ];
-
-            get_plname_from_file(nhfp, tplname);
-            result = dupstr(tplname);
+            /* room for "name+role+race+gend+algn X" where the space before
+               X is actually NUL and X is playmode: one of '-', 'X', or 'D' */
+            ln = (unsigned) PL_NSIZ_PLUS;
+            result = memset((genericptr_t) alloc(ln), '\0', ln);
+            get_plname_from_file(nhfp, result, FALSE);
         }
         close_nhfile(nhfp);
     }
     nh_compress(gs.SAVEF);
-
-    return result;
-#if 0
-/* --------- obsolete - used to be ifndef STORE_PLNAME_IN_FILE ----*/
-#if defined(UNIX) && defined(QT_GRAPHICS)
-    /* Name not stored in save file, so we have to extract it from
-       the filename, which loses information
-       (eg. "/", "_", and "." characters are lost. */
-    int k;
-    int uid;
-    char name[64]; /* more than PL_NSIZ */
-#ifdef COMPRESS_EXTENSION
-#define EXTSTR COMPRESS_EXTENSION
-#else
-#define EXTSTR ""
-#endif
-
-    if (sscanf(filename, "%*[^/]/%d%63[^.]" EXTSTR, &uid, name) == 2) {
-#undef EXTSTR
-        /* "_" most likely means " ", which certainly looks nicer */
-        for (k = 0; name[k]; k++)
-            if (name[k] == '_')
-                name[k] = ' ';
-        return dupstr(name);
-    } else
-#endif /* UNIX && QT_GRAPHICS */
-    {
-        return 0;
-    }
-/* --------- end of obsolete code ----*/
-#endif /* 0 - WAS STORE_PLNAME_IN_FILE*/
+    return result; /* file's plname[]+playmode value */
 }
 #endif /* defined(SELECTSAVED) */
 
 #define SUPPRESS_WAITSYNCH_PERFILE TRUE
 #define ALLOW_WAITSYNCH_PERFILE FALSE
 
+/* get list of saved games owned by current user */
 char **
 get_saved_games(void)
 {
+    char **result = NULL;
 #if defined(SELECTSAVED)
 #if defined(WIN32) || defined(UNIX)
     int n;
 #endif
     int j = 0;
-    char **result = 0;
 
 #ifdef WIN32
     {
         char *foundfile;
         const char *fq_save;
+#if 0
         const char *fq_new_save;
         const char *fq_old_save;
+#endif
         char **files = 0;
         int i, count_failures = 0;
 
@@ -1487,8 +1456,8 @@ get_saved_games(void)
         }
 
         if (n > 0) {
-            files = (char **) alloc((n + 1) * sizeof(char *)); /* at most */
-            (void) memset((genericptr_t) files, 0, (n + 1) * sizeof(char *));
+            files = (char **) alloc((n + 1) * sizeof (char *)); /* at most */
+            (void) memset((genericptr_t) files, 0, (n + 1) * sizeof (char *));
             if (findfirst((char *) fq_save)) {
                 i = 0;
                 do {
@@ -1498,13 +1467,19 @@ get_saved_games(void)
         }
 
         if (n > 0) {
-            result = (char **) alloc((n + 1) * sizeof(char *)); /* at most */
-            (void) memset((genericptr_t) result, 0, (n + 1) * sizeof(char *));
+            result = (char **) alloc((n + 1) * sizeof (char *)); /* at most */
+            (void) memset((genericptr_t) result, 0, (n + 1) * sizeof (char *));
             for(i = 0; i < n; i++) {
                 char *r;
                 r = plname_from_file(files[i], SUPPRESS_WAITSYNCH_PERFILE);
 
                 if (r) {
+                    /* this renaming of the savefile is not compatible
+                     * with 1f36b98b,  'selectsaved' extension from
+                     * Oct 10, 2024. Disable the renaming for the time
+                     * being.
+                     */
+#if 0
                     /* rename file if it is not named as expected */
                     Strcpy(svp.plname, r);
                     set_savefile_name(TRUE);
@@ -1514,7 +1489,7 @@ get_saved_games(void)
                     if (strcmp(fq_old_save, fq_new_save) != 0
                         && !file_exists(fq_new_save))
                         (void) rename(fq_old_save, fq_new_save);
-
+#endif
                     result[j++] = r;
                 } else {
                     count_failures++;
@@ -1526,7 +1501,7 @@ get_saved_games(void)
         if (count_failures)
             wait_synch();
     }
-#endif
+#endif /* WIN32 */
 #ifdef UNIX
     /* posixly correct version */
     int myuid = getuid();
@@ -1545,7 +1520,7 @@ get_saved_games(void)
             (void) memset((genericptr_t) result, 0, (n + 1) * sizeof(char *));
             for (i = 0, j = 0; i < n; i++) {
                 int uid;
-                char name[64]; /* more than PL_NSIZ */
+                char name[64]; /* more than PL_NSIZ+1 */
                 struct dirent *entry = readdir(dir);
 
                 if (!entry)
@@ -1566,7 +1541,7 @@ get_saved_games(void)
             closedir(dir);
         }
     }
-#endif
+#endif /* UNIX */
 #ifdef VMS
     Strcpy(svp.plname, "*");
     set_savefile_name(FALSE);
@@ -1576,14 +1551,14 @@ get_saved_games(void)
     if (j > 0) {
         if (j > 1)
             qsort(result, j, sizeof (char *), strcmp_wrap);
-        result[j] = 0;
-        return result;
+        result[j] = (char *) NULL;
     } else if (result) { /* could happen if save files are obsolete */
         free_saved_games(result);
+        result = (char **) NULL;
     }
 #endif /* SELECTSAVED */
 
-    return 0;
+    return result;
 }
 #undef SUPPRESS_WAITSYNCH_PERFILE
 #undef ALLOW_WAITSYNCH_PERFILE
@@ -1592,10 +1567,10 @@ void
 free_saved_games(char **saved)
 {
     if (saved) {
-        int i = 0;
+        int i;
 
-        while (saved[i])
-            free((genericptr_t) saved[i++]);
+        for (i = 0; saved[i]; ++i)
+            free((genericptr_t) saved[i]);
         free((genericptr_t) saved);
     }
 }
@@ -2448,18 +2423,28 @@ fopen_config_file(const char *filename, int src)
     set_configfile_name(tmp_config);
     if ((fp = fopen(configfile, "r")) != (FILE *) 0)
         return fp;
-#if defined(__APPLE__) /* UNIX+__APPLE__ => MacOSX */
+#if defined(__APPLE__) /* UNIX+__APPLE__ => OSX || MacOS */
     /* try an alternative */
     if (envp) {
+        /* keep 'tmp_config' intact here; if alternates fail, use it to
+           restore configfile[] to its preferred setting (".nethackrc") */
+        char alt_config[sizeof tmp_config];
+
         /* OSX-style configuration settings */
-        Sprintf(tmp_config, "%s/%s", envp,
-                "Library/Preferences/NetHack Defaults");
-        set_configfile_name(tmp_config);
+        Snprintf(alt_config, sizeof alt_config, "%s/%s", envp,
+                 "Library/Preferences/NetHack Defaults");
+        set_configfile_name(alt_config);
         if ((fp = fopen(configfile, "r")) != (FILE *) 0)
             return fp;
         /* may be easier for user to edit if filename has '.txt' suffix */
-        Sprintf(tmp_config, "%s/%s", envp,
-                "Library/Preferences/NetHack Defaults.txt");
+        Snprintf(alt_config, sizeof alt_config, "%s/%s", envp,
+                 "Library/Preferences/NetHack Defaults.txt");
+        set_configfile_name(alt_config);
+        if ((fp = fopen(configfile, "r")) != (FILE *) 0)
+            return fp;
+        /* couldn't open either of the alternate names; for use in
+           messages, put 'configfile' back to the normal value rather than
+           leaving it set to last alternate; retry open() to reset 'errno' */
         set_configfile_name(tmp_config);
         if ((fp = fopen(configfile, "r")) != (FILE *) 0)
             return fp;
@@ -2918,6 +2903,15 @@ cnf_line_SHELLERS(char *bufp)
     if (sysopt.shellers)
         free((genericptr_t) sysopt.shellers);
     sysopt.shellers = dupstr(bufp);
+    return TRUE;
+}
+
+staticfn boolean
+cnf_line_MSGHANDLER(char *bufp)
+{
+    if (sysopt.msghandler)
+        free((genericptr_t) sysopt.msghandler);
+    sysopt.msghandler = dupstr(bufp);
     return TRUE;
 }
 
@@ -3459,6 +3453,7 @@ static const struct match_config_line_stmt {
 #ifdef SYSCF
     CNFL_S(WIZARDS, 7),
     CNFL_S(SHELLERS, 8),
+    CNFL_S(MSGHANDLER, 9),
     CNFL_S(EXPLORERS, 7),
     CNFL_S(DEBUGFILES, 5),
     CNFL_S(DUMPLOGFILE, 7),
@@ -4420,7 +4415,7 @@ recover_savefile(void)
     int processed[256];
     char savename[SAVESIZE], errbuf[BUFSZ], indicator;
     struct savefile_info sfi;
-    char tmpplbuf[PL_NSIZ];
+    char tmpplbuf[PL_NSIZ_PLUS];
     const char *savewrite_failure = (const char *) 0;
 
     for (lev = 0; lev < 256; lev++)
@@ -4467,7 +4462,7 @@ recover_savefile(void)
             != sizeof version_data)
         || (read(gnhfp->fd, (genericptr_t) &sfi, sizeof sfi) != sizeof sfi)
         || (read(gnhfp->fd, (genericptr_t) &pltmpsiz, sizeof pltmpsiz)
-            != sizeof pltmpsiz) || (pltmpsiz > PL_NSIZ)
+            != sizeof pltmpsiz) || (pltmpsiz > PL_NSIZ_PLUS)
         || (read(gnhfp->fd, (genericptr_t) &tmpplbuf, pltmpsiz)
             != pltmpsiz)) {
         raw_printf("\nError reading %s -- can't recover.\n", gl.lock);
@@ -4608,23 +4603,6 @@ recover_savefile(void)
     return TRUE;
 }
 
-boolean
-copy_bytes(int ifd, int ofd)
-{
-    char buf[BUFSIZ];
-    int nfrom, nto = 0;
-
-    do {
-        nfrom = read(ifd, buf, BUFSIZ);
-        /* read can return -1 */
-        if (nfrom >= 0 && nfrom <= BUFSIZ)
-            nto = write(ofd, buf, nfrom);
-        if (nto != nfrom || nfrom < 0)
-            return FALSE;
-    } while (nfrom == BUFSIZ);
-    return TRUE;
-}
-
 /* ----------  END INTERNAL RECOVER ----------- */
 #endif /*SELF_RECOVER*/
 
@@ -4664,12 +4642,41 @@ assure_syscf_file(void)
         close(fd);
         return;
     }
+    if (gd.deferred_showpaths)
+        do_deferred_showpaths(1);  /* does not return */
     raw_printf("Unable to open SYSCF_FILE.\n");
     exit(EXIT_FAILURE);
 }
 
 #endif /* SYSCF_FILE */
 #endif /* SYSCF */
+
+ATTRNORETURN void
+do_deferred_showpaths(int code)
+{
+    gd.deferred_showpaths = FALSE;
+    reveal_paths(code);
+
+    /* cleanup before heading to an exit */
+    freedynamicdata();
+    dlb_cleanup();
+    l_nhcore_done();
+
+#ifdef UNIX
+    after_opt_showpaths(gd.deferred_showpaths_dir);
+#else
+#ifndef WIN32
+#ifdef CHDIR
+    chdirx(gd.deferred_showpaths_dir, 0);
+#endif
+#endif
+#if defined(WIN32) || defined(MICRO) || defined(OS2)
+    nethack_exit(EXIT_SUCCESS);
+#else
+    exit(EXIT_SUCCESS);
+#endif
+#endif
+}
 
 #ifdef DEBUG
 /* used by debugpline() to decide whether to issue a message
@@ -4730,10 +4737,16 @@ debugcore(const char *filename, boolean wildcards)
 #endif
 #endif
 
+#define SYSCONFFILE "system configuration file"
+
 void
-reveal_paths(void)
+reveal_paths(int code)
 {
+#if defined(SYSCF)
+    boolean skip_sysopt = FALSE;
+#endif
     const char *fqn, *nodumpreason;
+
     char buf[BUFSZ];
 #if defined(SYSCF) || !defined(UNIX) || defined(DLB)
     const char *filep;
@@ -4767,7 +4780,8 @@ reveal_paths(void)
 #else
     buf[0] = '\0';
 #endif
-    raw_printf("%s system configuration file%s:", s_suffix(gamename), buf);
+    raw_printf("%s %s%s:", s_suffix(gamename),
+               SYSCONFFILE, buf);
 #ifdef SYSCF_FILE
     filep = SYSCF_FILE;
 #else
@@ -4779,6 +4793,11 @@ reveal_paths(void)
         filep = configfile;
     }
     raw_printf("    \"%s\"", filep);
+    if (code == 1) {
+        raw_printf("NOTE: The %s above is missing or inaccessible!",
+                   SYSCONFFILE);
+        skip_sysopt = TRUE;
+    }
 #else /* !SYSCF */
     raw_printf("No system configuration file.");
 #endif /* ?SYSCF */
@@ -4851,17 +4870,22 @@ reveal_paths(void)
 
     /* dumplog */
 
+    fqn = (char *) 0;
 #ifndef DUMPLOG
     nodumpreason = "not supported";
 #else
     nodumpreason = "disabled";
 #ifdef SYSCF
-    fqn = sysopt.dumplogfile;
+    if (!skip_sysopt) {
+        fqn = sysopt.dumplogfile;
+        if (!fqn)
+            nodumpreason = "DUMPLOGFILE is not set in " SYSCONFFILE;
+    } else {
+        nodumpreason = SYSCONFFILE " is missing; no DUMPLOGFILE setting";
+    }
 #else  /* !SYSCF */
 #ifdef DUMPLOG_FILE
     fqn = DUMPLOG_FILE;
-#else
-    fqn = (char *) 0;
 #endif
 #endif /* ?SYSCF */
     if (fqn && *fqn) {
@@ -4869,22 +4893,27 @@ reveal_paths(void)
         (void) dump_fmtstr(fqn, buf, FALSE);
         buf[sizeof buf - sizeof "    \"\""] = '\0';
         raw_printf("    \"%s\"", buf);
-    } else
-#endif /* ?DUMPLOG */
+    } else {
         raw_printf("No end-of-game disclosure file (%s).", nodumpreason);
+    }
+#endif /* ?DUMPLOG */
 
+#ifdef SYSCF
 #ifdef WIN32
-    if (sysopt.portable_device_paths) {
-        const char *pd = get_portable_device();
+    if (!skip_sysopt) {
+        if (sysopt.portable_device_paths) {
+            const char *pd = get_portable_device();
 
-        /* an empty value for pd indicates that portable_device_paths
-           got set TRUE in a sysconf file other than the one containing
-           the executable; disregard it */
-        if (strlen(pd) > 0) {
-            raw_printf("portable_device_paths (set in sysconf):");
-            raw_printf("    \"%s\"", pd);
+            /* an empty value for pd indicates that portable_device_paths
+               got set TRUE in a sysconf file other than the one containing
+               the executable; disregard it */
+            if (strlen(pd) > 0) {
+                raw_printf("portable_device_paths (set in sysconf):");
+                raw_printf("    \"%s\"", pd);
+            }
         }
     }
+#endif
 #endif
 
     /* personal configuration file */
@@ -4942,6 +4971,12 @@ reveal_paths(void)
     raw_print("");
 #if defined(WIN32) && !defined(WIN32CON)
     wait_synch();
+#endif
+#ifndef DUMPLOG
+#ifdef SYSCF
+    nhUse(skip_sysopt);
+#endif
+    nhUse(nodumpreason);
 #endif
 }
 

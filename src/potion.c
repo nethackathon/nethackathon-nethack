@@ -1,4 +1,4 @@
-/* NetHack 3.7	potion.c	$NHDT-Date: 1726356849 2024/09/14 23:34:09 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.270 $ */
+/* NetHack 3.7	potion.c	$NHDT-Date: 1737605675 2025/01/22 20:14:35 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.274 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2013. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -1721,23 +1721,26 @@ potionhit(struct monst *mon, struct obj *obj, int how)
         switch (obj->otyp) {
         case POT_FULL_HEALING:
             cureblind = TRUE;
+            FALLTHROUGH;
             /*FALLTHRU*/
         case POT_EXTRA_HEALING:
             if (!obj->cursed)
                 cureblind = TRUE;
+            FALLTHROUGH;
             /*FALLTHRU*/
         case POT_HEALING:
             if (obj->blessed)
                 cureblind = TRUE;
             if (mon->data == &mons[PM_PESTILENCE])
                 goto do_illness;
+            FALLTHROUGH;
             /*FALLTHRU*/
         case POT_RESTORE_ABILITY:
         case POT_GAIN_ABILITY:
  do_healing:
             angermon = FALSE;
             if (mon->mhp < mon->mhpmax) {
-                mon->mhp = mon->mhpmax;
+                healmon(mon, mon->mhpmax, 0);
                 if (canseemon(mon))
                     pline("%s looks sound and hale again.", Monnam(mon));
             }
@@ -1824,9 +1827,7 @@ potionhit(struct monst *mon, struct obj *obj, int how)
                     angermon = FALSE;
                     if (canseemon(mon))
                         pline("%s looks healthier.", Monnam(mon));
-                    mon->mhp += d(2, 6);
-                    if (mon->mhp > mon->mhpmax)
-                        mon->mhp = mon->mhpmax;
+                    healmon(mon, d(2, 6), 0);
                     if (is_were(mon->data) && is_human(mon->data)
                         && !Protection_from_shape_changers)
                         new_were(mon); /* transform into beast */
@@ -1960,6 +1961,7 @@ potionbreathe(struct obj *obj)
         if (u.uhp < u.uhpmax)
             u.uhp++, disp.botl = TRUE;
         cureblind = TRUE;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case POT_EXTRA_HEALING:
         if (Upolyd && u.mh < u.mhmax)
@@ -1968,6 +1970,7 @@ potionbreathe(struct obj *obj)
             u.uhp++, disp.botl = TRUE;
         if (!obj->cursed)
             cureblind = TRUE;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case POT_HEALING:
         if (Upolyd && u.mh < u.mhmax)
@@ -2116,6 +2119,7 @@ mixtype(struct obj *o1, struct obj *o2)
     case POT_HEALING:
         if (o2typ == POT_SPEED)
             return POT_EXTRA_HEALING;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case POT_EXTRA_HEALING:
     case POT_FULL_HEALING:
@@ -2123,6 +2127,7 @@ mixtype(struct obj *o1, struct obj *o2)
             return (o1typ == POT_HEALING) ? POT_EXTRA_HEALING
                    : (o1typ == POT_EXTRA_HEALING) ? POT_FULL_HEALING
                      : POT_GAIN_ABILITY;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case UNICORN_HORN:
         switch (o2typ) {
@@ -2231,6 +2236,7 @@ hold_potion(
     obj_extract_self(potobj);
     /* re-insert into inventory, possibly merging with compatible stack */
     potobj = hold_another_object(potobj, drop_fmt, drop_arg, hold_msg);
+    nhUse(potobj);
     flags.pickup_burden = save_pickup_burden;
     update_inventory();
     return;
@@ -2500,7 +2506,8 @@ potion_dip(struct obj *obj, struct obj *potion)
         useup(potion); /* now gone */
         /* Mixing potions is dangerous...
            KMH, balance patch -- acid is particularly unstable */
-        if (obj->cursed || obj->otyp == POT_ACID || !rn2(10)) {
+        if (obj->cursed || obj->otyp == POT_ACID
+            || (obj->otyp == POT_OIL && obj->lamplit) || !rn2(10)) {
             /* it would be better to use up the whole stack in advance
                of the message, but we can't because we need to keep it
                around for potionbreathe() [and we can't set obj->in_use

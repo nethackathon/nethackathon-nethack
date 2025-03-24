@@ -1,4 +1,4 @@
-/* NetHack 3.7	mhitm.c	$NHDT-Date: 1698939796 2023/11/02 15:43:16 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.244 $ */
+/* NetHack 3.7	mhitm.c	$NHDT-Date: 1732979463 2024/11/30 07:11:03 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.253 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2011. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -232,7 +232,7 @@ mdisplacem(
                     pline("%s tries to move %s out of %s way.", Monnam(magr),
                           mon_nam(mdef), is_rider(pa) ? "the" : mhis(magr));
                 }
-                pline("%s turns to stone!", Monnam(magr));
+                pline_mon(magr, "%s turns to stone!", Monnam(magr));
             }
             monstone(magr);
             if (!DEADMONSTER(magr))
@@ -338,7 +338,7 @@ mattackm(
             } else {
                 if (iflags.last_msg == PLNMSG_HIDE_UNDER
                     && mdef->m_id == gl.last_hider)
-                    pline("%s emerges from hiding.", Monnam(mdef));
+                    pline_mon(mdef, "%s emerges from hiding.", Monnam(mdef));
                 else if (mdef->m_id == gl.last_hider)
                     You("notice %s.", mon_nam(mdef));
                 else
@@ -405,6 +405,7 @@ mattackm(
                     mswingsm(magr, mdef, mwep);
                 tmp += hitval(mwep, mdef);
             }
+            FALLTHROUGH;
             /*FALLTHRU*/
         case AT_CLAW:
         case AT_KICK:
@@ -484,7 +485,7 @@ mattackm(
 
         case AT_EXPL:
             /* D: Prevent explosions from a distance */
-            if (distmin(magr->mx,magr->my,mdef->mx,mdef->my) > 1)
+            if (distmin(magr->mx, magr->my, mdef->mx, mdef->my) > 1)
                 continue;
 
             res[i] = explmm(magr, mdef, mattk);
@@ -524,25 +525,20 @@ mattackm(
             break;
 
         case AT_BREA:
-            if (!monnear(magr, mdef->mx, mdef->my)) {
-                strike = (breamm(magr, mattk, mdef) == M_ATTK_MISS) ? 0 : 1;
-
-                /* We don't really know if we hit or not; pretend we did. */
-                if (strike)
-                    res[i] |= M_ATTK_HIT;
-                if (DEADMONSTER(mdef))
-                    res[i] = M_ATTK_DEF_DIED;
-                if (DEADMONSTER(magr))
-                    res[i] |= M_ATTK_AGR_DIED;
-            }
-            else
-                strike = 0;
-            break;
-
         case AT_SPIT:
+            /*
+             * Ranged attacks aren't allowed at point blank range.
+             *
+             * That impacts pet use of ranged attacks.  It's rather arbitrary
+             * but various parts of the code assume it to be the case, not to
+             * mention a part of player tactics when fighting dragons.
+             */
             if (!monnear(magr, mdef->mx, mdef->my)) {
-                strike = (spitmm(magr, mattk, mdef) == M_ATTK_MISS) ? 0 : 1;
+                int mmtmp = ((mattk->aatyp == AT_BREA)
+                             ? breamm(magr, mattk, mdef)
+                             : spitmm(magr, mattk, mdef));
 
+                strike = (mmtmp == M_ATTK_MISS) ? 0 : 1;
                 /* We don't really know if we hit or not; pretend we did. */
                 if (strike)
                     res[i] |= M_ATTK_HIT;
@@ -550,6 +546,9 @@ mattackm(
                     res[i] = M_ATTK_DEF_DIED;
                 if (DEADMONSTER(magr))
                     res[i] |= M_ATTK_AGR_DIED;
+            } else {
+                strike = 0;
+                attk = 0;
             }
             break;
 
@@ -683,6 +682,7 @@ hitmm(
                     Snprintf(buf, sizeof buf, "%s squeezes", magr_name);
                     break;
                 }
+                FALLTHROUGH;
                 /*FALLTHRU*/
             default:
                 if (!weaponhit || !mwep || !mwep->oartifact)
@@ -771,7 +771,7 @@ gazemm(struct monst *magr, struct monst *mdef, struct attack *mattk)
                 return M_ATTK_MISS;
             }
             if (canseemon(magr))
-                pline("%s is turned to stone!", Monnam(magr));
+                pline_mon(magr, "%s is turned to stone!", Monnam(magr));
             monstone(magr);
             if (!DEADMONSTER(magr))
                 return M_ATTK_MISS;
@@ -818,7 +818,7 @@ engulf_target(struct monst *magr, struct monst *mdef)
     dy = (mdef == &gy.youmonst) ? u.uy : mdef->my;
     lev = &levl[dx][dy];
     if (!(udef ? Passes_walls : passes_walls(mdef->data))
-          && (IS_ROCK(lev->typ) || closed_door(dx, dy) || IS_TREE(lev->typ)
+          && (IS_OBSTRUCTED(lev->typ) || closed_door(dx, dy) || IS_TREE(lev->typ)
               /* not passes_bars(); engulfer isn't squeezing through */
               || (lev->typ == IRONBARS && !is_whirly(magr->data))))
         return FALSE;
@@ -826,7 +826,7 @@ engulf_target(struct monst *magr, struct monst *mdef)
     ay = (magr == &gy.youmonst) ? u.uy : magr->my;
     lev = &levl[ax][ay];
     if (!(uatk ? Passes_walls : passes_walls(magr->data))
-        && (IS_ROCK(lev->typ) || closed_door(ax, ay) || IS_TREE(lev->typ)
+        && (IS_OBSTRUCTED(lev->typ) || closed_door(ax, ay) || IS_TREE(lev->typ)
             || (lev->typ == IRONBARS && !is_whirly(mdef->data))))
         return FALSE;
 
@@ -962,7 +962,7 @@ explmm(struct monst *magr, struct monst *mdef, struct attack *mattk)
         return M_ATTK_MISS;
 
     if (cansee(magr->mx, magr->my))
-        pline("%s explodes!", Monnam(magr));
+        pline_mon(magr, "%s explodes!", Monnam(magr));
     else
         noises(magr, mattk);
 
@@ -1033,7 +1033,7 @@ mdamagem(
                 return M_ATTK_HIT; /* no damage during the polymorph */
             }
             if (gv.vis && canspotmon(magr))
-                pline("%s turns to stone!", Monnam(magr));
+                pline_mon(magr, "%s turns to stone!", Monnam(magr));
             monstone(magr);
             if (!DEADMONSTER(magr))
                 return M_ATTK_HIT; /* lifesaved */
@@ -1093,7 +1093,7 @@ mdamagem(
                 return (M_ATTK_DEF_DIED
                         | (!DEADMONSTER(magr) ? 0 : M_ATTK_AGR_DIED));
             } else if (pd == &mons[PM_NURSE]) {
-                magr->mhp = magr->mhpmax;
+                healmon(magr, magr->mhpmax, 0);
             }
             mon_givit(magr, pd);
         }
@@ -1137,7 +1137,7 @@ mon_poly(struct monst *magr, struct monst *mdef, int dmg)
         if (resists_magm(mdef)) {
             /* Magic resistance */
             if (gv.vis)
-                shieldeff(mdef->mx, mdef->my);
+                shieldeff_mon(mdef);
         } else if (resist(mdef, WAND_CLASS, 0, TELL)) {
             /* general resistance to magic... */
             ;
@@ -1209,6 +1209,12 @@ paralyze_monst(struct monst *mon, int amt)
 int
 sleep_monst(struct monst *mon, int amt, int how)
 {
+    /* reveal mimic unless already asleep or paralyzed (won't be 'busy') */
+    if (how >= 0 && !mon->msleeping && !mon->mfrozen
+        && mon->data->mlet == S_MIMIC && (M_AP_TYPE(mon) == M_AP_FURNITURE
+                                          || M_AP_TYPE(mon) == M_AP_OBJECT))
+        seemimic(mon);
+
     if (resists_sleep(mon) || defended(mon, AD_SLEE)
         || (how >= 0 && resist(mon, (char) how, 0, NOTELL))) {
         shieldeff(mon->mx, mon->my);
@@ -1232,7 +1238,7 @@ slept_monst(struct monst *mon)
 {
     if (helpless(mon) && mon == u.ustuck
         && !sticks(gy.youmonst.data) && !u.uswallow) {
-        pline("%s grip relaxes.", s_suffix(Monnam(mon)));
+        pline_mon(mon, "%s grip relaxes.", s_suffix(Monnam(mon)));
         unstuck(mon);
     }
 }
@@ -1376,17 +1382,15 @@ passivemm(
         case AD_COLD:
             if (resists_cold(magr)) {
                 if (canseemon(magr)) {
-                    pline("%s is mildly chilly.", Monnam(magr));
+                    pline_mon(magr, "%s is mildly chilly.", Monnam(magr));
                     golemeffects(magr, AD_COLD, tmp);
                 }
                 tmp = 0;
                 break;
             }
             if (canseemon(magr))
-                pline("%s is suddenly very cold!", Monnam(magr));
-            mdef->mhp += tmp / 2;
-            if (mdef->mhpmax < mdef->mhp)
-                mdef->mhpmax = mdef->mhp;
+                pline_mon(magr, "%s is suddenly very cold!", Monnam(magr));
+            healmon(mdef, tmp/2, tmp/2);
             if (mdef->mhpmax > ((int) (mdef->m_lev + 1) * 8))
                 (void) split_mon(mdef, magr);
             break;
@@ -1394,7 +1398,7 @@ passivemm(
             if (!magr->mstun) {
                 magr->mstun = 1;
                 if (canseemon(magr))
-                    pline("%s %s...", Monnam(magr),
+                    pline_mon(magr, "%s %s...", Monnam(magr),
                           makeplural(stagger(magr->data, "stagger")));
             }
             tmp = 0;
@@ -1402,26 +1406,27 @@ passivemm(
         case AD_FIRE:
             if (resists_fire(magr)) {
                 if (canseemon(magr)) {
-                    pline("%s is mildly warmed.", Monnam(magr));
+                    pline_mon(magr, "%s is mildly warmed.", Monnam(magr));
                     golemeffects(magr, AD_FIRE, tmp);
                 }
                 tmp = 0;
                 break;
             }
             if (canseemon(magr))
-                pline("%s is suddenly very hot!", Monnam(magr));
+                pline_mon(magr, "%s is suddenly very hot!", Monnam(magr));
             break;
         case AD_ELEC:
             if (resists_elec(magr)) {
                 if (canseemon(magr)) {
-                    pline("%s is mildly tingled.", Monnam(magr));
+                    pline_mon(magr, "%s is mildly tingled.", Monnam(magr));
                     golemeffects(magr, AD_ELEC, tmp);
                 }
                 tmp = 0;
                 break;
             }
             if (canseemon(magr))
-                pline("%s is jolted with electricity!", Monnam(magr));
+                pline_mon(magr, "%s is jolted with electricity!",
+                          Monnam(magr));
             break;
         default:
             tmp = 0;
@@ -1447,7 +1452,7 @@ xdrainenergym(struct monst *mon, boolean givemsg)
             || attacktype(mon->data, AT_BREA))) {
         mon->mspec_used += d(2, 2);
         if (givemsg)
-            pline("%s seems lethargic.", Monnam(mon));
+            pline_mon(mon, "%s seems lethargic.", Monnam(mon));
     }
 }
 

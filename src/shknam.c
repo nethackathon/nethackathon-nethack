@@ -1,4 +1,4 @@
-/* NetHack 3.7	shknam.c	$NHDT-Date: 1715203028 2024/05/08 21:17:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.78 $ */
+/* NetHack 3.7	shknam.c	$NHDT-Date: 1736530208 2025/01/10 09:30:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.82 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2011. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -271,11 +271,12 @@ const struct shclass shtypes[] = {
       FOOD_CLASS,
       5,
       D_SHOP,
-      { { 83, FOOD_CLASS },
+      { { 80, FOOD_CLASS },
         { 5, -POT_FRUIT_JUICE },
         { 4, -POT_BOOZE },
         { 5, -POT_WATER },
         { 3, -ICE_BOX },
+        { 3, -COOLER_BAG },
         { 0, 0 } },
       shkfoods },
     { "jewelers", "ring shop",
@@ -331,7 +332,7 @@ const struct shclass shtypes[] = {
         { 2, -SCR_FOOD_DETECTION },
         { 1, -LUMP_OF_ROYAL_JELLY } },
       shkhealthfoods },
-    { "bag store", "tool shop",
+    { "bag store", "bag shop",
       TOOL_CLASS,
       2,
       D_SHOP,
@@ -429,8 +430,8 @@ shkveg(void)
     char oclass = FOOD_CLASS;
     int ok[NUM_OBJECTS];
 
+    (void) memset((genericptr_t) ok, 0, sizeof ok); /* lint suppression */
     j = maxprob = 0;
-    ok[0] = 0; /* lint suppression */
     for (i = svb.bases[(int) oclass]; i < NUM_OBJECTS; ++i) {
         if (objects[i].oc_class != oclass)
             break;
@@ -529,7 +530,7 @@ nameshk(struct monst *shk, const char *const *nlp)
 
         for (names_avail = 0; nlp[names_avail]; names_avail++)
             continue;
-
+        assert(names_avail > 0);
         name_wanted = name_wanted % names_avail;
 
         for (trycnt = 0; trycnt < 50; trycnt++) {
@@ -579,6 +580,7 @@ neweshk(struct monst *mtmp)
     if (!ESHK(mtmp))
         ESHK(mtmp) = (struct eshk *) alloc(sizeof(struct eshk));
     (void) memset((genericptr_t) ESHK(mtmp), 0, sizeof(struct eshk));
+    ESHK(mtmp)->parentmid = mtmp->m_id;
     ESHK(mtmp)->bill_p = (struct bill_x *) 0;
 }
 

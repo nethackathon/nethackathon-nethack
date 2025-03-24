@@ -8,8 +8,6 @@
 #include "wincurs.h"
 #include "cursinit.h"
 
-#include <ctype.h>
-
 /* Initialization and startup functions for curses interface */
 
 /* Private declarations */
@@ -114,6 +112,7 @@ curses_create_main_windows(void)
 
     case 3:
         noperminv_borders = TRUE;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 1:                     /* On */
         borders = TRUE;
@@ -121,6 +120,7 @@ curses_create_main_windows(void)
 
     case 4:
         noperminv_borders = TRUE;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 2:                     /* Auto */
         borders = (term_cols >= 80 + 2 && term_rows >= 24 + 2);

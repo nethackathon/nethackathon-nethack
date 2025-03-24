@@ -20,7 +20,6 @@
 #ifndef __BORLANDC__
 #include <direct.h>
 #endif
-#include <ctype.h>
 #ifdef TTY_GRAPHICS
 #include "wintty.h"
 #endif
@@ -53,10 +52,11 @@ int redirect_stdout;
 
 #ifdef WIN32CON
 typedef HWND(WINAPI *GETCONSOLEWINDOW)(void);
-#ifdef WIN32CON
+#if 0
 static HWND GetConsoleHandle(void);
 static HWND GetConsoleHwnd(void);
-#endif
+#endif /* 0 */
+#endif /* WIN32CON */
 #if !defined(TTY_GRAPHICS)
 extern void backsp(void);
 #endif
@@ -78,7 +78,6 @@ static int max_filename(void);
 
 int def_kbhit(void);
 int (*nt_kbhit)(void) = def_kbhit;
-#endif /* WIN32CON */
 
 #ifndef WIN32CON
 /* this is used as a printf() replacement when the window
@@ -92,7 +91,7 @@ VA_DECL(const char *, fmt)
     VA_END();
     return;
 }
-#endif
+#endif  /* WIN32CON */
 
 char
 switchar(void)
@@ -232,8 +231,10 @@ VA_DECL(const char *, s)
     VA_START(s);
     VA_INIT(s, const char *);
     /* error() may get called before tty is initialized */
+#ifdef TTY_GRAPHICS
     if (iflags.window_inited)
-        end_screen();
+        term_end_screen();
+#endif
     if (WINDOWPORT(tty)) {
         buf[0] = '\n';
         (void) vsnprintf(&buf[1], sizeof buf - (1 + sizeof "\n"), s, VA_ARGS);
@@ -328,6 +329,7 @@ interject_assistance(int num, int interjection_type, genericptr_t ptr1, genericp
         }
     } break;
     }
+    nhUse(interjection_type);
 }
 
 void
@@ -412,16 +414,19 @@ void port_insert_pastebuf(char *buf)
 }
 
 #ifdef WIN32CON
+#if 0
 static HWND
 GetConsoleHandle(void)
 {
     HMODULE hMod = GetModuleHandle("kernel32.dll");
-    GETCONSOLEWINDOW pfnGetConsoleWindow =
-        (GETCONSOLEWINDOW) GetProcAddress(hMod, "GetConsoleWindow");
-    if (pfnGetConsoleWindow)
-        return pfnGetConsoleWindow();
-    else
-        return GetConsoleHwnd();
+
+    if (hMod) {
+        GETCONSOLEWINDOW pfnGetConsoleWindow =
+            (GETCONSOLEWINDOW) GetProcAddress(hMod, "GetConsoleWindow");
+        if (pfnGetConsoleWindow)
+            return pfnGetConsoleWindow();
+    }
+    return GetConsoleHwnd();
 }
 
 static HWND
@@ -434,7 +439,7 @@ GetConsoleHwnd(void)
     /* Get current window title */
     GetConsoleTitle(OldTitle, sizeof OldTitle);
 
-    (void) sprintf(NewTitle, "NETHACK%ld/%ld", GetTickCount(),
+    (void) sprintf(NewTitle, "NETHACK%lld/%ld", GetTickCount64(),
                    GetCurrentProcessId());
     SetConsoleTitle(NewTitle);
 
@@ -449,8 +454,9 @@ GetConsoleHwnd(void)
     /*       printf("%d iterations\n", iterations); */
     return hwndFound;
 }
+#endif /* 0 */
 #endif /* WIN32CON */
-#endif
+#endif /* RUNTIME_PASTEBUF_SUPPORT */
 
 #ifdef RUNTIME_PORT_ID
 /*
@@ -481,6 +487,10 @@ get_port_id(char *buf)
 }
 #endif /* RUNTIME_PORT_ID */
 
+#ifdef MSWIN_GRAPHICS
+extern void free_winmain_stuff(void);
+#endif
+
 void
 nethack_exit(int code)
 {
@@ -504,6 +514,11 @@ nethack_exit(int code)
         if (iflags.window_inited)
             wait_synch();
     }
+    /* frees some status tracking data */
+    genl_status_finish();
+#ifdef MSWIN_GRAPHICS
+    free_winmain_stuff();
+#endif
     exit(code);
 }
 
@@ -737,7 +752,7 @@ sys_random_seed(void)
         time_t datetime = 0;
         const char *emsg;
 
-        if (status == STATUS_NOT_FOUND)
+        if (status == (NTSTATUS) STATUS_NOT_FOUND)
             emsg = "BCRYPT_RNG_ALGORITHM not avail, falling back";
         else
             emsg = "Other failure than algorithm not avail";
@@ -785,11 +800,11 @@ struct CRctxt {
 } ctxp_ = { NULL, NULL, NULL, 0, 0, 0, NULL, 0 };
 struct CRctxt *ctxp = &ctxp_;    // XXX should this now be in gc.* ?
 
-#define win32err(fn) errname = fn; goto error
+#define win32err(fn) errname = (char *) fn; goto error
 
 int
-win32_cr_helper(char cmd, struct CRctxt *ctxp, void *p, int d){
-    char *errname = "unknown";
+win32_cr_helper(char cmd, struct CRctxt *contextp, void *p, int d){
+    char *errname = (char *) "unknown";
     switch (cmd) {
     default:
         /* Not panic - we don't want to upgrade an impossible to a
@@ -804,77 +819,77 @@ win32_cr_helper(char cmd, struct CRctxt *ctxp, void *p, int d){
         return MessageBoxW(NULL, lbidstr, L"bidshow", MB_SETFOREGROUND);
     }
         break;
-    case 'i': /* HASH_INIT(ctxp) */
+    case 'i': /* HASH_INIT(contextp) */
         if (!IsWindowsVistaOrGreater())
             return 1; // CNG not available.
-        ctxp->bah = NULL;
-        ctxp->bhh = NULL;
-        ctxp->pbhashobj = NULL;
-        ctxp->cbhashobj = 0;
-        ctxp->cbhash = 0;
-        ctxp->cbdata = 0;
-        ctxp->pbhash = NULL;
-        ctxp->st = 0;
+        contextp->bah = NULL;
+        contextp->bhh = NULL;
+        contextp->pbhashobj = NULL;
+        contextp->cbhashobj = 0;
+        contextp->cbhash = 0;
+        contextp->cbdata = 0;
+        contextp->pbhash = NULL;
+        contextp->st = 0;
         // win32err("test");        // TESTING - FAKE AN ERROR
-        if (0 > (ctxp->st = BCryptOpenAlgorithmProvider(
-                     &ctxp->bah, BCRYPT_MD4_ALGORITHM, NULL, 0))) {
+        if (0 > (contextp->st = BCryptOpenAlgorithmProvider(
+                     &contextp->bah, BCRYPT_MD4_ALGORITHM, NULL, 0))) {
             win32err("BCryptOpenAlgorithmProvider");
         };
-        if (0 > (ctxp->st =
-                     BCryptGetProperty(ctxp->bah, BCRYPT_OBJECT_LENGTH,
-                                       (unsigned char *) &ctxp->cbhashobj,
-                                       sizeof(DWORD), &ctxp->cbdata, 0))) {
+        if (0 > (contextp->st =
+                     BCryptGetProperty(contextp->bah, BCRYPT_OBJECT_LENGTH,
+                                       (unsigned char *) &contextp->cbhashobj,
+                                       sizeof(DWORD), &contextp->cbdata, 0))) {
             win32err("BCryptGetProperty1");
         };
         if (0
-            == (ctxp->pbhashobj =
-                    HeapAlloc(GetProcessHeap(), 0, ctxp->cbhashobj))) {
+            == (contextp->pbhashobj =
+                    HeapAlloc(GetProcessHeap(), 0, contextp->cbhashobj))) {
             win32err("HeapAlloc1");
         };
-        if (0 > (ctxp->st = BCryptGetProperty(
-                     ctxp->bah, BCRYPT_HASH_LENGTH, (PBYTE) &ctxp->cbhash,
-                     sizeof(DWORD), &ctxp->cbdata, 0))) {
+        if (0 > (contextp->st = BCryptGetProperty(
+                     contextp->bah, BCRYPT_HASH_LENGTH, (PBYTE) &contextp->cbhash,
+                     sizeof(DWORD), &contextp->cbdata, 0))) {
             win32err("BCryptGetProperty2");
         }
         if (0
-            == (ctxp->pbhash =
-                    HeapAlloc(GetProcessHeap(), 0, ctxp->cbhash))) {
+            == (contextp->pbhash =
+                    HeapAlloc(GetProcessHeap(), 0, contextp->cbhash))) {
 
             win32err("HeapAlloc2\n");
         }
-        if (0 > BCryptCreateHash(ctxp->bah, &ctxp->bhh, ctxp->pbhashobj,
-                                 ctxp->cbhashobj, NULL, 0, 0)) {
+        if (0 > BCryptCreateHash(contextp->bah, &contextp->bhh, contextp->pbhashobj,
+                                 contextp->cbhashobj, NULL, 0, 0)) {
             win32err("BCryptCreateHash");
         }
         break;
-    case 'u':        /* HASH_UPDATE(ctxp, ptr, len) */
-        if (0 > (ctxp->st = BCryptHashData(ctxp->bhh, p, d, 0))) {
+    case 'u':        /* HASH_UPDATE(contextp, ptr, len) */
+        if (0 > (contextp->st = BCryptHashData(contextp->bhh, p, d, 0))) {
             win32err("BCryptHashData");
         }
         break;
-    case 'f':        /* HASH_FINISH(ctxp) */
-        if (0 > BCryptFinishHash(ctxp->bhh, ctxp->pbhash, ctxp->cbhash, 0)) {
+    case 'f':        /* HASH_FINISH(contextp) */
+        if (0 > BCryptFinishHash(contextp->bhh, contextp->pbhash, contextp->cbhash, 0)) {
             win32err("BCryptFinishHash");
         }
         break;
-    case 'c':        /* HASH_CLEANUP(ctxp) */
-        if (ctxp->bah) {
-            BCryptCloseAlgorithmProvider(ctxp->bah, 0);
+    case 'c':        /* HASH_CLEANUP(contextp) */
+        if (contextp->bah) {
+            BCryptCloseAlgorithmProvider(contextp->bah, 0);
         }
-        if (ctxp->bhh) {
-            BCryptDestroyHash(ctxp->bhh);
+        if (contextp->bhh) {
+            BCryptDestroyHash(contextp->bhh);
         }
-        if (ctxp->pbhashobj) {
-            HeapFree(GetProcessHeap(), 0, ctxp->pbhashobj);
+        if (contextp->pbhashobj) {
+            HeapFree(GetProcessHeap(), 0, contextp->pbhashobj);
         }
-        if (ctxp->pbhash) {
-            HeapFree(GetProcessHeap(), 0, ctxp->pbhash);
+        if (contextp->pbhash) {
+            HeapFree(GetProcessHeap(), 0, contextp->pbhash);
         }
         break;
-    case 's':        /* HASH_RESULT_SIZE(ctxp) */
-        return ctxp->cbhash;
-    case 'r':        /* HASH_RESULT(ctxp, resp) */
-        *(unsigned char **)p = ctxp->pbhash;
+    case 's':        /* HASH_RESULT_SIZE(contextp) */
+        return contextp->cbhash;
+    case 'r':        /* HASH_RESULT(contextp, resp) */
+        *(unsigned char **)p = contextp->pbhash;
         break;
     case 'b':        /* HASH_BINFILE(NULL,&binfile,0) */
             // XXX This buffer should be allocated, not static (and freed in
@@ -895,7 +910,7 @@ win32_cr_helper(char cmd, struct CRctxt *ctxp, void *p, int d){
     return 0;        /* ok */
 error:
     raw_printf("WIN32 function %s failed: status=%" PRIx64 "\n",
-            errname, (uint64)ctxp->st);
+            errname, (uint64)contextp->st);
     return 1;        /* fail */
 }
 #undef win32err
@@ -949,8 +964,17 @@ printf("E2: M=%s e=%d\n",msg,errnum);
 }
 #endif
 
+#ifdef USE_BACKTRACE
+#define USED_IF_BACKTRACE
+#else
+#define USED_IF_BACKTRACE UNUSED
+#endif
+
 int
-win32_cr_gettrace(int maxframes, char *out, int outsize){
+win32_cr_gettrace(int maxframes USED_IF_BACKTRACE,
+		  char *out USED_IF_BACKTRACE,
+		  int outsize USED_IF_BACKTRACE)
+{
 #ifdef USE_BACKTRACE
     userstate.error_count = 0;
     userstate.good_count = 0;

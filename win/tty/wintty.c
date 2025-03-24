@@ -1,4 +1,4 @@
-/* NetHack 3.7	wintty.c	$NHDT-Date: 1717967340 2024/06/09 21:09:00 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.410 $ */
+/* NetHack 3.7	wintty.c	$NHDT-Date: 1737691300 2025/01/23 20:01:40 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.420 $ */
 /* Copyright (c) David Cohrs, 1991                                */
 /* NetHack may be freely redistributed.  See license for details. */
 
@@ -26,12 +26,6 @@
 extern void msmsg(const char *, ...);
 #endif
 #endif
-
-#ifdef MSDOS
-#ifdef ENHANCED_SYMBOLS
-#undef ENHANCED_SYMBOLS
-#endif
-#endif /* MSDOS */
 
 #ifndef NO_TERMS
 #include "tcap.h"
@@ -154,8 +148,7 @@ struct window_procs tty_procs = {
     tty_get_color_string,
 #endif
 
-    /* other defs that really should go away (they're tty specific) */
-    tty_start_screen, tty_end_screen, genl_outrip,
+    genl_outrip,
     tty_preference_update,
     tty_getmsghistory, tty_putmsghistory,
     tty_status_init,
@@ -203,7 +196,7 @@ static int clipy = 0, clipymax = 0;
 extern void adjust_cursor_flags(struct WinDesc *);
 #endif
 
-#if defined(ASCIIGRAPH) && !defined(NO_TERMS)
+#if defined(ASCIIGRAPH)
 boolean GFlag = FALSE;
 boolean HE_resets_AS; /* see termcap.c */
 #endif
@@ -524,9 +517,9 @@ tty_init_nhwindows(int *argcp UNUSED, char **argv UNUSED)
     /*
      *  Remember tty modes, to be restored on exit.
      *
-     *  gettty() must be called before tty_startup()
+     *  gettty() must be called before term_startup()
      *    due to ordering of LI/CO settings
-     *  tty_startup() must be called before initoptions()
+     *  term_startup() must be called before initoptions()
      *    due to ordering of graphics settings
      */
 #if defined(UNIX) || defined(VMS)
@@ -535,8 +528,8 @@ tty_init_nhwindows(int *argcp UNUSED, char **argv UNUSED)
     gettty();
 
     /* to port dependant tty setup */
-    tty_startup(&wid, &hgt);
-    setftty(); /* calls start_screen */
+    term_startup(&wid, &hgt);
+    setftty(); /* calls term_start_screen */
     term_curs_set(0);
 
     /* set up tty descriptor */
@@ -665,6 +658,7 @@ tty_askname(void)
         case -1:
             bail("Until next time then..."); /* quit */
             /*NOTREACHED*/
+            break;
         case 0:
             break; /* no game chosen; start new game */
         case 1:
@@ -798,7 +792,7 @@ void
 tty_resume_nhwindows(void)
 {
     gettty();
-    setftty(); /* calls start_screen */
+    setftty(); /* calls term_start_screen */
     term_curs_set(0);
     docrt();
 }
@@ -845,12 +839,7 @@ tty_exit_nhwindows(const char *str)
     ttyDisplay = (struct DisplayDesc *) 0;
 #endif
 
-#ifndef NO_TERMS    /*(until this gets added to the window interface)*/
-    tty_shutdown(); /* cleanup termcap/terminfo/whatever */
-#endif
-#ifdef WIN32CON
-    consoletty_exit();
-#endif
+    term_shutdown(); /* cleanup termcap/terminfo/whatever */
     iflags.window_inited = 0;
 }
 
@@ -1084,6 +1073,7 @@ tty_clear_nhwindow(winid window)
     case NHW_MAP:
         /* cheap -- clear the whole thing and tell nethack to redraw botl */
         disp.botlx = TRUE;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case NHW_BASE:
         /* if erasing_tty_screen is True, calling sequence is
@@ -1721,6 +1711,7 @@ process_menu_window(winid window, struct WinDesc *cw)
             break;
         case MENU_EXPLICIT_CHOICE:
             morc = really_morc;
+            FALLTHROUGH;
         /*FALLTHRU*/
         default:
             if (cw->how == PICK_NONE || !strchr(resp, morc)) {
@@ -1878,12 +1869,14 @@ tty_display_nhwindow(
             tty_display_nhwindow(WIN_MESSAGE, TRUE);
             return;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case NHW_BASE:
         (void) fflush(stdout);
         break;
     case NHW_TEXT:
         cw->maxcol = ttyDisplay->cols; /* force full-screen mode */
+        FALLTHROUGH;
         /*FALLTHRU*/
     case NHW_MENU:
         cw->active = 1;
@@ -1951,6 +1944,7 @@ tty_dismiss_nhwindow(winid window)
         if (ttyDisplay->toplin != TOPLINE_EMPTY)
             tty_display_nhwindow(WIN_MESSAGE, TRUE);
         nhassert(ttyDisplay->toplin == TOPLINE_EMPTY);
+        FALLTHROUGH;
         /*FALLTHRU*/
     case NHW_STATUS:
     case NHW_BASE:
@@ -2042,8 +2036,7 @@ erase_tty_screen(void)
 void
 tty_curs(
     winid window,
-    int x, int y) /* not xchar: perhaps xchar is unsigned
-                   * then curx-x would be unsigned too */
+    int x, int y)  /* coordinates (and curx-x) must be signed */
 {
     struct WinDesc *cw = 0;
     int cx = ttyDisplay->curx;
@@ -2861,21 +2854,28 @@ tty_ctrl_nhwindow(
         wri->tocore = zero_tocore;
         tty_ok = assesstty(ttyinvmode, &offx, &offy, &rows, &cols, &maxcol,
                            &minrow, &maxrow);
-        wri->tocore.needrows = (int) (minrow + 1 + ROWNO + StatusRows());
-        wri->tocore.needcols = (int) tty_perminv_mincol;
-        wri->tocore.haverows = (int) ttyDisplay->rows;
-        wri->tocore.havecols = (int) ttyDisplay->cols;
-        if (!tty_ok) {
-#ifdef RESIZABLE
-            /* terminal isn't big enough right now but player might resize it
-               and then use 'm O' to try to set 'perm_invent' again */
-            wri->tocore.tocore_flags |= too_small;
-#else
-            wri->tocore.tocore_flags |= prohibited;
-#endif
+        if (!tty_ok && rows == 0 && cols == 0) {
+            /* something is terribly wrong, possibly too early in startup */
+            wri->tocore.tocore_flags |= too_early;
         } else {
-            maxslot = (maxrow - 2) * (!inuse_only ? 2 : 1);
-            wri->tocore.maxslot = maxslot;
+            wri->tocore.needrows = (int) (minrow + 1 + ROWNO + StatusRows());
+            wri->tocore.needcols = (int) tty_perminv_mincol;
+            wri->tocore.haverows = (int) ttyDisplay->rows;
+            wri->tocore.havecols = (int) ttyDisplay->cols;
+            if (!tty_ok) {
+#ifdef RESIZABLE
+                /* terminal isn't big enough right now but player might
+                 * resize it and then use 'm O' to try to set 'perm_invent'
+                 * again
+                 */
+                wri->tocore.tocore_flags |= too_small;
+#else
+                wri->tocore.tocore_flags |= prohibited;
+#endif
+            } else {
+                maxslot = (maxrow - 2) * (!inuse_only ? 2 : 1);
+                wri->tocore.maxslot = maxslot;
+            }
         }
 #endif  /* TTY_PERM_INVENT */
         break;
@@ -3394,7 +3394,7 @@ ttyinv_populate_slot(
         if (cell->color != color + 1) {
             /* offset color by 1 so 0 is not valid */
             if (ccnt >= (col + clroffset))
-                cell->color = color + 1; 
+                cell->color = color + 1;
             else
                 cell->color = NO_COLOR + 1;
             cell->refresh = 1;
@@ -3541,6 +3541,14 @@ assesstty(
     boolean inuse_only = (invmode & InvInUse) != 0,
             show_gold = (invmode & InvShowGold) != 0 && !inuse_only;
     int perminv_minrow = tty_perminv_minrow + (show_gold ? 1 : 0);
+
+    if (!ttyDisplay) {
+        /* too early */
+        *offx = *offy = *rows = *cols = 0;
+        *maxcol = 0;
+        *minrow = *maxrow = 0;
+        return !(*rows < perminv_minrow || *cols < tty_perminv_mincol);
+    }
 
     *offx = 0;
     /* topline + map rows + status lines */
@@ -3705,15 +3713,15 @@ end_glyphout(void)
     }
 }
 
-#ifndef WIN32CON
 void
 g_putch(int in_ch)
 {
     char ch = (char) in_ch;
 
+#ifndef WIN32CON
     HUPSKIP();
 
-#if defined(ASCIIGRAPH) && !defined(NO_TERMS)
+#if defined(ASCIIGRAPH)
     if (SYMHANDLING(H_UTF8)) {
         (void) putchar(ch);
     } else if (SYMHANDLING(H_IBM)
@@ -3747,14 +3755,16 @@ g_putch(int in_ch)
         (void) putchar(ch);
     }
 
-#else
+#else  /* ?ASCIIGRAPH */
     (void) putchar(ch);
 
-#endif /* ASCIIGRAPH && !NO_TERMS */
-
+#endif /* ASCIIGRAPH */
+#else  /* WIN32CON */
+    console_g_putch(in_ch);
+    nhUse(ch);
+#endif /* WIN32CON */
     return;
 }
-#endif /* !WIN32CON */
 
 #if defined(UNIX) || defined(VMS)
 #if defined(ENHANCED_SYMBOLS)
@@ -3950,13 +3960,12 @@ term_start_bgcolor(int color)
 {
     /* placeholder for now */
 }
-#endif  /* !MSDOS && !WIN32 */
-
 void
 term_curs_set(int visibility UNUSED)
 {
     /* nothing */
 }
+#endif
 
 #ifdef CHANGE_COLOR
 void
@@ -4438,6 +4447,7 @@ tty_status_update(
     switch (fldidx) {
     case BL_RESET:
         reset_state = FORCE_RESET;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case BL_FLUSH:
         if (make_things_fit(reset_state) || truncation_expected) {
@@ -4458,6 +4468,7 @@ tty_status_update(
         break;
     case BL_GOLD:
         text = decode_mixed(goldbuf, text);
+        FALLTHROUGH;
         /*FALLTHRU*/
     default:
         attrmask = (color >> 8) & 0x00FF;
@@ -4506,6 +4517,7 @@ tty_status_update(
         break;
     case BL_LEVELDESC:
         dlvl_shrinklvl = 0; /* caller is passing full length string */
+        FALLTHROUGH;
         /*FALLTHRU*/
     case BL_HUNGER:
         /* The core sends trailing blanks for some fields.
@@ -5095,7 +5107,7 @@ render_status(void)
                     if (hpbar_crit_hp)
                         repad_with_dashes(bar);
                     bar_len = (int) strlen(bar); /* always 30 */
-                    tlth = bar_len + 2;
+                    /*tlth = bar_len + 2; // not needed within this 'if'*/
                     attrmask = 0; /* for the second part only case: dead */
                     /* when at full HP, the whole title will be highlighted;
                        when injured or dead, there will be a second portion

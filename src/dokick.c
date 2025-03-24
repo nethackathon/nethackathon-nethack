@@ -612,9 +612,9 @@ really_kick_object(coordxy x, coordxy y)
     Norep("You kick %s.",
           !isgold ? singular(gk.kickedobj, doname) : doname(gk.kickedobj));
 
-    if (IS_ROCK(levl[x][y].typ) || closed_door(x, y)) {
+    if (IS_OBSTRUCTED(levl[x][y].typ) || closed_door(x, y)) {
         if ((!martial() && rn2(20) > ACURR(A_DEX))
-            || IS_ROCK(levl[u.ux][u.uy].typ) || closed_door(u.ux, u.uy)) {
+            || IS_OBSTRUCTED(levl[u.ux][u.uy].typ) || closed_door(u.ux, u.uy)) {
             if (Blind)
                 pline("It doesn't come loose.");
             else
@@ -805,7 +805,7 @@ kickstr(char *buf, const char *kickobjnam)
         what = "a tree";
     else if (IS_STWALL(gm.maploc->typ))
         what = "a wall";
-    else if (IS_ROCK(gm.maploc->typ))
+    else if (IS_OBSTRUCTED(gm.maploc->typ))
         what = "a rock";
     else if (IS_THRONE(gm.maploc->typ))
         what = "a throne";
@@ -949,7 +949,7 @@ kick_door(coordxy x, coordxy y, int avrg_attrib)
             gm.maploc->doormask = D_BROKEN;
         }
         feel_newsym(x, y); /* we know we broke it */
-        unblock_point(x, y); /* vision */
+        recalc_block_point(x, y); /* vision */
         if (shopdoor) {
             add_damage(x, y, SHOP_DOOR_COST);
             pay_for_damage("break", FALSE);
@@ -1356,6 +1356,7 @@ dokick(void)
                 pline("%s burps loudly.", Monnam(u.ustuck));
                 break;
             }
+            FALLTHROUGH;
             /*FALLTHRU*/
         default:
             Your("feeble kick has no effect.");
@@ -1376,7 +1377,7 @@ dokick(void)
          * reachable for bracing purposes
          * Possible extension: allow bracing against stuff on the side?
          */
-        if (isok(xx, yy) && !IS_ROCK(levl[xx][yy].typ)
+        if (isok(xx, yy) && !IS_OBSTRUCTED(levl[xx][yy].typ)
             && !IS_DOOR(levl[xx][yy].typ)
             && (!Is_airlevel(&u.uz) || !OBJ_AT(xx, yy))) {
             You("have nothing to brace yourself against.");
@@ -1500,6 +1501,7 @@ drop_to(coord *cc, schar loc, coordxy x, coordxy y)
             cc->y = cc->x = 0;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case MIGR_STAIRS_UP:
     case MIGR_LADDER_UP:
@@ -1816,6 +1818,7 @@ obj_delivery(boolean near_hero)
         switch (where) {
         case MIGR_LADDER_UP:
             isladder = TRUE;
+            FALLTHROUGH;
             /*FALLTHRU*/
         case MIGR_STAIRS_UP:
         case MIGR_SSTAIRS:

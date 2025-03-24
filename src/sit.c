@@ -158,6 +158,7 @@ throne_sit_effect(void)
                     default:
                     case 2: /* more than 1 eye */
                         eye = makeplural(eye);
+                        FALLTHROUGH;
                         /*FALLTHRU*/
                     case 1: /* one eye (Cyclops, floating eye) */
                         Your("%s %s...", eye, vtense(eye, "tingle"));
@@ -315,7 +316,10 @@ dosit(void)
         } else if (obj->otyp == TOWEL) {
             pline("It's probably not a good time for a picnic...");
         } else {
-            You("sit on %s.", the(xname(obj)));
+            if (slithy(gy.youmonst.data))
+                You("coil up around %s.", the(xname(obj)));
+            else
+                You("sit on %s.", the(xname(obj)));
             if (obj->otyp == CORPSE && amorphous(&mons[obj->corpsenm]))
                 pline("It's squishy...");
             else if (obj->otyp == CREAM_PIE) {
@@ -379,7 +383,7 @@ dosit(void)
         if (Upolyd && u.umonnum == PM_GREMLIN) {
             if (split_mon(&gy.youmonst, (struct monst *) 0)) {
                 if (levl[u.ux][u.uy].typ == FOUNTAIN)
-                    dryup(u.ux, u.uy, TRUE);
+                    dryup(u.ux, u.uy, TRUE, FALSE);
             }
             /* splitting--or failing to do so--protects gear from the water */
         } else {
@@ -517,6 +521,7 @@ attrcurse(void)
             ret = FIRE_RES;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 2:
         if (HTeleportation & INTRINSIC) {
@@ -525,6 +530,7 @@ attrcurse(void)
             ret = TELEPORT;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 3:
         if (HPoison_resistance & INTRINSIC) {
@@ -533,6 +539,7 @@ attrcurse(void)
             ret = POISON_RES;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 4:
         if (HTelepat & INTRINSIC) {
@@ -543,6 +550,7 @@ attrcurse(void)
             ret = TELEPAT;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 5:
         if (HCold_resistance & INTRINSIC) {
@@ -551,6 +559,7 @@ attrcurse(void)
             ret = COLD_RES;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 6:
         if (HInvis & INTRINSIC) {
@@ -559,6 +568,7 @@ attrcurse(void)
             ret = INVIS;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 7:
         if (HSee_invisible & INTRINSIC) {
@@ -574,6 +584,7 @@ attrcurse(void)
             ret = SEE_INVIS;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 8:
         if (HFast & INTRINSIC) {
@@ -582,6 +593,7 @@ attrcurse(void)
             ret = FAST;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 9:
         if (HStealth & INTRINSIC) {
@@ -590,6 +602,7 @@ attrcurse(void)
             ret = STEALTH;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 10:
         /* intrinsic protection is just disabled, not set back to 0 */
@@ -599,6 +612,7 @@ attrcurse(void)
             ret = PROTECTION;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 11:
         if (HAggravate_monster & INTRINSIC) {
@@ -607,6 +621,7 @@ attrcurse(void)
             ret = AGGRAVATE_MONSTER;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     default:
         break;

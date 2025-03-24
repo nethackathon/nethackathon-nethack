@@ -21,6 +21,7 @@ newemin(struct monst *mtmp)
     if (!EMIN(mtmp)) {
         EMIN(mtmp) = (struct emin *) alloc(sizeof(struct emin));
         (void) memset((genericptr_t) EMIN(mtmp), 0, sizeof(struct emin));
+        EMIN(mtmp)->parentmid = mtmp->m_id;
     }
 }
 
@@ -528,10 +529,6 @@ gain_guardian_angel(void)
              * the final level of the game. The angel will still appear, but
              * won't be tamed. */
             if (u.uconduct.pets) {
-                /* guardian angel -- the one case mtame doesn't
-                 * imply an edog structure, so we don't want to
-                 * call tamedog().
-                 */
                 mtmp->mtame = 10;
                 u.uconduct.pets++;
             }

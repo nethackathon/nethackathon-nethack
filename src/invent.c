@@ -1,4 +1,4 @@
-/* NetHack 3.7	invent.c	$NHDT-Date: 1724094299 2024/08/19 19:04:59 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.516 $ */
+/* NetHack 3.7	invent.c	$NHDT-Date: 1737384766 2025/01/20 06:52:46 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.531 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Derek S. Ray, 2015. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -1230,6 +1230,12 @@ hold_another_object(
            dropped, avoid perminv update when temporarily adding it */
         obj = addinv_core0(obj, (struct obj *) 0, FALSE);
         goto drop_it;
+    } else if (obj->otyp == CORPSE
+               && !u_safe_from_fatal_corpse(obj, st_all)
+               && obj->wishedfor) {
+        obj->wishedfor = 0;
+        obj = addinv_core0(obj, (struct obj *) 0, FALSE);
+        goto drop_it;
     } else {
         long oquan = obj->quan;
         int prev_encumbr = near_capacity(); /* before addinv() */
@@ -1367,6 +1373,11 @@ freeinv_core(struct obj *obj)
     } else if (obj->otyp == FIGURINE && obj->timed) {
         (void) stop_timer(FIG_TRANSFORM, obj_to_any(obj));
     }
+
+    if (obj == svc.context.tin.tin) {
+        svc.context.tin.tin = (struct obj *) 0;
+        svc.context.tin.o_id = 0;
+    }
 }
 
 /* remove an object from the hero's inventory */
@@ -1480,6 +1491,18 @@ carrying(int type)
     /* this could be replaced by 'return m_carrying(&gy.youmonst, type);' */
     for (otmp = gi.invent; otmp; otmp = otmp->nobj)
         if (otmp->otyp == type)
+            break;
+    return otmp;
+}
+
+/* return inventory object of type that will petrify on touch */
+struct obj *
+carrying_stoning_corpse(void)
+{
+    struct obj *otmp;
+
+    for (otmp = gi.invent; otmp; otmp = otmp->nobj)
+        if (otmp->otyp == CORPSE && touch_petrifies(&mons[otmp->corpsenm]))
             break;
     return otmp;
 }
@@ -2234,15 +2257,17 @@ ggetobj(const char *word, int (*fn)(OBJ_P), int mx,
             return 0;
         if (strchr(buf, 'i')) {
             char ailets[1+26+26+1+5+1]; /* $ + a-z + A-Z + # + slop + \0 */
-            struct obj *otmp;
+            struct obj *otmp, *nextobj;
 
             /* applicable inventory letters; if empty, show entire invent */
             ailets[0] = '\0';
             if (ofilter)
-                for (otmp = gi.invent; otmp; otmp = otmp->nobj)
+                for (otmp = gi.invent; otmp; otmp = nextobj) {
+                    nextobj = otmp->nobj;
                     /* strchr() check: limit overflow items to one '#' */
                     if ((*ofilter)(otmp) && !strchr(ailets, otmp->invlet))
                         (void) strkitten(ailets, otmp->invlet);
+                }
             if (display_inventory(ailets, TRUE) == '\033')
                 return 0;
         } else
@@ -2453,6 +2478,7 @@ askchain(
         switch (sym) {
         case 'a':
             allflag = 1;
+            FALLTHROUGH;
             /*FALLTHRU*/
         case 'y':
             tmp = (*fn)(otmp);
@@ -2471,10 +2497,13 @@ askchain(
             cnt += tmp;
             if (--mx == 0)
                 goto ret;
+            FALLTHROUGH;
             /*FALLTHRU*/
         case 'n':
             if (nodot)
                 dud++;
+            FALLTHROUGH;
+            /*FALLTHRU*/
         default:
             break;
         case 'q':
@@ -2523,7 +2552,7 @@ fully_identify_obj(struct obj *otmp)
 {
     makeknown(otmp->otyp);
     if (otmp->oartifact)
-        discover_artifact((coordxy) otmp->oartifact);
+        discover_artifact((xint16) otmp->oartifact);
     otmp->known = otmp->dknown = otmp->bknown = otmp->rknown = 1;
     set_cknown_lknown(otmp); /* set otmp->{cknown,lknown} if applicable */
     if (otmp->otyp == EGG && otmp->corpsenm != NON_PM)
@@ -2785,7 +2814,7 @@ xprname(
     char suffix[80]; /* plenty of room for count and hallucinatory currency */
     int sfxlen, txtlen; /* signed int for %*s formatting */
     const char *fmt;
-    boolean use_invlet = (flags.invlet_constant
+    boolean use_invlet = (flags.invlet_constant && obj != NULL
                           && let != CONTAINED_SYM && let != HANDS_SYM);
     long savequan = 0L;
 
@@ -2800,8 +2829,10 @@ xprname(
      *  >  Then the object is contained and doesn't have an inventory letter.
      */
     fmt = "%c - %.*s%s";
-    if (!txt)
+    if (!txt) {
+        assert(obj != NULL);
         txt = doname(obj);
+    }
     txtlen = (int) strlen(txt);
 
     if (cost != 0L || let == '*') {
@@ -2965,6 +2996,7 @@ itemactions_pushkeys(struct obj *otmp, int act)
         switch (act) {
         default:
             impossible("Unknown item action");
+            break;
         case IA_NONE:
             break;
         case IA_UNWIELD:
@@ -3501,7 +3533,7 @@ dispinv_with_action(
     boolean use_inuse_ordering, /* affects sortloot() and header labels */
     const char *alt_label)      /* alternate value for in-use "Accessories" */
 {
-    struct obj *otmp;
+    struct obj *otmp, *nextobj;
     const char *save_accessories = 0;
     char c, save_sortloot = 0;
     unsigned len = lets ? (unsigned) strlen(lets) : 0U;
@@ -3527,9 +3559,11 @@ dispinv_with_action(
     iflags.force_invmenu = save_force_invmenu;
 
     if (c && c != '\033') {
-        for (otmp = gi.invent; otmp; otmp = otmp->nobj)
+        for (otmp = gi.invent; otmp; otmp = nextobj) {
+            nextobj = otmp->nobj;
             if (otmp->invlet == c)
                 return itemactions(otmp);
+        }
     }
     return ECMD_OK;
 }
@@ -3610,11 +3644,10 @@ display_pickinv(
     Loot *sortedinvent, *srtinv;
     int8_t prevorderclass;
     boolean (*filter)(struct obj *) = (boolean (*)(OBJ_P)) 0;
-
     boolean wizid = (wizard && iflags.override_ID), gotsomething = FALSE;
     int clr = NO_COLOR, menu_behavior = MENU_BEHAVE_STANDARD;
     boolean show_gold = TRUE, inuse_only = FALSE, skipped_gold = FALSE,
-            doing_perm_invent = FALSE, save_flags_sortpack = flags.sortpack,
+            doing_perm_invent = FALSE, save_flags_sortpack,
             usextra = (xtra_choice && allowxtra);
 
     if (lets && !*lets)
@@ -4209,7 +4242,7 @@ dounpaid(
     }
 
     win = create_nhwindow(NHW_MENU);
-    cost = totcost = 0;
+    totcost = 0L;
     num_so_far = 0; /* count of # printed so far */
     if (!flags.invlet_constant)
         reassign();
@@ -4920,6 +4953,8 @@ mergable(
         return TRUE;
 
     if (obj->cursed != otmp->cursed || obj->blessed != otmp->blessed)
+        return FALSE;
+    if ((obj->how_lost & ~LOSTOVERRIDEMASK) != 0)
         return FALSE;
 #if 0   /* don't require 'bypass' to match; that results in items dropped
          * via 'D' not stacking with compatible items already on the floor;
@@ -6132,6 +6167,12 @@ sync_perminvent(void)
             || in_perm_invent_toggled) {
             wri = ctrl_nhwindow(WIN_INVEN, request_settings, &wri_info);
             if (wri != 0) {
+                if ((wri->tocore.tocore_flags & (too_early)) != 0) {
+                    /* don't be too noisy about this as it's really
+                     * a startup timing issue. Just set a marker. */
+                    iflags.perm_invent_pending = TRUE;
+                    return;
+                }
                 if ((wri->tocore.tocore_flags & (too_small | prohibited))
                     != 0) {
                     /* sizes aren't good enough */

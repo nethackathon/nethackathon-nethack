@@ -35,6 +35,7 @@ staticfn uchar abil_to_adtyp(long *) NONNULLARG1;
 staticfn int glow_strength(int);
 staticfn boolean untouchable(struct obj *, boolean);
 staticfn int count_surround_traps(coordxy, coordxy);
+staticfn void dispose_of_orig_obj(struct obj *);
 
 /* The amount added to the victim's total hit points to insure that the
    victim will be killed even after damage bonus/penalty adjustments.
@@ -142,13 +143,18 @@ artiname(int artinum)
    If no alignment is given, then 'otmp' is converted
    into an artifact of matching type, or returned as-is if that's not
    possible.
-   For the 2nd case, caller should use ``obj = mk_artifact(obj, A_NONE);''
-   for the 1st, ``obj = mk_artifact((struct obj *) 0, some_alignment);''.
+   For the 2nd case, caller should use ``obj = mk_artifact(obj, A_NONE, 99);''
+   For the 1st, ``obj = mk_artifact((struct obj *) 0, some_alignment, ...);''.
+   The max_giftvalue is the value of the sacrifice, for an artifact obtained
+   by sacrificing, or 99 otherwise.
  */
 struct obj *
 mk_artifact(
-    struct obj *otmp,   /* existing object; ignored if alignment specified */
-    aligntyp alignment) /* target alignment, or A_NONE */
+    struct obj *otmp,    /* existing object; ignored and disposed of
+                          * if alignment specified */
+    aligntyp alignment,  /* target alignment, or A_NONE */
+    uchar max_giftvalue, /* cap on generated giftvalue */
+    boolean adjust_spe)  /* whether to add spe to situational artifacts */
 {
     const struct artifact *a;
     int m, n, altn;
@@ -156,6 +162,7 @@ mk_artifact(
     short o_typ = (by_align || !otmp) ? 0 : otmp->otyp;
     boolean unique = !by_align && otmp && objects[o_typ].oc_unique;
     short eligible[NROFARTIFACTS];
+    xint16 skill_compatibility;
 
     n = altn = 0;    /* no candidates found yet */
     eligible[0] = 0; /* lint suppression */
@@ -164,6 +171,8 @@ mk_artifact(
         if (artiexist[m].exists)
             continue;
         if ((a->spfx & SPFX_NOGEN) || unique)
+            continue;
+        if (a->gift_value > max_giftvalue && !Role_if(a->role))
             continue;
 
         if (!by_align) {
@@ -186,17 +195,33 @@ mk_artifact(
                 n = 1;
                 break; /* skip all other candidates */
             }
+
+            /* check if this is skill-compatible */
+            skill_compatibility = P_SKILLED;
+            if (objects[a->otyp].oc_class == WEAPON_CLASS) {
+                schar skill = objects[a->otyp].oc_skill;
+                if (skill < 0)
+                    skill_compatibility = P_MAX_SKILL(-skill);
+                else
+                    skill_compatibility = P_MAX_SKILL(skill);
+            }
+
             /* found something to consider for random selection */
-            if (a->alignment != A_NONE || u.ugifts > 0) {
+            if ((a->alignment != A_NONE || u.ugifts > 0 || !rn2(3)) &&
+                (!rn2(4) || skill_compatibility >= P_SKILLED ||
+                 (skill_compatibility >= P_BASIC && rn2(2)))) {
                 /* right alignment, or non-aligned with at least 1
-                   previous gift bestowed, makes this one viable */
+                   previous gift bestowed, makes this one viable;
+                   unaligned artifacts are possible even as the first
+                   gift, but less likely; if it's a bad weapon type
+                   for the role that also makes it less likely */
                 eligible[n++] = m;
             } else {
-                /* non-aligned with no previous gifts;
-                   if no candidates have been found yet, record
+                /* if no candidates have been found yet, record
                    this one as a[nother] fallback possibility in
                    case all aligned candidates have been used up
-                   (via wishing, naming, bones, random generation) */
+                   (via wishing, naming, bones, random generation)
+                   or failed the randomized compatibility checks */
                 if (!n)
                     eligible[altn++] = m;
                 /* [once a regular candidate is found, the list
@@ -215,23 +240,60 @@ mk_artifact(
         a = &artilist[m];
 
         /* make an appropriate object if necessary, then christen it */
-        if (by_align)
-            otmp = mksobj((int) a->otyp, TRUE, FALSE);
+        if (by_align) {
+            /* 'by_align' indicates that an alignment was passed as
+             * an argument, but also that the 'otmp' argument is not
+             * relevant */
+            struct obj *artiobj = mksobj((int) a->otyp, TRUE, FALSE);
 
-        if (otmp) {
-            /* prevent erosion from generating */
-            otmp->oeroded = otmp->oeroded2 = 0;
-            otmp = oname(otmp, a->name, ONAME_NO_FLAGS);
-            otmp->oartifact = m;
-            /* set existence and reason for creation bits */
-            artifact_origin(otmp, ONAME_RANDOM); /* 'random' is default */
+            /* nonnull value of 'otmp' is unexpected. Cope. */
+            if (otmp) /* just in case; avoid orphaning */
+                dispose_of_orig_obj(otmp);
+            otmp = artiobj;
+        }
+        /*
+         * otmp should be nonnull at this point:
+         * either the passed argument (if !by_align == A_NONE), or
+         * the result of mksobj() just above if by_align is an alignment. */
+        assert(otmp != 0);
+        /* prevent erosion from generating */
+        otmp->oeroded = otmp->oeroded2 = 0;
+        otmp = oname(otmp, a->name, ONAME_NO_FLAGS);
+        otmp->oartifact = m;  /* probably already set by this point, but */
+        /* set existence and reason for creation bits */
+        artifact_origin(otmp, ONAME_RANDOM); /* 'random' is default */
+        if (adjust_spe) {
+            int new_spe;
+
+            /* Adjust artiobj->spe by a->gen_spe. (This is a no-op for
+               non-weapons, which always have a gen_spe of 0, and for many
+               weapons, too.) The result is clamped into the "normal" range to
+               prevent an outside chance of +12 artifacts generating. */
+            new_spe = (int) otmp->spe + a->gen_spe;
+            if (new_spe >= -10 && new_spe < 10)
+                otmp->spe = new_spe;
         }
     } else {
         /* nothing appropriate could be found; return original object */
-        if (by_align)
-            otmp = 0; /* (there was no original object) */
+        if (by_align && otmp) {
+            /* (there shouldn't have been an original object). Deal with it.
+             * The callers that passed an alignment and a NULL otmp are
+             * prepared to get a potential NULL return value, so this is okay */
+            dispose_of_orig_obj(otmp);
+            otmp = 0;
+        } /* otherwise, otmp has not changed; just fallthrough to return it */
     }
     return otmp;
+}
+
+staticfn void
+dispose_of_orig_obj(struct obj *obj)
+{
+    if (!obj)
+        return;
+
+    obj_extract_self(obj);
+    obfree(obj, (struct obj *) 0);
 }
 
 /*
@@ -629,7 +691,10 @@ protects(struct obj *otmp, boolean being_worn)
  * unworn/unwielded/dropped.  Pickup/drop only set/reset the W_ART mask.
  */
 void
-set_artifact_intrinsic(struct obj *otmp, boolean on, long wp_mask)
+set_artifact_intrinsic(
+    struct obj *otmp,
+    boolean on,
+    long wp_mask)
 {
     long *mask = 0;
     const struct artifact *art, *oart = get_artifact(otmp);
@@ -803,6 +868,13 @@ set_artifact_intrinsic(struct obj *otmp, boolean on, long wp_mask)
         if (oart->inv_prop <= LAST_PROP
             && (u.uprops[oart->inv_prop].extrinsic & W_ARTI))
             (void) arti_invoke(otmp);
+    }
+
+    if (wp_mask == W_WEP && is_art(otmp, ART_SUNSWORD)) {
+        if (on)
+            EBlnd_resist |= wp_mask;
+        else
+            EBlnd_resist &= ~wp_mask;
     }
 }
 
@@ -1600,9 +1672,7 @@ artifact_hit(
                     healup(drain, 0, FALSE, FALSE);
                 } else {
                     assert(magr != 0);
-                    magr->mhp += drain;
-                    if (magr->mhp > magr->mhpmax)
-                        magr->mhp = magr->mhpmax;
+                    healmon(magr, drain, 0);
                 }
             }
             return vis;
@@ -1628,9 +1698,7 @@ artifact_hit(
             }
             losexp("life drainage");
             if (magr && magr->mhp < magr->mhpmax) {
-                magr->mhp += (abs(oldhpmax - u.uhpmax) + 1) / 2;
-                if (magr->mhp > magr->mhpmax)
-                    magr->mhp = magr->mhpmax;
+                healmon(magr, (abs(oldhpmax - u.uhpmax) + 1) / 2, 0);
             }
             return TRUE;
         }
@@ -2224,6 +2292,10 @@ what_gives(long *abil)
                     /* property conferred when wielded or worn */
                     if ((art->spfx & spfx) == spfx && obj->owornmask)
                         return obj;
+                }
+                if (obj == uwep && abil == &EBlnd_resist
+                    && (*abil & W_WEP) != 0L) {
+                    return obj; /* Sunsword */
                 }
             }
         } else {

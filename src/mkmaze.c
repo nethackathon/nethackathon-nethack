@@ -1,4 +1,4 @@
-/* NetHack 3.7	mkmaze.c	$NHDT-Date: 1712454188 2024/04/07 01:43:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.163 $ */
+/* NetHack 3.7	mkmaze.c	$NHDT-Date: 1737387068 2025/01/20 07:31:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.176 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Pasi Kallinen, 2018. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -26,7 +26,6 @@ staticfn void stolen_booty(void);
 staticfn boolean maze_inbounds(coordxy, coordxy);
 staticfn void maze_remove_deadends(xint16);
 staticfn void populate_maze(void);
-staticfn boolean is_exclusion_zone(xint16, coordxy, coordxy);
 
 /* adjust a coordinate one step in the specified direction */
 #define mz_move(X, Y, dir) \
@@ -79,19 +78,22 @@ set_levltyp(coordxy x, coordxy y, schar newtyp)
     if (isok(x, y) && newtyp >= STONE && newtyp < MAX_TYPE) {
         if (CAN_OVERWRITE_TERRAIN(levl[x][y].typ)) {
             schar oldtyp = levl[x][y].typ;
-            boolean was_ice = (levl[x][y].typ == ICE);
+            /* typ==ICE || (typ==DRAWBRIDGE_UP && drawbridgemask==DB_ICE) */
+            boolean was_ice = is_ice(x, y);
 
             levl[x][y].typ = newtyp;
             /* TODO?
              *  if oldtyp used flags or horizontal differently from
-             *  from the way newtyp will use them, clear them.
+             *  the way newtyp will use them, clear them.
              */
 
-            if (IS_LAVA(newtyp))
+            if (IS_LAVA(newtyp)) /* [what about IS_LAVA(oldtyp)=>.lit = 0?] */
                 levl[x][y].lit = 1;
-
-            if (was_ice && newtyp != ICE)
+            if (was_ice && newtyp != ICE) {
+                /* frozen corpses resume rotting, no more ice to melt away */
+                obj_ice_effects(x, y, TRUE);
                 spot_stop_timers(x, y, MELT_ICE_AWAY);
+            }
             if ((IS_FOUNTAIN(oldtyp) != IS_FOUNTAIN(newtyp))
                 || (IS_SINK(oldtyp) != IS_SINK(newtyp)))
                 count_level_features(); /* level.flags.nfountains,nsinks */
@@ -302,7 +304,7 @@ maze0xy(coord *cc)
     return;
 }
 
-staticfn boolean
+boolean
 is_exclusion_zone(xint16 type, coordxy x, coordxy y)
 {
     struct exclusion_zone *ez = sve.exclusion_zones;
@@ -586,6 +588,7 @@ fixup_special(void)
                 sp = find_level(r->rname.str);
                 lev = sp->dlevel;
             }
+            FALLTHROUGH;
             /*FALLTHRU*/
 
         case LR_UPSTAIR:
@@ -1006,7 +1009,6 @@ create_maze(int corrwid, int wallthick, boolean rmdeadends)
             mx = (x % 2) ? corrwid : (x == 2 || x == rdx * 2) ? 1 : wallthick;
             ry = y = 2;
             while (ry < gy.y_maze_max) {
-                dx = dy = 0;
                 my = (y % 2) ? corrwid
                      : (y == 2 || y == rdy * 2) ? 1
                        : wallthick;
@@ -1319,8 +1321,8 @@ mazexy(coord *cc)
         x = rnd(gx.x_maze_max);
         y = rnd(gy.y_maze_max);
         if (levl[x][y].typ == allowedtyp) {
-            cc->x = (coordxy) x;
-            cc->y = (coordxy) y;
+            cc->x = x;
+            cc->y = y;
             return;
         }
     } while (++cpt < 100);
@@ -1328,8 +1330,8 @@ mazexy(coord *cc)
     for (x = 1; x <= gx.x_maze_max; x++)
         for (y = 1; y <= gy.y_maze_max; y++)
             if (levl[x][y].typ == allowedtyp) {
-                cc->x = (coordxy) x;
-                cc->y = (coordxy) y;
+                cc->x = x;
+                cc->y = y;
                 return;
             }
     /* every spot on the area of map allowed for mazes has been rejected */
@@ -1438,7 +1440,8 @@ bound_digging(void)
 
     for (x = 0; x < COLNO; x++)
         for (y = 0; y < ROWNO; y++)
-            if (y <= ymin || y >= ymax || x <= xmin || x >= xmax)
+            if (IS_STWALL(levl[x][y].typ)
+                && (y <= ymin || y >= ymax || x <= xmin || x >= xmax))
                 levl[x][y].wall_info |= W_NONDIGGABLE;
 }
 
@@ -2070,6 +2073,7 @@ mv_bubble(struct bubble *b, coordxy dx, coordxy dy, boolean ini)
         break;
     case 3:
         b->dy = -b->dy;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 2:
         b->dx = -b->dx;

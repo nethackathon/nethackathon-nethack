@@ -1,4 +1,4 @@
-/* NetHack 3.7	apply.c	$NHDT-Date: 1720128162 2024/07/04 21:22:42 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.449 $ */
+/* NetHack 3.7	apply.c	$NHDT-Date: 1737275719 2025/01/19 00:35:19 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.464 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2012. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -13,6 +13,7 @@ staticfn void use_whistle(struct obj *);
 staticfn void use_magic_whistle(struct obj *);
 staticfn void magic_whistled(struct obj *);
 staticfn int use_leash(struct obj *);
+staticfn void use_leash_core(struct obj *, struct monst *, coord *, int);
 staticfn boolean mleashed_next2u(struct monst *);
 staticfn int use_mirror(struct obj *);
 staticfn void use_bell(struct obj **);
@@ -31,6 +32,7 @@ staticfn int touchstone_ok(struct obj *);
 staticfn int use_stone(struct obj *);
 staticfn int set_trap(void); /* occupation callback */
 staticfn void display_polearm_positions(boolean);
+staticfn void calc_pole_range(int *, int *);
 staticfn int use_cream_pie(struct obj *);
 staticfn int jelly_ok(struct obj *);
 staticfn int use_royal_jelly(struct obj **);
@@ -62,8 +64,11 @@ do_blinding_ray(struct obj *obj)
                     (int (*) (OBJ_P, OBJ_P)) 0, &obj);
 
     obj->ox = u.ux, obj->oy = u.uy; /* flash_hits_mon() wants this */
-    if (mtmp)
+    if (mtmp) {
         (void) flash_hits_mon(mtmp, obj);
+        if (obj->otyp == EXPENSIVE_CAMERA)
+            see_monster_closeup(mtmp);
+    }
     /* normally bhit() would do this but for FLASHED_LIGHT we want it
        to be deferred until after flash_hits_mon() */
     transient_light_cleanup();
@@ -227,8 +232,7 @@ its_dead(coordxy rx, coordxy ry, int *resp)
             /* (most corpses don't retain the monster's sex, so
                we're usually forced to use generic pronoun here) */
             if (mtmp) {
-                mptr = mtmp->data = &mons[mtmp->mnum];
-                /* TRUE: override visibility check--it's not on the map */
+                mtmp->data = &mons[mtmp->mnum];
                 gndr = pronoun_gender(mtmp, PRONOUN_NO_IT);
             } else {
                 mptr = &mons[corpse->corpsenm];
@@ -447,6 +451,7 @@ use_stethoscope(struct obj *obj)
         Soundeffect(se_hollow_sound, 100);
         You_hear(hollow_str, "door");
         cvt_sdoor_to_door(lev); /* ->typ = DOOR */
+        recalc_block_point(rx, ry);
         feel_newsym(rx, ry);
         return res;
     case SCORR:
@@ -752,13 +757,11 @@ leashable(struct monst *mtmp)
                        && (!nolimbs(mtmp->data) || has_head(mtmp->data)));
 }
 
-/* ARGSUSED */
 staticfn int
 use_leash(struct obj *obj)
 {
     coord cc;
     struct monst *mtmp;
-    int spotmon;
 
     if (u.uswallow) {
         /* if the leash isn't in use, assume we're trying to leash
@@ -785,8 +788,8 @@ use_leash(struct obj *obj)
     if (u_at(cc.x, cc.y)) {
         if (u.usteed && u.dz > 0) {
             mtmp = u.usteed;
-            spotmon = 1;
-            goto got_target;
+            use_leash_core(obj, mtmp, &cc, 1);
+            return ECMD_TIME;
         }
         pline("Leash yourself?  Very funny...");
         return ECMD_OK;
@@ -802,16 +805,20 @@ use_leash(struct obj *obj)
         return ECMD_TIME;
     }
 
-    spotmon = canspotmon(mtmp);
- got_target:
+    use_leash_core(obj, mtmp, &cc, canspotmon(mtmp));
+    return ECMD_TIME;
+}
 
-    if (!spotmon && !glyph_is_invisible(levl[cc.x][cc.y].glyph)) {
+staticfn void
+use_leash_core(struct obj *obj, struct monst *mtmp, coord *cc, int spotmon)
+{
+    if (!spotmon && !glyph_is_invisible(levl[cc->x][cc->y].glyph)) {
         /* for the unleash case, we don't verify whether this unseen
            monster is the creature attached to the current leash */
         You("fail to %sleash something.", obj->leashmon ? "un" : "");
         /* trying again will work provided the monster is tame
            (and also that it doesn't change location by retry time) */
-        map_invisible(cc.x, cc.y);
+        map_invisible(cc->x, cc->y);
     } else if (!mtmp->mtame) {
         pline("%s %s leashed!", Monnam(mtmp),
               (!obj->leashmon) ? "cannot be" : "is not");
@@ -829,7 +836,7 @@ use_leash(struct obj *obj)
             char lmonbuf[BUFSZ];
             char *lmonnam = l_monnam(mtmp);
 
-            if (cc.x != mtmp->mx || cc.y != mtmp->my) {
+            if (cc->x != mtmp->mx || cc->y != mtmp->my) {
                 Sprintf(lmonbuf, "%s tail", s_suffix(lmonnam));
                 lmonnam = lmonbuf;
             }
@@ -858,7 +865,6 @@ use_leash(struct obj *obj)
                 spotmon ? y_monnam(mtmp) : l_monnam(mtmp));
         }
     }
-    return ECMD_TIME;
 }
 
 /* assuming mtmp->mleashed has been checked */
@@ -1959,8 +1965,8 @@ display_jump_positions(boolean on_off)
         tmp_at(DISP_BEAM, cmap_to_glyph(S_goodpos));
         for (dx = -4; dx <= 4; dx++)
             for (dy = -4; dy <= 4; dy++) {
-                x = dx + (coordxy) u.ux;
-                y = dy + (coordxy) u.uy;
+                x = dx + u.ux;
+                y = dy + u.uy;
                 if (get_valid_jump_position(x, y) && !u_at(x, y))
                     tmp_at(x, y);
             }
@@ -2510,7 +2516,7 @@ figurine_location_checks(struct obj *obj, coord *cc, boolean quietly)
             You("cannot put the figurine there.");
         return FALSE;
     }
-    if (IS_ROCK(levl[x][y].typ)
+    if (IS_OBSTRUCTED(levl[x][y].typ)
         && !(passes_walls(&mons[obj->corpsenm]) && may_passwall(x, y))) {
         if (!quietly)
             You("cannot place a figurine in %s!",
@@ -2827,7 +2833,7 @@ use_trap(struct obj *otmp)
     else if (On_stairs(u.ux, u.uy)) {
         stairway *stway = stairway_at(u.ux, u.uy);
         what = stway->isladder ? "on the ladder" : "on the stairs";
-    } else if (IS_FURNITURE(levtyp) || IS_ROCK(levtyp)
+    } else if (IS_FURNITURE(levtyp) || IS_OBSTRUCTED(levtyp)
              || closed_door(u.ux, u.uy) || t_at(u.ux, u.uy))
         what = "here";
     else if (Is_airlevel(&u.uz) || Is_waterlevel(&u.uz))
@@ -3336,12 +3342,71 @@ display_polearm_positions(boolean on_off)
     }
 }
 
+/*
+ * Calculate allowable range (pole's reach is always 2 steps):
+ *  unskilled and basic: orthogonal direction, 4..4;
+ *  skilled: as basic, plus knight's jump position, 4..5;
+ *  expert: as skilled, plus diagonal, 4..8.
+ *      ...9...
+ *      .85458.
+ *      .52125.
+ *      9410149
+ *      .52125.
+ *      .85458.
+ *      ...9...
+ *  (Note: no roles in NetHack can become expert or better
+ *  for polearm skill; Yeoman in slash'em can become expert.)
+ */
+staticfn void
+calc_pole_range(int *min_range, int *max_range)
+{
+    int typ = uwep_skill_type();
+
+    *min_range = 4;
+    if (typ == P_NONE || P_SKILL(typ) <= P_BASIC)
+        *max_range = 4;
+    else if (P_SKILL(typ) == P_SKILLED)
+        *max_range = 5;
+    else
+        *max_range = 8; /* (P_SKILL(typ) >= P_EXPERT) */
+
+    gp.polearm_range_min = *min_range;
+    gp.polearm_range_max = *max_range;
+
+}
+
+/* return TRUE if hero is wielding a polearm and there's
+   at least one monster they could hit with it */
+boolean
+could_pole_mon(void)
+{
+    int min_range, max_range;
+    coord cc;
+    struct monst *hitm = svc.context.polearm.hitmon;
+
+    if (!uwep || !is_pole(uwep))
+        return FALSE;
+
+    calc_pole_range(&min_range, &max_range);
+
+    cc.x = u.ux;
+    cc.y = u.uy;
+    if (!find_poleable_mon(&cc, min_range, max_range)) {
+        if (hitm && !DEADMONSTER(hitm) && sensemon(hitm)
+            && mdistu(hitm) <= max_range && mdistu(hitm) >= min_range)
+            return TRUE;
+    } else {
+        return TRUE;
+    }
+    return FALSE;
+}
+
 /* Distance attacks by pole-weapons */
 int
 use_pole(struct obj *obj, boolean autohit)
 {
     const char thump[] = "Thump!  Your blow bounces harmlessly off the %s.";
-    int res = ECMD_OK, typ, max_range, min_range, glyph;
+    int res = ECMD_OK, max_range, min_range, glyph;
     coord cc;
     struct monst *mtmp;
     struct monst *hitm = svc.context.polearm.hitmon;
@@ -3361,32 +3426,7 @@ use_pole(struct obj *obj, boolean autohit)
     }
     /* assert(obj == uwep); */
 
-    /*
-     * Calculate allowable range (pole's reach is always 2 steps):
-     *  unskilled and basic: orthogonal direction, 4..4;
-     *  skilled: as basic, plus knight's jump position, 4..5;
-     *  expert: as skilled, plus diagonal, 4..8.
-     *      ...9...
-     *      .85458.
-     *      .52125.
-     *      9410149
-     *      .52125.
-     *      .85458.
-     *      ...9...
-     *  (Note: no roles in NetHack can become expert or better
-     *  for polearm skill; Yeoman in slash'em can become expert.)
-     */
-    min_range = 4;
-    typ = uwep_skill_type();
-    if (typ == P_NONE || P_SKILL(typ) <= P_BASIC)
-        max_range = 4;
-    else if (P_SKILL(typ) == P_SKILLED)
-        max_range = 5;
-    else
-        max_range = 8; /* (P_SKILL(typ) >= P_EXPERT) */
-
-    gp.polearm_range_min = min_range;
-    gp.polearm_range_max = max_range;
+    calc_pole_range(&min_range, &max_range);
 
     /* Prompt for a location */
     if (!autohit)
@@ -3770,6 +3810,7 @@ use_grapple(struct obj *obj)
             (void) thitmonst(mtmp, uwep);
             return ECMD_TIME;
         }
+        FALLTHROUGH;
     /*FALLTHRU*/
     case 3: /* Surface */
         if (IS_AIR(levl[cc.x][cc.y].typ) || is_pool(cc.x, cc.y))
@@ -3811,6 +3852,18 @@ broken_wand_explode(struct obj *obj, int dmg, int expltype)
     explode(u.ux, u.uy, -(obj->otyp), dmg, WAND_CLASS, expltype);
     makeknown(obj->otyp); /* explode describes the effect */
     discard_broken_wand();
+}
+
+/* if x,y has lava or water, dunk any boulders at that location into it */
+void
+maybe_dunk_boulders(coordxy x, coordxy y)
+{
+    struct obj *otmp;
+
+    while (is_pool_or_lava(x, y) && (otmp = sobj_at(BOULDER, x, y)) != 0) {
+        obj_extract_self(otmp);
+        (void) boulder_hits_pool(otmp, x,y, FALSE);
+    }
 }
 
 /* return 1 if the wand is broken, hence some time elapsed */
@@ -3889,6 +3942,7 @@ do_break_wand(struct obj *obj)
             discard_broken_wand();
             return ECMD_TIME;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case WAN_WISHING:
     case WAN_NOTHING:
@@ -3917,6 +3971,7 @@ do_break_wand(struct obj *obj)
         Soundeffect(se_wall_of_force, 65);
         pline("A wall of force smashes down around you!");
         dmg = d(1 + obj->spe, 6); /* normally 2d12 */
+        FALLTHROUGH;
         /*FALLTHRU*/
     case WAN_CANCELLATION:
     case WAN_POLYMORPH:
@@ -3948,8 +4003,9 @@ do_break_wand(struct obj *obj)
 
         if (obj->otyp == WAN_DIGGING) {
             schar typ;
+            enum digcheck_result dcres = dig_check(BY_OBJECT, x, y);
 
-            if (dig_check(BY_OBJECT, x, y) < DIGCHECK_FAILED) {
+            if (dcres < DIGCHECK_FAILED || dcres == DIGCHECK_FAIL_BOULDER) {
                 if (IS_WALL(levl[x][y].typ) || IS_DOOR(levl[x][y].typ)) {
                     /* normally, pits and holes don't anger guards, but they
                      * do if it's a wall or door that's being dug */
@@ -3977,6 +4033,9 @@ do_break_wand(struct obj *obj)
                                        && !levl[x][y].candig)) ? PIT : HOLE);
                 }
             }
+            fill_pit(x, y);
+            maybe_dunk_boulders(x, y);
+            recalc_block_point(x, y);
             continue;
         } else if (obj->otyp == WAN_CREATE_MONSTER) {
             /* u.ux,u.uy creates it near you--x,y might create it in rock */
@@ -4306,6 +4365,7 @@ doapply(void)
             pline("It rings! ... But no-one answers.");
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     default:
         /* Pole-weapons can strike at a distance */

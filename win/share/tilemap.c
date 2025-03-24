@@ -1,4 +1,4 @@
-/* NetHack 3.7	tilemap.c	$NHDT-Date: 1640987372 2021/12/31 21:49:32 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.64 $ */
+/* NetHack 3.7	tilemap.c	$NHDT-Date: 1737720923 2025/01/24 04:15:23 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.87 $ */
 /*      Copyright (c) 2016 by Michael Allison                     */
 /* NetHack may be freely redistributed.  See license for details. */
 
@@ -52,10 +52,6 @@ FILE *tilemap_file;
 #if !defined(MSDOS) && !defined(WIN32)
 extern void exit(int);
 #endif
-#endif
-
-#if defined(CROSSCOMPILE) && defined(ENHANCED_SYMBOLS)
-#undef ENHANCED_SYMBOLS
 #endif
 
 struct {
@@ -195,14 +191,14 @@ struct conditionals_t {
 const char *
 tilename(int set, const int file_entry, int gend UNUSED)
 {
-    int i, k, cmap, condnum, tilenum, gendnum;
+    int i, k, cmap, condnum, tilenum;
     static char buf[BUFSZ];
 #if 0
-    int offset;
+    int offset, gendnum;
 #endif
     (void) def_char_to_objclass(']');
 
-    condnum = tilenum = gendnum = 0;
+    tilenum = 0;
 
     buf[0] = '\0';
     if (set == MON_GLYPH) {
@@ -318,7 +314,7 @@ tilename(int set, const int file_entry, int gend UNUSED)
 
         /* cmap A */
         for (cmap = S_ndoor; cmap <= S_brdnladder; cmap++) {
-            i = cmap - S_ndoor;
+            i = cmap - S_ndoor;  nhUse(i);
             if (tilenum == file_entry) {
                 if (*defsyms[cmap].explanation) {
                     return defsyms[cmap].explanation;
@@ -366,7 +362,7 @@ tilename(int set, const int file_entry, int gend UNUSED)
 
         /* cmap B */
         for (cmap = S_grave; cmap < S_arrow_trap + MAXTCHARS; cmap++) {
-            i = cmap - S_grave;
+            i = cmap - S_grave;  nhUse(i);
             if (tilenum == file_entry) {
                 if (*defsyms[cmap].explanation) {
                     return defsyms[cmap].explanation;
@@ -423,7 +419,7 @@ tilename(int set, const int file_entry, int gend UNUSED)
 
         /* cmap C */
         for (cmap = S_digbeam; cmap <= S_goodpos; cmap++) {
-            i = cmap - S_digbeam;
+            i = cmap - S_digbeam;  nhUse(i);
             if (tilenum == file_entry) {
                 if (*defsyms[cmap].explanation) {
                     return defsyms[cmap].explanation;
@@ -469,7 +465,7 @@ tilename(int set, const int file_entry, int gend UNUSED)
         /* explosions */
         for (k = expl_dark; k <= expl_frosty; k++) {
             for (cmap = S_expl_tl; cmap <= S_expl_br; cmap++) {
-                i = cmap - S_expl_tl;
+                i = cmap - S_expl_tl;  nhUse(i);
                 if (tilenum == file_entry) {
                     /* substitute "explosion " in the tilelabel
                        with "explosion dark " etc */
@@ -1364,7 +1360,7 @@ main(int argc UNUSED, char *argv[] UNUSED)
 #ifdef ENHANCED_SYMBOLS
     enhanced = ", 0"; /* replace ", utf8rep" since we're done with that */
 #endif
-    Fprintf(ofp, "const glyph_info nul_glyphinfo = { \n");
+    Fprintf(ofp, "const glyph_info nul_glyphinfo = {\n");
     Fprintf(ofp, "%sNO_GLYPH, ' ', NO_COLOR,\n", indent);
     Fprintf(ofp, "%s%s/* glyph_map */\n", indent, indent);
     Fprintf(ofp, "%s%s{ %s, TILE_UNEXPLORED%s }\n", indent, indent,
@@ -1497,14 +1493,19 @@ add_tileref(
     char buf[BUFSZ];
 
     if (!tilelist[n]) {
-        tilelist[n] = malloc(sizeof temp);
-        tilelist[n]->tilenum = n;
-        tilelist[n]->src = src;
-        tilelist[n]->file_entry = entrynum;
-        /* leave room for trailing "...nnnn" */
-        Snprintf(tilelist[n]->tilenam, sizeof tilelist[n]->tilenam - 7,
-                 "%s%s", prefix, nam);
-        tilelist[n]->references[0] = '\0';
+        if ((tilelist[n] = malloc(sizeof temp)) != 0) {
+            tilelist[n]->tilenum = n;
+            tilelist[n]->src = src;
+            tilelist[n]->file_entry = entrynum;
+            /* leave room for trailing "...nnnn" */
+            Snprintf(tilelist[n]->tilenam, sizeof tilelist[n]->tilenam - 7,
+                     "%s%s", prefix, nam);
+            tilelist[n]->references[0] = '\0';
+        } else {
+            Fprintf(stderr, "tilemap malloc failure %zu bytes\n",
+                    sizeof temp);
+            exit(EXIT_FAILURE);
+        }
     }
     Snprintf(temp.references,
              sizeof temp.references - 7, /* room for "...nnnn" */

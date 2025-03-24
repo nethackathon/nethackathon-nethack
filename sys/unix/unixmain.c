@@ -8,7 +8,6 @@
 #include "hack.h"
 #include "dlb.h"
 
-#include <ctype.h>
 #include <sys/stat.h>
 #include <signal.h>
 #include <pwd.h>
@@ -37,7 +36,6 @@ static void consume_two_args(int, int *, char ***);
 static void early_options(int *, char ***, char **);
 ATTRNORETURN static void opt_terminate(void) NORETURN;
 ATTRNORETURN static void opt_usage(const char *) NORETURN;
-static void opt_showpaths(const char *);
 ATTRNORETURN static void scores_only(int, char **, const char *) NORETURN;
 #ifdef SND_LIB_INTEGRATED
 uint32_t soundlibchoice = soundlib_nosound;
@@ -644,15 +642,15 @@ early_options(int *argc_p, char ***argv_p, char **hackdir_p)
             ++arg;
 
         switch (arg[1]) { /* char after leading dash */
-	case 'b':
+        case 'b':
 #ifdef CRASHREPORT
-		// --bidshow
-	    if (argcheck(argc, argv, ARG_BIDSHOW) == 2){
+            // --bidshow
+            if (argcheck(argc, argv, ARG_BIDSHOW) == 2){
                 opt_terminate();
                 /*NOTREACHED*/
-	    }
+            }
 #endif
-	    break;
+            break;
         case 'd':
             if (argcheck(argc, argv, ARG_DEBUG) == 1) {
                 consume_arg(ndx, argc_p, argv_p), consumed = 1;
@@ -661,6 +659,9 @@ early_options(int *argc_p, char ***argv_p, char **hackdir_p)
                 opt_terminate();
                 /*NOTREACHED*/
 #endif
+            } else if (argcheck(argc, argv, ARG_DUMPMONGEN) == 2) {
+                opt_terminate();
+                /*NOTREACHED*/
             } else {
 #ifdef CHDIR
                 oldargc = argc;
@@ -703,9 +704,10 @@ early_options(int *argc_p, char ***argv_p, char **hackdir_p)
             break;
         case 's':
             if (argcheck(argc, argv, ARG_SHOWPATHS) == 2) {
-                opt_showpaths(*hackdir_p);
-                opt_terminate();
-                /*NOTREACHED*/
+		gd.deferred_showpaths = TRUE;
+		gd.deferred_showpaths_dir = *hackdir_p;
+                config_error_done();
+		return;
             }
             /* check for "-s" request to show scores */
             if (lopt(arg, ((ArgValDisallowed | ArgErrComplain)
@@ -786,18 +788,16 @@ opt_usage(const char *hackdir)
 
 /* show the sysconf file name, playground directory, run-time configuration
    file name, dumplog file name if applicable, and some other things */
-static void
-opt_showpaths(const char *dir)
+ATTRNORETURN void
+after_opt_showpaths(const char *dir)
 {
 #ifdef CHDIR
     chdirx(dir, FALSE);
 #else
     nhUse(dir);
 #endif
-    iflags.initoptions_noterminate = TRUE;
-    initoptions();
-    iflags.initoptions_noterminate = FALSE;
-    reveal_paths();
+    opt_terminate();
+    /*NOTREACHED*/
 }
 
 /* handle "-s <score options> [character-names]" to show all the entries

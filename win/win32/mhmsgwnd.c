@@ -171,6 +171,7 @@ NHMessageWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         data = (PNHMessageWindow) GetWindowLongPtr(hWnd, GWLP_USERDATA);
         free(data);
         SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR) 0);
+        windowdata[NHW_MESSAGE].address = 0;
     } break;
 
     case WM_SIZE: {
@@ -480,8 +481,8 @@ onMSNH_VScroll(HWND hWnd, WPARAM wParam, LPARAM lParam)
     // of the scroll box, and update the window. UpdateWindow
     // sends the WM_PAINT message.
 
-    if (yInc = max(MSG_VISIBLE_LINES - data->yPos,
-                   min(yInc, data->yMax - data->yPos))) {
+    if ((yInc = max(MSG_VISIBLE_LINES - data->yPos,
+                   min(yInc, data->yMax - data->yPos)))) {
         data->yPos += yInc;
         /* ScrollWindowEx(hWnd, 0, -data->yChar * yInc,
                 (CONST RECT *) NULL, (CONST RECT *) NULL,
@@ -729,6 +730,7 @@ onCreate(HWND hWnd, WPARAM wParam, LPARAM lParam)
     ZeroMemory(data, sizeof(NHMessageWindow));
     data->max_text = MAXWINDOWTEXT;
     SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR) data);
+    windowdata[NHW_MESSAGE].address = (genericptr_t) data;  // for cleanup at the end
 
     /* re-calculate window size (+ font size) */
     mswin_message_window_size(hWnd, &dummy);

@@ -9,7 +9,6 @@
 #ifndef NO_SIGNAL
 #include <signal.h>
 #endif
-#include <ctype.h>
 #ifndef LONG_MAX
 #include <limits.h>
 #endif
@@ -38,12 +37,6 @@ staticfn void dump_everything(int, time_t);
 staticfn void fixup_death(int);
 staticfn int wordcount(char *);
 staticfn void bel_copy1(char **, char *);
-
-#if defined(__BEOS__) || defined(MICRO) || defined(OS2) || defined(WIN32)
-ATTRNORETURN extern void nethack_exit(int) NORETURN;
-#else
-#define nethack_exit exit
-#endif
 
 #define done_stopprint program_state.stopprint
 
@@ -79,7 +72,7 @@ done1(int sig_unused UNUSED)
 #ifndef NO_SIGNAL
     (void) signal(SIGINT, SIG_IGN);
 #endif
-    iflags.debug_fuzzer = FALSE;
+    iflags.debug_fuzzer = fuzzer_off;
     if (flags.ignintr) {
 #ifndef NO_SIGNAL
         (void) signal(SIGINT, (SIG_RET_TYPE) done1);
@@ -120,7 +113,7 @@ done2(void)
 
         if (abandon_tutorial)
             schedule_goto(&u.ucamefrom, UTOTYPE_ATSTAIRS,
-                          "Resuming regular play", (char *) 0);
+                          "Resuming regular play.", (char *) 0);
         return ECMD_OK;
     }
 
@@ -213,7 +206,7 @@ done_in_by(struct monst *mtmp, int how)
         svk.killer.format = KILLED_BY;
     }
     /* _the_ <invisible> <distorted> ghost of Dudley */
-    if (mptr == &mons[PM_GHOST] && has_mgivenname(mtmp)) {
+    if (has_ebones(mtmp)) {
         Strcat(buf, "the ");
         svk.killer.format = KILLED_BY;
     }
@@ -256,8 +249,10 @@ done_in_by(struct monst *mtmp, int how)
                                : "%s imitating %s",
                 realnm, shape);
         mptr = mtmp->data; /* reset for mimicker case */
-    } else if (is_bones_monster(mptr)) {
-        Strcat(buf, pmname(mptr, Mgender(mtmp)));
+    } else if (has_ebones(mtmp)) {
+        Strcpy(buf, m_monnam(mtmp));
+    } else if (mptr == &mons[PM_GHOST]) {
+        Strcat(buf, "ghost");
         if (has_mgivenname(mtmp))
             Sprintf(eos(buf), " of %s", MGIVENNAME(mtmp));
     } else if (mtmp->isshk) {
@@ -273,8 +268,11 @@ done_in_by(struct monst *mtmp, int how)
         Strcat(buf, m_monnam(mtmp));
     } else {
         Strcat(buf, pmname(mptr, Mgender(mtmp)));
-        if (has_mgivenname(mtmp))
-            Sprintf(eos(buf), " called %s", MGIVENNAME(mtmp));
+        if (has_mgivenname(mtmp)) {
+            Sprintf(eos(buf), " %s %s",
+                    has_ebones(mtmp) ? "of" : "called",
+                    MGIVENNAME(mtmp));
+        }
     }
 
     Strcpy(svk.killer.name, buf);
@@ -1250,14 +1248,15 @@ really_done(int how)
         display_nhwindow(WIN_MESSAGE, FALSE);
 
     if (how != PANICKED) {
-        struct obj *obj;
+        struct obj *obj, *nextobj;
 
         /*
          * This is needed for both inventory disclosure and dumplog.
          * Both are optional, so do it once here instead of duplicating
          * it in both of those places.
          */
-        for (obj = gi.invent; obj; obj = obj->nobj) {
+        for (obj = gi.invent; obj; obj = nextobj) {
+            nextobj = obj->nobj;
             discover_object(obj->otyp, TRUE, FALSE);
             obj->known = obj->bknown = obj->dknown = obj->rknown = 1;
             set_cknown_lknown(obj); /* set flags when applicable */

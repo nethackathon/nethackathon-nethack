@@ -1,4 +1,4 @@
-/* NetHack 3.7	mkobj.c	$NHDT-Date: 1725138481 2024/08/31 21:08:01 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.304 $ */
+/* NetHack 3.7	mkobj.c	$NHDT-Date: 1737528890 2025/01/21 22:54:50 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.315 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Derek S. Ray, 2015. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -9,7 +9,7 @@ staticfn boolean may_generate_eroded(struct obj *);
 staticfn void mkobj_erosions(struct obj *);
 staticfn void mkbox_cnts(struct obj *);
 staticfn unsigned nextoid(struct obj *, struct obj *);
-staticfn void mksobj_init(struct obj *, boolean);
+staticfn void mksobj_init(struct obj **, boolean);
 staticfn int item_on_ice(struct obj *);
 staticfn void shrinking_glob_gone(struct obj *);
 staticfn void obj_timer_checks(struct obj *, coordxy, coordxy, int);
@@ -331,6 +331,7 @@ mkbox_cnts(struct obj *box)
             n = 0;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case DESIGNER_BAG:
     case FABERGE_EGG:
@@ -384,11 +385,9 @@ mkbox_cnts(struct obj *box)
             }
             otmp = mksobj(item_type, TRUE, FALSE);
             otmp->age = 0L;
-            if (otmp->timed) {
-                (void) stop_timer(ROT_CORPSE, obj_to_any(otmp));
-                (void) stop_timer(REVIVE_MON, obj_to_any(otmp));
-                (void) stop_timer(SHRINK_GLOB, obj_to_any(otmp));
-            }
+            /* Instead of stopping the timer, let's use the on_ice property
+             * to slow down the timer for rotting */
+            otmp->on_ice = 1;
         } else if (box->otyp == BAG_OF_BAGS) {
             int bag_n = rn2(100);
             int bag_type;
@@ -585,7 +584,7 @@ next_ident(void)
        uses 16-bit 'int'), just live with that and hope no o_id conflicts
        between objects or m_id conflicts between monsters arise */
     if (!svc.context.ident)
-        svc.context.ident = rnd(2);
+        svc.context.ident = rnd(2) + 1;   /* id 1 is reserved */
 
     return res;
 }
@@ -915,6 +914,7 @@ unknow_object(struct obj *obj)
 
     obj->bknown = obj->rknown = 0;
     obj->cknown = obj->lknown = 0;
+    obj->tknown = 0;
     /* for an existing object, awareness of charges or enchantment has
        gone poof...  [object types which don't use the known flag have
        it set True for some reason] */
@@ -923,9 +923,10 @@ unknow_object(struct obj *obj)
 
 /* do some initialization to newly created object; otyp must already be set */
 staticfn void
-mksobj_init(struct obj *otmp, boolean artif)
+mksobj_init(struct obj **obj, boolean artif)
 {
     int mndx, tryct;
+    struct obj *otmp = *obj;
     char let = objects[otmp->otyp].oc_class;
 
     switch (let) {
@@ -943,8 +944,11 @@ mksobj_init(struct obj *otmp, boolean artif)
         if (is_poisonable(otmp) && !rn2(100))
             otmp->opoisoned = 1;
 
-        if (artif && !rn2(20 + (10 * nartifact_exist())))
-            otmp = mk_artifact(otmp, (aligntyp) A_NONE);
+        if (artif && !rn2(20 + (10 * nartifact_exist()))) {
+            /* mk_artifact() with otmp and A_NONE will never return NULL */
+            otmp = mk_artifact(otmp, (aligntyp) A_NONE, 99, TRUE);
+            *obj = otmp;
+        }
         break;
     case FOOD_CLASS:
         otmp->oeaten = 0;
@@ -1064,6 +1068,8 @@ mksobj_init(struct obj *otmp, boolean artif)
         case LARGE_BOX:
             otmp->olocked = !!(rn2(5));
             otmp->otrapped = !(rn2(10));
+            otmp->tknown = otmp->otrapped && !rn2(100); /* obvious trap */
+            FALLTHROUGH;
             /*FALLTHRU*/
         case ICE_BOX:
         case COOLER_BAG:
@@ -1150,8 +1156,11 @@ mksobj_init(struct obj *otmp, boolean artif)
             otmp->spe = rne(3);
         } else
             blessorcurse(otmp, 10);
-        if (artif && !rn2(40 + (10 * nartifact_exist())))
-            otmp = mk_artifact(otmp, (aligntyp) A_NONE);
+        if (artif && !rn2(40 + (10 * nartifact_exist()))) {
+            /* mk_artifact() with otmp and A_NONE will never return NULL */
+            otmp = mk_artifact(otmp, (aligntyp) A_NONE, 99, TRUE);
+            *obj = otmp;
+        }
         /* simulate lacquered armor for samurai */
         if (Role_if(PM_SAMURAI) && otmp->otyp == SPLINT_MAIL
             && (svm.moves <= 1 || In_quest(&u.uz))) {
@@ -1241,7 +1250,7 @@ mksobj(int otyp, boolean init, boolean artif)
     otmp->pickup_prev = 0;
 
     if (init)
-        mksobj_init(otmp, artif);
+        mksobj_init(&otmp, artif);
 
     /* some things must get done (corpsenm, timers) even if init = 0 */
     switch ((otmp->oclass == POTION_CLASS && otmp->otyp != POT_OIL)
@@ -1253,6 +1262,7 @@ mksobj(int otyp, boolean init, boolean artif)
             if (svm.mvitals[otmp->corpsenm].mvflags & (G_NOCORPSE | G_GONE))
                 otmp->corpsenm = gu.urole.mnum;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case STATUE:
     case FIGURINE:
@@ -1266,6 +1276,7 @@ mksobj(int otyp, boolean init, boolean artif)
                            : is_male(ptr) ? CORPSTAT_MALE
                              : rn2(2) ? CORPSTAT_FEMALE : CORPSTAT_MALE);
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case EGG:
     /* case TIN: */
@@ -1279,6 +1290,7 @@ mksobj(int otyp, boolean init, boolean artif)
         break;
     case POT_OIL:
         otmp->age = MAX_OIL_IN_FLASK; /* amount of oil */
+        FALLTHROUGH;
         /*FALLTHRU*/
     case POT_WATER: /* POTION_CLASS */
         otmp->fromsink = 0; /* overloads corpsenm, which was set to NON_PM */
@@ -1293,8 +1305,10 @@ mksobj(int otyp, boolean init, boolean artif)
     }
 
     /* unique objects may have an associated artifact entry */
-    if (objects[otyp].oc_unique && !otmp->oartifact)
-        otmp = mk_artifact(otmp, (aligntyp) A_NONE);
+    if (objects[otyp].oc_unique && !otmp->oartifact) {
+        /* mk_artifact() with otmp and A_NONE will never return NULL */
+        otmp = mk_artifact(otmp, (aligntyp) A_NONE, 99, FALSE);
+    }
     otmp->owt = weight(otmp);
     return otmp;
 }
@@ -1452,9 +1466,15 @@ item_on_ice(struct obj *item)
 
     otmp = item;
     /* if in a container, it might be nested so find outermost one since
-       that's the item whose location needs to be checked */
-    while (otmp->where == OBJ_CONTAINED)
+       that's the item whose location needs to be checked
+       If any container is a cooler bag, the item is on ice
+     */
+    while (otmp->where == OBJ_CONTAINED) {
         otmp = otmp->ocontainer;
+        if (otmp->otyp == COOLER_BAG) {
+          return SET_ON_ICE;
+        }
+    }
 
     if (get_obj_location(otmp, &ox, &oy, BURIED_TOO)) {
         switch (otmp->where) {
@@ -2516,9 +2536,8 @@ remove_object(struct obj *otmp)
         panic("remove_object: obj not on floor");
     extract_nexthere(otmp, &svl.level.objects[x][y]);
     extract_nobj(otmp, &fobj);
-    /* update vision iff this was the only boulder at its spot */
-    if (otmp->otyp == BOULDER && !sobj_at(BOULDER, x, y))
-        unblock_point(x, y); /* vision */
+    if (otmp->otyp == BOULDER)
+        recalc_block_point(x, y); /* vision */
     if (otmp->timed)
         obj_timer_checks(otmp, x, y, 0);
 }
@@ -2747,6 +2766,8 @@ container_weight(struct obj *object)
 void
 dealloc_obj(struct obj *obj)
 {
+    if (obj->otyp == BOULDER)
+        obj->next_boulder = 0;
     if (obj->where == OBJ_DELETED) {
         impossible("dealloc_obj: obj already deleted (type=%d)", obj->otyp);
         return;
@@ -2784,6 +2805,10 @@ dealloc_obj(struct obj *obj)
         gt.thrownobj = 0;
     if (obj == gk.kickedobj)
         gk.kickedobj = 0;
+    if (obj == svc.context.tin.tin) {
+        svc.context.tin.tin = (struct obj *) 0;
+        svc.context.tin.o_id = 0;
+    }
 
     /* if obj came from the most recent splitobj(), it's no longer eligible
        for unsplitobj(); perform inline clear_splitobjs() */
@@ -3062,6 +3087,7 @@ objlist_sanity(struct obj *objlist, int wheretype, const char *mesg)
                 /* note: ball and chain can also be OBJ_FREE, but not across
                    turns so this sanity check shouldn't encounter that */
                 bc_ok = TRUE;
+            FALLTHROUGH;
             /*FALLTHRU*/
             default:
                 if ((obj != uchain && obj != uball) || !bc_ok) {

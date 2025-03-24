@@ -95,6 +95,8 @@ static void SelectMenuItem(HWND hwndList, PNHMenuWindow data, int item,
                            int count);
 static void reset_menu_count(HWND hwndList, PNHMenuWindow data);
 static BOOL onListChar(HWND hWnd, HWND hwndList, WORD ch);
+static genericptr_t menu_data_to_free;
+void free_menu_data(void);
 
 /*-----------------------------------------------------------------------------*/
 HWND
@@ -298,6 +300,7 @@ MenuWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             data->bmpDC = CreateCompatibleDC(hdc);
             data->is_active = FALSE;
             SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR) data);
+            windowdata[NHW_MENU].address = (genericptr_t) data;
         }
         /* set font for the text control */
         cached_font * font = mswin_get_font(NHW_MENU, ATR_NONE, hdc, FALSE);
@@ -519,6 +522,7 @@ MenuWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             }
             free(data);
             SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR) 0);
+            windowdata[NHW_MENU].address = 0;
         }
         return TRUE;
     }
@@ -625,6 +629,8 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
                 data->menui.menu.items, data->menui.menu.allocated * sizeof(NHMenuItem));
             if (!data->menui.menu.items)
                 free(was);
+            else
+                menu_data_to_free = (genericptr_t) data->menui.menu.items;
         }
 
         if (data->menui.menu.items) {
@@ -717,6 +723,14 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
 
     }
 }
+
+void
+free_menu_data(void)
+{
+    if (menu_data_to_free != 0)
+        free(menu_data_to_free), menu_data_to_free = 0;
+}
+
 /*-----------------------------------------------------------------------------*/
 void
 LayoutMenu(HWND hWnd)
@@ -909,7 +923,7 @@ SetMenuListType(HWND hWnd, int how)
     for (i = 0; i < data->menui.menu.size; i++) {
         LVITEM lvitem;
         ZeroMemory(&lvitem, sizeof(lvitem));
-        sprintf(buf, "%c - %s", max(data->menui.menu.items[i].accelerator, ' '),
+        Snprintf(buf, sizeof buf, "%c - %s", max(data->menui.menu.items[i].accelerator, ' '),
                 data->menui.menu.items[i].str);
 
         lvitem.mask = LVIF_PARAM | LVIF_STATE | LVIF_TEXT;
@@ -926,6 +940,7 @@ SetMenuListType(HWND hWnd, int how)
     }
     if (data->is_active)
         SetFocus(control);
+    nhUse(nItem);
 }
 /*-----------------------------------------------------------------------------*/
 HWND
@@ -1022,7 +1037,7 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
     lpdis = (LPDRAWITEMSTRUCT) lParam;
 
     /* If there are no list box items, skip this message. */
-    if (lpdis->itemID == -1)
+    if (lpdis->itemID == (UINT) -1)
         return FALSE;
 
     data = (PNHMenuWindow) GetWindowLongPtr(hWnd, GWLP_USERDATA);
@@ -1186,10 +1201,12 @@ onDrawItem(HWND hWnd, WPARAM wParam, LPARAM lParam)
             && data->menui.menu.items[lpdis->itemID].count != 0
             && item->glyphinfo.glyph != NO_GLYPH) {
             if (data->menui.menu.items[lpdis->itemID].count == -1) {
-                _stprintf(wbuf, TEXT("Count: All"));
+                nh_stprintf(wbuf, sizeof wbuf,
+                            TEXT("Count: All"));
             } else {
-                _stprintf(wbuf, TEXT("Count: %d"),
-                          data->menui.menu.items[lpdis->itemID].count);
+                nh_stprintf(wbuf, sizeof wbuf,
+                            TEXT("Count: %d"),
+                            data->menui.menu.items[lpdis->itemID].count);
             }
 
             /* TODO: add blinking for blink text */
@@ -1532,6 +1549,8 @@ onListChar(HWND hWnd, HWND hwndList, WORD ch)
                 int iter = topIndex;
                 do {
                     i = iter % data->menui.menu.size;
+                    if (iflags.debug_fuzzer && iter > 1000000)
+                        ch = data->menui.menu.items[i].accelerator;
                     if (data->menui.menu.items[i].accelerator == ch) {
                         if (data->how == PICK_ANY) {
                             SelectMenuItem(

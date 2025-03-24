@@ -262,12 +262,30 @@ query_classes(
     return TRUE;
 }
 
+/*
+ * tests:
+ *  st_gloves      wearing gloves?
+ *  st_corpse      is it a corpse obj?
+ *  st_petrifies   does the corpse petrify on touch?
+ *  st_resists     does hero have stoning resistance?
+ *  st_all         st_gloves | st_corpse | st_petrifies | st_resists
+ */
+boolean
+u_safe_from_fatal_corpse(struct obj *obj, int tests)
+{
+    if (((tests & st_gloves) && uarmg)
+        || ((tests & st_corpse) && obj->otyp != CORPSE)
+        || ((tests & st_petrifies) && !touch_petrifies(&mons[obj->corpsenm]))
+        || ((tests & st_resists) && Stone_resistance))
+        return TRUE;
+    return FALSE;
+}
+
 /* check whether hero is bare-handedly touching a cockatrice corpse */
 staticfn boolean
 fatal_corpse_mistake(struct obj *obj, boolean remotely)
 {
-    if (uarmg || remotely || obj->otyp != CORPSE
-        || !touch_petrifies(&mons[obj->corpsenm]) || Stone_resistance)
+    if (u_safe_from_fatal_corpse(obj, st_all) || remotely)
         return FALSE;
 
     if (poly_when_stoned(gy.youmonst.data) && polymon(PM_STONE_GOLEM)) {
@@ -853,6 +871,7 @@ pickup(int what) /* should be a long */
                     lcount = (long) yn_number;
                     if (lcount > obj->quan)
                         lcount = obj->quan;
+                    FALLTHROUGH;
                     /*FALLTHRU*/
                 default: /* 'y' */
                     break;
@@ -931,6 +950,8 @@ autopick_testobj(struct obj *otmp, boolean calc_costly)
         || (flags.pickup_stolen && otmp->how_lost == LOST_STOLEN))
         return TRUE;
     if (flags.nopick_dropped && otmp->how_lost == LOST_DROPPED)
+        return FALSE;
+    if (otmp->how_lost == LOST_EXPLODING)
         return FALSE;
 
     /* check for pickup_types */
@@ -1461,6 +1482,7 @@ query_category(
                         /* assert( n == 1 ); */
                         break; /* from switch */
                     }
+                    FALLTHROUGH;
                     /*FALLTHRU*/
                 case 'q':
                 default:
@@ -1847,7 +1869,7 @@ pickup_object(
        couldn't pick up a thrown, stolen, or dropped item that was split
        off from a carried stack even while still carrying the rest of the
        stack unless we have at least one free slot available */
-    obj->how_lost = LOST_NONE; /* affects merge_choice() */
+    obj->how_lost &= ~LOSTOVERRIDEMASK;  /* affects merge_choice() */
     res = lift_object(obj, (struct obj *) 0, &count, telekinesis);
     obj->how_lost = save_how_lost; /* even when res > 0,
                                     * in case we call splitobj() below */
@@ -1860,7 +1882,7 @@ pickup_object(
     if (obj->quan != count && obj->otyp != LOADSTONE)
         obj = splitobj(obj, count);
 
-    obj->how_lost = LOST_NONE;
+    obj->how_lost &= ~LOSTOVERRIDEMASK;
     obj = pick_obj(obj);
 
     if (uwep && uwep == obj)
@@ -2623,18 +2645,23 @@ in_container(struct obj *obj)
         }
     }
     if (Icebox && !age_is_relative(obj)) {
-        obj->age = svm.moves - obj->age; /* actual age */
-        /* stop any corpse timeouts when frozen */
-        if (obj->otyp == CORPSE) {
-            if (obj->timed) {
-                (void) stop_timer(ROT_CORPSE, obj_to_any(obj));
-                (void) stop_timer(REVIVE_MON, obj_to_any(obj));
+        if (obj->otyp == COOLER_BAG) {
+            obj->on_ice = 1;
+        } else {
+            // ICE_BOX
+            obj->age = svm.moves - obj->age; /* actual age */
+            /* stop any corpse timeouts when frozen */
+            if (obj->otyp == CORPSE) {
+                if (obj->timed) {
+                    (void) stop_timer(ROT_CORPSE, obj_to_any(obj));
+                    (void) stop_timer(REVIVE_MON, obj_to_any(obj));
+                }
+                /* if this is the corpse of a cancelled ice troll, uncancel it */
+                if (obj->corpsenm == PM_ICE_TROLL && has_omonst(obj))
+                    OMONST(obj)->mcan = 0;
+            } else if (obj->globby && obj->timed) {
+                (void) stop_timer(SHRINK_GLOB, obj_to_any(obj));
             }
-            /* if this is the corpse of a cancelled ice troll, uncancel it */
-            if (obj->corpsenm == PM_ICE_TROLL && has_omonst(obj))
-                OMONST(obj)->mcan = 0;
-        } else if (obj->globby && obj->timed) {
-            (void) stop_timer(SHRINK_GLOB, obj_to_any(obj));
         }
     } else if (Is_mbag(gc.current_container) && mbag_explodes(obj, 0)) {
         livelog_printf(LL_ACHIEVE, "just blew up %s bag of holding", uhis());
@@ -2801,6 +2828,10 @@ out_container(struct obj *obj)
 void
 removed_from_icebox(struct obj *obj)
 {
+    if (obj->otyp == COOLER_BAG) {
+        obj->on_ice = 0;
+        return;
+    }
     if (!age_is_relative(obj)) {
         obj->age = svm.moves - obj->age; /* actual age */
         if (obj->otyp == CORPSE) {

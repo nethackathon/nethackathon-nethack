@@ -1,4 +1,4 @@
-/* NetHack 3.7	cmd.c	$NHDT-Date: 1717967336 2024/06/09 21:08:56 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.729 $ */
+/* NetHack 3.7	cmd.c	$NHDT-Date: 1736401574 2025/01/08 21:46:14 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.744 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2013. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -805,7 +805,7 @@ extcmd_via_menu(void)
                              * ('w' in wizard mode) */
         /* -3: two line menu header, 1 line menu footer (for prompt) */
         one_per_line = (nchoices < ROWNO - 3);
-        accelerator = prevaccelerator = 0;
+        prevaccelerator = 0;
         acount = 0;
         for (i = 0; choices[i]; ++i) {
             accelerator = choices[i]->ef_txt[matchlevel];
@@ -934,7 +934,7 @@ domonability(void)
     } else if (is_vampire(uptr) || is_vampshifter(&gy.youmonst)) {
         return dopoly();
     } else if (u.usteed && can_breathe(u.usteed->data)) {
-        (void) pet_ranged_attk(u.usteed);
+        (void) pet_ranged_attk(u.usteed, TRUE);
         return ECMD_TIME;
     } else if (Upolyd) {
         pline("Any special ability you may have is purely reflexive.");
@@ -2266,6 +2266,73 @@ handler_rebind_keys(void)
     }
 }
 
+void
+handler_change_autocompletions(void)
+{
+    winid win;
+    anything any;
+    int i, n;
+    menu_item *picks = (menu_item *) 0;
+    int clr = NO_COLOR;
+    struct ext_func_tab *ec;
+    char buf[BUFSZ];
+
+    win = create_nhwindow(NHW_MENU);
+    start_menu(win, MENU_BEHAVE_STANDARD);
+    any = cg.zeroany;
+
+    for (i = 0; i < extcmdlist_length; i++) {
+        ec = &extcmdlist[i];
+
+        if ((ec->flags & (INTERNALCMD|CMD_NOT_AVAILABLE)) != 0)
+            continue;
+        if (strlen(ec->ef_txt) < 2)
+            continue;
+
+        any.a_int = (i + 1);
+        Sprintf(buf, "%c %s: %s",
+                (ec->flags & AUTOCOMP_ADJ) ? '*' : ' ',
+                ec->ef_txt, ec->ef_desc);
+        add_menu(win, &nul_glyphinfo, &any, '\0', 0, ATR_NONE, clr, buf,
+                 (ec->flags & AUTOCOMPLETE)
+                 ? MENU_ITEMFLAGS_SELECTED :
+                 MENU_ITEMFLAGS_NONE);
+    }
+
+    end_menu(win, "Which commands autocomplete?");
+    n = select_menu(win, PICK_ANY, &picks);
+    if (n >= 0) {
+        int j;
+
+        for (i = 0; i < extcmdlist_length; i++) {
+            boolean setit = FALSE;
+
+            ec = &extcmdlist[i];
+
+            if ((ec->flags & (INTERNALCMD|CMD_NOT_AVAILABLE)) != 0)
+                continue;
+            if (strlen(ec->ef_txt) < 2)
+                continue;
+
+            Sprintf(buf, "%s", ec->ef_txt);
+
+            for (j = 0; j < n; ++j) {
+                if (ec == &extcmdlist[(picks[j].item.a_int - 1)]) {
+                    parseautocomplete(buf, TRUE);
+                    setit = TRUE;
+                    break;
+                }
+            }
+
+            if (!setit) {
+                parseautocomplete(buf, FALSE);
+            }
+        }
+    }
+
+    destroy_nhwindow(win);
+}
+
 /* find extended command entries matching findstr.
    if findstr is NULL, returns all available entries.
    returns: number of matching extended commands,
@@ -2972,8 +3039,12 @@ parseautocomplete(char *autocomplete, boolean condition)
     /* find and modify the extended command */
     for (efp = extcmdlist; efp->ef_txt; efp++) {
         if (!strcmp(autocomplete, efp->ef_txt)) {
-            if (condition == ((efp->flags & AUTOCOMPLETE) ? FALSE : TRUE))
-                efp->flags |= AUTOCOMP_ADJ;
+            if (condition == ((efp->flags & AUTOCOMPLETE) ? FALSE : TRUE)) {
+                if ((efp->flags & AUTOCOMP_ADJ))
+                    efp->flags &= ~AUTOCOMP_ADJ;
+                else
+                    efp->flags |= AUTOCOMP_ADJ;
+            }
             if (condition)
                 efp->flags |= AUTOCOMPLETE;
             else
@@ -3002,6 +3073,20 @@ all_options_autocomplete(strbuf_t *sbuf)
                     efp->ef_txt);
             strbuf_append(sbuf, buf);
         }
+}
+
+/* return the number of changed autocompletions */
+int
+count_autocompletions(void)
+{
+    struct ext_func_tab *efp;
+    int n = 0;
+
+    for (efp = extcmdlist; efp->ef_txt; efp++)
+        if ((efp->flags & AUTOCOMP_ADJ) != 0)
+            n++;
+
+    return n;
 }
 
 /* save&clear the mouse button actions, or restore the saved ones */
@@ -3394,7 +3479,6 @@ rhack(int key)
                 }
                 res = ECMD_FAIL;
                 prefix_seen = 0;
-                was_m_prefix = FALSE;
             } else {
                 /* we discard 'const' because some compilers seem to have
                    trouble with the pointer passed to set_occupation() */
@@ -3441,7 +3525,6 @@ rhack(int key)
                         return;
                     }
                     prefix_seen = tlist;
-                    bad_command = FALSE;
                     cmdq_ec = NULL;
                     if (func == do_reqmenu)
                         was_m_prefix = TRUE;
@@ -3476,7 +3559,6 @@ rhack(int key)
                     return;
                 }
                 prefix_seen = 0;
-                was_m_prefix = FALSE;
             }
             /* it is possible to have a result of (ECMD_TIME|ECMD_CANCEL)
                [for example, using 'f'ire, manually filling quiver with
@@ -3507,9 +3589,10 @@ rhack(int key)
     }
 
     if (bad_command) {
-        Norep("Unknown command '%s'.", visctrl(key));
+        custompline(SUPPRESS_HISTORY, "Unknown command '%s'.", visctrl(key));
         cmdq_clear(CQ_CANNED);
         cmdq_clear(CQ_REPEAT);
+        iflags.sanity_no_check = iflags.sanity_check; /* skip sanity check */
     }
     /* didn't move */
     svc.context.move = FALSE;
@@ -3518,7 +3601,7 @@ rhack(int key)
 }
 
 /* convert an x,y pair into a direction code */
-coordxy
+int
 xytod(coordxy x, coordxy y)
 {
     int dd;
@@ -4840,6 +4923,9 @@ end_of_input(void)
 #endif
     program_state.something_worth_saving = 0; /* don't save */
 #endif
+
+    if (In_tutorial(&u.uz))
+        program_state.something_worth_saving = 0; /* don't save in tutorial */
 
 #ifndef SAFERHANGUP
     if (!program_state.done_hup++)

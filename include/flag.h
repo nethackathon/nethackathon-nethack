@@ -224,6 +224,12 @@ struct accessibility_data {
             a11y.mon_notices_blocked = 0;                           \
         } } while(0)
 
+enum debug_fuzzer_states {
+    fuzzer_off,
+    fuzzer_impossible_panic,
+    fuzzer_impossible_continue
+};
+
 /*
  * Stuff that really isn't option or platform related and does not
  * get saved and restored.  They are set and cleared during the game
@@ -313,6 +319,7 @@ struct instance_flags {
     boolean news;             /* print news */
     boolean num_pad;          /* use numbers for movement commands */
     boolean perm_invent;      /* display persistent inventory window */
+    boolean perm_invent_pending;  /* need to try again */
     boolean renameallowed;    /* can change hero name during role selection */
     boolean renameinprogress; /* we are changing hero name */
     boolean sounds;           /* master on/off switch for using soundlib */

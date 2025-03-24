@@ -11,9 +11,7 @@
 
 staticfn void putmesg(const char *);
 staticfn char *You_buf(int);
-#if defined(MSGHANDLER)
 staticfn void execplinehandler(const char *);
-#endif
 #ifdef USER_SOUNDS
 extern void maybe_play_sound(const char *);
 #endif
@@ -78,6 +76,23 @@ putmesg(const char *line)
     SoundSpeak(line);
 }
 
+/* set the direction where next message happens */
+void
+set_msg_dir(int dir)
+{
+    dtoxy(&a11y.msg_loc, dir);
+    a11y.msg_loc.x += u.ux;
+    a11y.msg_loc.y += u.uy;
+}
+
+/* set the coordinate where next message happens */
+void
+set_msg_xy(coordxy x, coordxy y)
+{
+    a11y.msg_loc.x = x;
+    a11y.msg_loc.y = y;
+}
+
 staticfn void vpline(const char *, va_list);
 
 DISABLE_WARNING_FORMAT_NONLITERAL
@@ -121,28 +136,14 @@ pline_mon(struct monst *mtmp, const char *line, ...)
 {
     va_list the_args;
 
-    set_msg_xy(mtmp->mx, mtmp->my);
+    if (mtmp == &gy.youmonst)
+        set_msg_xy(0, 0);
+    else
+        set_msg_xy(mtmp->mx, mtmp->my);
 
     va_start(the_args, line);
     vpline(line, the_args);
     va_end(the_args);
-}
-
-/* set the direction where next message happens */
-void
-set_msg_dir(int dir)
-{
-    dtoxy(&a11y.msg_loc, dir);
-    a11y.msg_loc.x += u.ux;
-    a11y.msg_loc.y += u.uy;
-}
-
-/* set the coordinate where next message happens */
-void
-set_msg_xy(coordxy x, coordxy y)
-{
-    a11y.msg_loc.x = x;
-    a11y.msg_loc.y = y;
 }
 
 staticfn void
@@ -153,6 +154,11 @@ vpline(const char *line, va_list the_args)
     int ln;
     int msgtyp;
     boolean no_repeat;
+    coord a11y_mesgxy;
+
+    a11y_mesgxy = a11y.msg_loc; /* save a11y.msg_loc before reseting it */
+    /* always reset a11y.msg_loc whether we end up using it or not */
+    a11y.msg_loc.x = a11y.msg_loc.y = 0;
 
     if (!line || !*line)
         return;
@@ -163,16 +169,15 @@ vpline(const char *line, va_list the_args)
     if (program_state.wizkit_wishing)
         return;
 
-    if (a11y.accessiblemsg && isok(a11y.msg_loc.x,a11y.msg_loc.y)) {
-        char *tmp;
-        char *dirstr;
-        static char dirstrbuf[BUFSZ];
-        int g = (iflags.getpos_coords == GPCOORDS_NONE)
-            ? GPCOORDS_COMFULL : iflags.getpos_coords;
+    /* when accessiblemsg is set and a11y.msg_loc is nonzero, use the latter
+       to insert a location prefix in front of current message */
+    if (a11y.accessiblemsg && isok(a11y_mesgxy.x, a11y_mesgxy.y)) {
+        char *tmp, *dirstr, dirstrbuf[QBUFSZ];
 
-        dirstr = coord_desc(a11y.msg_loc.x, a11y.msg_loc.y, dirstrbuf, g);
-        a11y.msg_loc.x = a11y.msg_loc.y = 0;
-        tmp = (char *)alloc(strlen(line) + sizeof ": " + strlen(dirstr));
+        dirstr = coord_desc(a11y_mesgxy.x, a11y_mesgxy.y, dirstrbuf,
+                            ((iflags.getpos_coords == GPCOORDS_NONE)
+                             ? GPCOORDS_COMFULL : iflags.getpos_coords));
+        tmp = (char *) alloc(strlen(line) + sizeof ": " + strlen(dirstr));
         Strcpy(tmp, dirstr);
         Strcat(tmp, ": ");
         Strcat(tmp, line);
@@ -255,16 +260,19 @@ vpline(const char *line, va_list the_args)
             goto pline_done;
     }
 
-    if (gv.vision_full_recalc)
+    if (gv.vision_full_recalc) {
+        int tmp_in_pline = in_pline;
+
+        in_pline = 0;
         vision_recalc(0);
+        in_pline = tmp_in_pline;
+    }
     if (u.ux)
         flush_screen((gp.pline_flags & NO_CURS_ON_U) ? 0 : 1); /* %% */
 
     putmesg(line);
 
-#if defined(MSGHANDLER)
     execplinehandler(line);
-#endif
 
     /* this gets cleared after every pline message */
     iflags.last_msg = PLNMSG_UNKNOWN;
@@ -272,6 +280,7 @@ vpline(const char *line, va_list the_args)
     switch (msgtyp) {
     case MSGTYP_ALERT:
         iflags.msg_is_alert = TRUE; /* <TAB> */
+        FALLTHROUGH;
         /* FALLTHRU */
     case MSGTYP_STOP:
         display_nhwindow(WIN_MESSAGE, TRUE); /* --more-- */
@@ -572,9 +581,7 @@ vraw_printf(const char *line, va_list the_args)
         pbuf[BUFSZ - 1] = '\0'; /* terminate strncpy or truncate vsprintf */
     }
     raw_print(line);
-#if defined(MSGHANDLER)
     execplinehandler(line);
-#endif
     if (!program_state.beyond_savefile_load)
         ge.early_raw_messages++;
 }
@@ -595,7 +602,7 @@ impossible(const char *s, ...)
     va_end(the_args);
     pbuf[BUFSZ - 1] = '\0'; /* sanity */
     paniclog("impossible", pbuf);
-    if (iflags.debug_fuzzer == 1)
+    if (iflags.debug_fuzzer == fuzzer_impossible_panic)
         panic("%s", pbuf);
 
     gp.pline_flags = URGENT_MESSAGE;
@@ -634,37 +641,30 @@ impossible(const char *s, ...)
 
 RESTORE_WARNING_FORMAT_NONLITERAL
 
-#if defined(MSGHANDLER)
 static boolean use_pline_handler = TRUE;
 
 staticfn void
 execplinehandler(const char *line)
 {
-#if defined(POSIX_TYPES) || defined(__GNUC__)
+#if defined(UNIX) && (defined(POSIX_TYPES) || defined(__GNUC__))
     int f;
 #endif
     const char *args[3];
-    char *env;
 
-    if (!use_pline_handler)
+    if (!use_pline_handler || !sysopt.msghandler)
         return;
 
-    if (!(env = nh_getenv("NETHACK_MSGHANDLER"))) {
-        use_pline_handler = FALSE;
-        return;
-    }
-
-#if defined(POSIX_TYPES) || defined(__GNUC__)
+#if defined(UNIX) && (defined(POSIX_TYPES) || defined(__GNUC__))
     f = fork();
     if (f == 0) { /* child */
-        args[0] = env;
+        args[0] = sysopt.msghandler;
         args[1] = line;
         args[2] = NULL;
         (void) setgid(getgid());
         (void) setuid(getuid());
         (void) execv(args[0], (char *const *) args);
         perror((char *) 0);
-        (void) fprintf(stderr, "Exec to message handler %s failed.\n", env);
+        (void) fprintf(stderr, "Exec to message handler %s failed.\n", sysopt.msghandler);
         nh_terminate(EXIT_FAILURE);
     } else if (f > 0) {
         int status;
@@ -678,16 +678,18 @@ execplinehandler(const char *line)
 #elif defined(WIN32)
     {
         intptr_t ret;
-        args[0] = env;
+        args[0] = sysopt.msghandler;
         args[1] = line;
         args[2] = NULL;
-        ret = _spawnv(_P_NOWAIT, env, args);
+        ret = _spawnv(_P_NOWAIT, sysopt.msghandler, args);
+        nhUse(ret);  /* -Wunused-but-set-variable */
     }
 #else
-#error MSGHANDLER is not implemented on this system.
+    use_pline_handler = FALSE;
+    nhUse(args);
+    nhUse(line);
 #endif
 }
-#endif /* MSGHANDLER */
 
 /*
  * varargs handling for files.c

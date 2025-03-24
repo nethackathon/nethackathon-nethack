@@ -24,6 +24,7 @@
 #include "winos.h"
 #include "hack.h"
 #include "wintty.h"
+#include <VersionHelpers.h>
 #include <sys\types.h>
 #include <sys\stat.h>
 #ifdef VIRTUAL_TERMINAL_SEQUENCES
@@ -96,11 +97,27 @@ cell_t clear_cell = { CONSOLE_CLEAR_CHARACTER, CONSOLE_CLEAR_ATTRIBUTE };
 cell_t undefined_cell = { CONSOLE_UNDEFINED_CHARACTER,
                           CONSOLE_UNDEFINED_ATTRIBUTE };
 #else /* VIRTUAL_TERMINAL_SEQUENCES */
-cell_t clear_cell = { { CONSOLE_CLEAR_CHARACTER, 0, 0, 0, 0, 0, 0 },
-                        CONSOLE_CLEAR_CHARACTER, 0, 0L, 0, "\x1b[0m" };
-cell_t undefined_cell = { { CONSOLE_UNDEFINED_CHARACTER, 0, 0, 0, 0, 0, 0 },
-                            CONSOLE_UNDEFINED_CHARACTER, 0, 0L, 0, (const char *) 0 };
+cell_t clear_cell = {
+	        { CONSOLE_CLEAR_CHARACTER, 0, 0, 0, 0, 0, 0 },
+                CONSOLE_CLEAR_CHARACTER,         /* wcharacter */
+		0,                               /* attr */
+		0L,                              /* color24 */
+		0,                               /* color256idx */
+		"\x1b[0m",                       /* bkcolorseq */
+		0                                /* colorseq */
+};
+cell_t undefined_cell = {
+		{ CONSOLE_UNDEFINED_CHARACTER, 0, 0, 0, 0, 0, 0 },
+                CONSOLE_UNDEFINED_CHARACTER,     /* wcharacter */
+		0,                               /* attr */
+		0L,                              /* color24 */
+		0,                               /* color256idx */
+		(const char *) 0,                /* bkcolorseq */
+		(const char *) 0                 /* colorseq */
+};
+#if 0
 static const uint8 empty_utf8str[MAX_UTF8_SEQUENCE] = { 0 };
+#endif
 #endif /* VIRTUAL_TERMINAL_SEQUENCES */
 
 /*
@@ -129,12 +146,14 @@ static void xputc_core(int);
 #endif /* VIRTUAL_TERMINAL_SEQUENCES */
 void cmov(int, int);
 void nocmov(int, int);
-int process_keystroke(INPUT_RECORD *, boolean *, boolean numberpad,
+int process_keystroke(INPUT_RECORD *, boolean *, uchar numberpad,
                       int portdebug);
 static void init_ttycolor(void);
 static void really_move_cursor(void);
 static void check_and_set_font(void);
+#ifndef VIRTUAL_TERMINAL_SEQUENCES
 static boolean check_font_widths(void);
+#endif
 static void set_known_good_console_font(void);
 static void restore_original_console_font(void);
 extern void safe_routines(void);
@@ -144,9 +163,12 @@ extern void (*ibmgraphics_mode_callback)(void);  /* symbols.c */
 extern void (*utf8graphics_mode_callback)(void); /* symbols.c */
 #endif /* VIRTUAL_TERMINAL_SEQUENCES */
 
+static void init_custom_colors(void);
+static void free_custom_colors(void);
+
 /* Win32 Screen buffer,coordinate,console I/O information */
 COORD ntcoord;
-INPUT_RECORD ir;
+INPUT_RECORD gbl_ir;
 static boolean orig_QuickEdit;
 
 /* Support for changing console font if existing glyph widths are too wide */
@@ -209,11 +231,11 @@ struct console_t {
     0,                                                     /* current_nhcolor */
     0,                                                     /* current_nhbkcolor */
     0,                                                     /* current_colorflags */
-    {FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE},
-    {0, 0},   /* cursor */
+    { FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE },
+    { 0, 0 }, /* cursor */
     NULL,     /* hConOut*/
     NULL,     /* hConIn */
-    { 0 },    /* cbsi */
+    { { 0, 0}, { 0, 0}, 0, { 0, 0, 0, 0 }, { 0, 0 } },    /* cbsi */
     0,        /* width */
     0,        /* height */
     FALSE,    /* has_unicode */
@@ -238,7 +260,9 @@ struct console_t {
 #endif /* VIRTUAL_TERMINAL_SEQUENCES */
 };
 
+#if 0
 static const char default_name[] = "default";
+#endif
 const char *const legal_key_handling[] = {
     "none",
     "default",
@@ -249,27 +273,27 @@ const char *const legal_key_handling[] = {
 enum windows_key_handling keyh[] = { no_keyhandling, default_keyhandling, ray_keyhandling,
                                      nh340_keyhandling };
 
-int default_processkeystroke(HANDLE, INPUT_RECORD *, boolean *, boolean, int);
+int default_processkeystroke(HANDLE, INPUT_RECORD *, boolean *, uchar, int);
 int default_kbhit(HANDLE, INPUT_RECORD *);
-int default_checkinput(HANDLE, INPUT_RECORD *, DWORD *, boolean,
+int default_checkinput(HANDLE, INPUT_RECORD *, DWORD *, uchar,
                        int, int *, coord *);
 
-int ray_processkeystroke(HANDLE, INPUT_RECORD *, boolean *, boolean, int);
+int ray_processkeystroke(HANDLE, INPUT_RECORD *, boolean *, uchar, int);
 int ray_kbhit(HANDLE, INPUT_RECORD *);
-int ray_checkinput(HANDLE, INPUT_RECORD *, DWORD *, boolean,
+int ray_checkinput(HANDLE, INPUT_RECORD *, DWORD *, uchar,
                        int, int *, coord *);
 
-int nh340_processkeystroke(HANDLE, INPUT_RECORD *, boolean *, boolean, int);
+int nh340_processkeystroke(HANDLE, INPUT_RECORD *, boolean *, uchar, int);
 int nh340_kbhit(HANDLE, INPUT_RECORD *);
-int nh340_checkinput(HANDLE, INPUT_RECORD *, DWORD *, boolean,
+int nh340_checkinput(HANDLE, INPUT_RECORD *, DWORD *, uchar,
                        int, int *, coord *);
 
 struct keyboard_handling_t {
     enum windows_key_handling khid;
     int (*pProcessKeystroke)(HANDLE, INPUT_RECORD *, boolean *,
-                                          boolean, int);
+                                          uchar, int);
     int (*pNHkbhit)(HANDLE, INPUT_RECORD *);
-    int (*pCheckInput)(HANDLE, INPUT_RECORD *, DWORD *, boolean,
+    int (*pCheckInput)(HANDLE, INPUT_RECORD *, DWORD *, uchar,
                                    int, int *, coord *);
 } keyboard_handling = {
     no_keyhandling,
@@ -278,7 +302,10 @@ struct keyboard_handling_t {
     default_checkinput
 };
 
-static DWORD ccount, acount;
+static DWORD ccount;
+#if 0
+static DWORD acount;
+#endif
 #ifndef CLR_MAX
 #define CLR_MAX 16
 #endif
@@ -288,7 +315,9 @@ int ttycolors_inv[CLR_MAX];
 
 #define MAX_OVERRIDES 256
 unsigned char key_overrides[MAX_OVERRIDES];
+#if 0
 static char nullstr[] = "";
+#endif
 char erase_char, kill_char;
 #define DEFTEXTCOLOR ttycolors[7]
 static INPUT_RECORD bogus_key;
@@ -296,7 +325,7 @@ static INPUT_RECORD bogus_key;
 /*
 Windows console palette:
 Color Name      Console Legacy RGB Values  New Default RGB Values
-BLACK           0,0,0	                   12,12,12
+BLACK           0,0,0                      12,12,12
 DARK_BLUE       0,0,128                    0,55,218
 DARK_GREEN      0,128,0                    19,161,14
 DARK_CYAN       0,128,128                  58,150,221
@@ -316,8 +345,8 @@ WHITE           255,255,255                242,242,242
 
 #ifdef VIRTUAL_TERMINAL_SEQUENCES
 long customcolors[CLR_MAX];
-const char *esc_seq_colors[CLR_MAX];
-const char *esc_seq_bkcolors[CLR_MAX];
+const char *esc_seq_colors[CLR_MAX] = { 0 };
+const char *esc_seq_bkcolors[CLR_MAX] = { 0 };
 
 struct rgbvalues {
     int idx;
@@ -466,7 +495,17 @@ struct rgbvalues {
     { 138, "white", "#FFFFFF", 255, 255, 255 },
 };
 
-long
+void buffer_fill_to_end(cell_t * buffer, cell_t * fill, int x, int y);
+void buffer_write(cell_t * buffer, cell_t * cell, COORD pos);
+static long rgbtable_to_long(struct rgbvalues *);
+void term_start_256color(int idx);
+void set_cp_map(void);
+#ifdef PORT_DEBUG
+void win32con_debug_keystrokes(void);
+void win32con_toggle_cursor_info(void);
+#endif
+
+static long
 rgbtable_to_long(struct rgbvalues *tbl)
 {
     long rgblong = (tbl->r << 0) | (tbl->gn << 8) | (tbl->b << 16);
@@ -550,6 +589,32 @@ init_custom_colors(void)
     esc_seq_bkcolors[CLR_BRIGHT_CYAN] = dupstr(bkcolorbuf);
 }
 
+static void
+free_custom_colors(void)
+{
+#define CLR_FREE(c) \
+    if (esc_seq_bkcolors[(c)] != 0) \
+        free((genericptr_t) esc_seq_bkcolors[(c)]), esc_seq_bkcolors[(c)] = 0
+
+    CLR_FREE(CLR_BLACK);
+    CLR_FREE(CLR_RED);
+    CLR_FREE(CLR_GREEN);
+    CLR_FREE(CLR_YELLOW);
+    CLR_FREE(CLR_BLUE);
+    CLR_FREE(CLR_MAGENTA);
+    CLR_FREE(CLR_CYAN);
+    CLR_FREE(CLR_WHITE);
+    CLR_FREE(CLR_BROWN);
+    CLR_FREE(CLR_GRAY);
+    CLR_FREE(NO_COLOR);
+    CLR_FREE(CLR_ORANGE);
+    CLR_FREE(CLR_BRIGHT_GREEN);
+    CLR_FREE(CLR_BRIGHT_BLUE);
+    CLR_FREE(CLR_BRIGHT_MAGENTA);
+    CLR_FREE(CLR_BRIGHT_CYAN);
+#undef CLR_FREE
+}
+
 void emit_start_bold(void);
 void emit_stop_bold(void);
 void emit_start_dim(void);
@@ -565,125 +630,125 @@ void emit_start_256color(int u256coloridx);
 void emit_default_color(void);
 void emit_return_to_default(void);
 void emit_hide_cursor(void);
-void emit_show_curor(void);
+void emit_show_cursor(void);
 
 void
 emit_hide_cursor(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static const char escseq[] = "\x1b[?25l";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 
 void
 emit_show_cursor(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static const char escseq[] = "\x1b[?25h";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 
 void
 emit_start_bold(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static const char escseq[] = "\x1b[1m";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 
 void
 emit_stop_bold(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static const char escseq[] = "\x1b[24m";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 #if 0
 emit_start_dim(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static const char escseq[] = "\x1b[4m";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 
 void
 emit_stop_dim(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static const char escseq[] = "\x1b[24m";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 #endif
 
 void
 emit_start_blink(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static const char escseq[] = "\x1b[5m";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 
 void
 emit_stop_blink(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static const char escseq[] = "\x1b[25m";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 
 void
 emit_start_underline(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static const char escseq[] = "\x1b[4m";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 
 void
 emit_stop_underline(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static const char escseq[] = "\x1b[24m";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 void
 emit_start_inverse(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static const char escseq[] = "\x1b[7m";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 
 void
 emit_stop_inverse(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static const char escseq[] = "\x1b[27m";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 
 #if 0
@@ -700,21 +765,21 @@ emit_stop_inverse(void)
 #define tcfmtstr24bit "\x1b[38:2:%ld:%ld:%ldm"
 #define tcfmtstr256 "\x1b[38:5:%dm"
 #endif
- 
+
 void
 emit_start_256color(int u256coloridx)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static char tcolorbuf[QBUFSZ];
     Snprintf(tcolorbuf, sizeof tcolorbuf, tcfmtstr256, u256coloridx);
     WriteConsoleA(console.hConOut, (LPCSTR) tcolorbuf,
-                  (int) strlen(tcolorbuf), &unused, &reserved);
+                  (int) strlen(tcolorbuf), &unused, NULL);
 }
 
 void
 emit_start_24bitcolor(long color24bit)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static char tcolorbuf[QBUFSZ];
     uint32 mcolor = COLORVAL(color24bit);
     Snprintf(tcolorbuf, sizeof tcolorbuf, tcfmtstr24bit,
@@ -722,33 +787,35 @@ emit_start_24bitcolor(long color24bit)
              ((mcolor >>  8) & 0xFF),   /* green */
              ((mcolor >>  0) & 0xFF));  /* blue */
     WriteConsoleA(console.hConOut, (LPCSTR) tcolorbuf,
-                  (int) strlen(tcolorbuf), &unused, &reserved);
+                  (int) strlen(tcolorbuf), &unused, NULL);
 }
 
 void
 emit_default_color(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static char escseq[] = "\x1b[39m";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
 void
 emit_return_to_default(void)
 {
-    DWORD unused, reserved;
+    DWORD unused;
     static char escseq[] = "\x1b[0m";
 
     WriteConsoleA(console.hConOut, (LPCSTR) escseq, (int) strlen(escseq),
-                  &unused, &reserved);
+                  &unused, NULL);
 }
+#if 0
 static boolean newattr_on = TRUE;
+#endif
 static boolean color24_on = TRUE;
 
 /* for debugging */
 WORD what_is_there_now;
-BOOL success;
+//BOOL success;
 DWORD error_result;
 #endif /* VIRTUAL_TERMINAL_SEQUENCES */
 
@@ -778,7 +845,6 @@ back_buffer_flip(void)
     cell_t *front = console.front_buffer;
     COORD pos;
     DWORD unused;
-    DWORD reserved;
     unsigned do_anything, did_anything;
 
     if (!console.is_ready)
@@ -843,15 +909,15 @@ back_buffer_flip(void)
                     did_anything |= did_colorseq;
                     WriteConsoleA(console.hConOut, back->colorseq,
                                   (int) strlen(back->colorseq), &unused,
-                                  &reserved);
+                                  NULL);
                 }
                 if (back->bkcolorseq) {
                     did_anything |= did_bkcolorseq;
                     WriteConsoleA(console.hConOut, back->bkcolorseq,
                                   (int) strlen(back->bkcolorseq), &unused,
-                                  &reserved);
+                                  NULL);
                 }
-                if ((did_anything | (did_colorseq | did_bkcolorseq | did_color24)) == 0) {
+                if ((did_anything & (did_colorseq | did_bkcolorseq | did_color24)) == 0) {
                     did_anything &= ~(did_bkcolorseq | did_color24);
                     did_anything |= did_colorseq;
                     emit_default_color();
@@ -862,12 +928,12 @@ back_buffer_flip(void)
                     if (SYMHANDLING(H_UTF8) || !console.has_unicode) {
                         WriteConsoleA(console.hConOut, (LPCSTR) back->utf8str,
                                       (int) strlen((char *) back->utf8str),
-                                      &unused, &reserved);
+                                      &unused, NULL);
                         did_anything |= did_utf8_content;
                     } else {
 #endif
                     WriteConsoleW(console.hConOut, &back->wcharacter, 1,
-                                  &unused, &reserved);
+                                  &unused, NULL);
                     did_anything |= did_wide_content;
 #ifdef UTF8_FROM_CORE
                     }
@@ -986,7 +1052,7 @@ void
 settty(const char *s)
 {
     cmov(ttyDisplay->curx, ttyDisplay->cury);
-    end_screen();
+    term_end_screen();
     if (s)
         raw_print(s);
     restore_original_console_font();
@@ -1009,11 +1075,11 @@ settty(const char *s)
 void
 setftty(void)
 {
-    start_screen();
+    term_start_screen();
 }
 
 void
-tty_startup(int *wid, int *hgt)
+term_startup(int *wid, int *hgt)
 {
     *wid = console.width;
     *hgt = console.height;
@@ -1021,13 +1087,43 @@ tty_startup(int *wid, int *hgt)
 }
 
 void
-tty_number_pad(int state)
+tty_number_pad(int state UNUSED)
 {
     // do nothing
 }
 
+/* stub tcap replacements for linkage from wintty.c */
+
 void
-tty_start_screen(void)
+term_shutdown(void)
+{
+    consoletty_exit();
+}
+
+#ifdef ASCIIGRAPH
+void
+graph_on(void)
+{
+}
+
+void
+graph_off(void)
+{
+}
+#endif
+
+void
+term_end_screen(void)
+{
+    term_clear_screen();
+    really_move_cursor();
+    buffer_fill_to_end(console.back_buffer, &clear_cell, 0, 0);
+    back_buffer_flip();
+    FlushConsoleInputBuffer(console.hConIn);
+}
+
+void
+term_start_screen(void)
 {
     if (iflags.num_pad)
         tty_number_pad(1); /* make keypad send digits */
@@ -1041,16 +1137,6 @@ tty_start_screen(void)
 #endif /* VIRTUAL_TERMINAL_SEQUENCES */
 }
 
-void
-tty_end_screen(void)
-{
-    term_clear_screen();
-    really_move_cursor();
-    buffer_fill_to_end(console.back_buffer, &clear_cell, 0, 0);
-    back_buffer_flip();
-    FlushConsoleInputBuffer(console.hConIn);
-}
-
 static BOOL
 CtrlHandler(DWORD ctrltype)
 {
@@ -1058,6 +1144,8 @@ CtrlHandler(DWORD ctrltype)
     /* case CTRL_C_EVENT: */
     case CTRL_BREAK_EVENT:
         term_clear_screen();
+        FALLTHROUGH;
+	/* FALLTHRU */
     case CTRL_CLOSE_EVENT:
     case CTRL_LOGOFF_EVENT:
     case CTRL_SHUTDOWN_EVENT:
@@ -1076,7 +1164,7 @@ CtrlHandler(DWORD ctrltype)
 
 /* called by pcmain() and process_options() */
 void
-consoletty_open(int mode)
+consoletty_open(int mode UNUSED)
 {
     int debugvar;
 
@@ -1094,6 +1182,7 @@ consoletty_open(int mode)
     CO = console.width;
 
     really_move_cursor();
+    nhUse(debugvar);
 }
 
 void
@@ -1101,13 +1190,18 @@ consoletty_exit(void)
 {
     /* go back to using the safe routines */
     safe_routines();
+    free_custom_colors();
+    free((genericptr_t) console.front_buffer);
+    free((genericptr_t) console.back_buffer);
+    free((genericptr_t) console.localestr);
+    free((genericptr_t) console.orig_localestr);
 }
 
 int
 process_keystroke(
     INPUT_RECORD *ir,
     boolean *valid,
-    boolean numberpad,
+    uchar numberpad,
     int portdebug)
 {
     int ch;
@@ -1130,7 +1224,7 @@ process_keystroke(
 int
 consoletty_kbhit(void)
 {
-    return keyboard_handling.pNHkbhit(console.hConIn, &ir);
+    return keyboard_handling.pNHkbhit(console.hConIn, &gbl_ir);
 }
 
 int
@@ -1139,20 +1233,20 @@ tgetch(void)
     int mod;
     coord cc;
     DWORD count;
-    boolean numpad = iflags.num_pad;
+    uchar numberpad = iflags.num_pad;
 
     really_move_cursor();
     if (iflags.debug_fuzzer)
         return randomkey();
 #ifdef QWERTZ_SUPPORT
     if (gc.Cmd.swap_yz)
-        numpad |= 0x10;
+        numberpad |= 0x10;
 #endif
 
     return (program_state.done_hup)
                ? '\033'
                : keyboard_handling.pCheckInput(
-                   console.hConIn, &ir, &count, numpad, 0, &mod, &cc);
+                   console.hConIn, &gbl_ir, &count, numberpad, 0, &mod, &cc);
 }
 
 int
@@ -1161,7 +1255,7 @@ console_poskey(coordxy *x, coordxy *y, int *mod)
     int ch;
     coord cc = { 0, 0 };
     DWORD count;
-    boolean numpad = iflags.num_pad;
+    boolean numberpad = iflags.num_pad;
 
     really_move_cursor();
     if (iflags.debug_fuzzer) {
@@ -1175,19 +1269,21 @@ console_poskey(coordxy *x, coordxy *y, int *mod)
     }
 #ifdef QWERTZ_SUPPORT
     if (gc.Cmd.swap_yz)
-        numpad |= 0x10;
+        numberpad |= 0x10;
 #endif
+    term_curs_set(1);
     ch = (program_state.done_hup)
              ? '\033'
              : keyboard_handling.pCheckInput(
-                   console.hConIn, &ir, &count, numpad, 1, mod, &cc);
+                   console.hConIn, &gbl_ir, &count, numberpad, 1, mod, &cc);
 #ifdef QWERTZ_SUPPORT
-    numpad &= ~0x10;
+    numberpad &= ~0x10;
 #endif
     if (!ch) {
         *x = cc.x;
         *y = cc.y;
     }
+    term_curs_set(0);
     return ch;
 }
 
@@ -1210,9 +1306,11 @@ really_move_cursor(void)
         if (GetConsoleTitle(oldtitle, BUFSZ)) {
             oldtitle[39] = '\0';
         }
-        Sprintf(newtitle, "%-55s tty=(%02d,%02d) consoletty=(%02d,%02d)", oldtitle,
-                ttyDisplay->curx, ttyDisplay->cury,
-                console.cursor.X, console.cursor.Y);
+        Snprintf(newtitle, sizeof newtitle,
+		 "%-55s tty=(%02d,%02d) consoletty=(%02d,%02d)",
+		 oldtitle,
+                 ttyDisplay->curx, ttyDisplay->cury,
+                 console.cursor.X, console.cursor.Y);
         (void) SetConsoleTitle(newtitle);
     }
 #endif
@@ -1280,7 +1378,7 @@ xputc(int ch)
 
 #ifndef VIRTUAL_TERMINAL_SEQUENCES
 void
-xputc_core(char ch) 
+xputc_core(char ch)
 #else
 void
 xputc_core(int ch)
@@ -1301,7 +1399,8 @@ xputc_core(int ch)
     case '\n':
         if (console.cursor.Y < console.height - 1)
             console.cursor.Y++;
-    /* fall through */
+        FALLTHROUGH;
+    /* FALLTHRU */
     case '\r':
         console.cursor.X = 1;
         break;
@@ -1385,29 +1484,26 @@ xputc_core(int ch)
   */
 #endif
 void
-g_putch(int in_ch)
+console_g_putch(int in_ch)
 {
+    unsigned char ch = (unsigned char) in_ch;
+    cell_t cell;
 #ifndef VIRTUAL_TERMINAL_SEQUENCES
     boolean inverse = FALSE;
 #else /* VIRTUAL_TERMINAL_SEQUENCES */
-    int ccount = 0;
+    ccount = 0;
     WCHAR wch[2];
+    boolean usemap = (ch >= 0 && ch < SIZE(console.cpMap));
 #endif /* VIRTUAL_TERMINAL_SEQUENCES */
-    unsigned char ch = (unsigned char) in_ch;
 
     set_console_cursor(ttyDisplay->curx, ttyDisplay->cury);
 #ifndef VIRTUAL_TERMINAL_SEQUENCES
-
     inverse = (console.current_nhattr[ATR_INVERSE] && iflags.wc_inverse);
     console.attr = (console.current_nhattr[ATR_INVERSE] && iflags.wc_inverse) ?
                     ttycolors_inv[console.current_nhcolor] :
                     ttycolors[console.current_nhcolor];
     if (console.current_nhattr[ATR_BOLD])
         console.attr |= (inverse) ? BACKGROUND_INTENSITY : FOREGROUND_INTENSITY;
-
-#endif /* ! VIRTUAL_TERMINAL_SEQUENCES */
-    cell_t cell;
-#ifndef VIRTUAL_TERMINAL_SEQUENCES
     cell.attribute = console.attr;
     cell.character = (console.has_unicode ? cp437[ch] : ch);
 #else
@@ -1418,7 +1514,7 @@ g_putch(int in_ch)
     cell.color256idx = 0;
     wch[1] = 0;
     if (console.has_unicode) {
-        wch[0] = (ch >= 0 && ch < SIZE(console.cpMap)) ? console.cpMap[ch] : ch;
+        wch[0] = (usemap) ? console.cpMap[ch] : ch;
 #ifdef UTF8_FROM_CORE
         if (SYMHANDLING(H_UTF8)) {
             /* we have to convert it to UTF-8 for cell.utf8str */
@@ -1440,7 +1536,7 @@ g_putch(int in_ch)
         cell.utf8str[1] = 0;
         ccount = 2;
     }
-#endif
+#endif /* VIRTUAL_TERMINAL_SEQUENCES */
     buffer_write(console.back_buffer, &cell, console.cursor);
 }
 
@@ -1486,10 +1582,10 @@ term_start_extracolor(uint32 nhcolor, uint16 color256idx)
         term_start_color(console.current_nhcolor);
 #ifdef VIRTUAL_TERMINAL_SEQUENCES
     }
-#endif    
+#endif
 }
 
-void term_start_256color(int idx)
+void term_start_256color(int idx UNUSED)
 {
 }
 
@@ -1506,7 +1602,7 @@ term_end_extracolor(void)
 void
 cl_end(void)
 {
-    if (ttyDisplay->curx < console.width 
+    if (ttyDisplay->curx < console.width
             && ttyDisplay->cury < console.height) {
         set_console_cursor(ttyDisplay->curx, ttyDisplay->cury);
         buffer_clear_to_end_of_line(console.back_buffer, console.cursor.X,
@@ -1524,9 +1620,6 @@ raw_clear_screen(void)
         cell_t * front = console.front_buffer;
         COORD pos;
         DWORD unused;
-#ifdef VIRTUAL_TERMINAL_SEQUENCES
-        DWORD reserved;
-#endif
 
 #ifdef VIRTUAL_TERMINAL_SEQUENCES
         pos.Y = 0;
@@ -1552,10 +1645,10 @@ raw_clear_screen(void)
                 *back = clear_cell;
                 if (console.has_unicode)
                     WriteConsoleW(console.hConOut, &back->wcharacter, 1,
-                                  &unused, &reserved);
+                                  &unused, NULL);
                 else
                     WriteConsoleA(console.hConOut, (LPCSTR) back->utf8str,
-                                    (int) strlen((char *) back->utf8str), &unused, &reserved);
+                                    (int) strlen((char *) back->utf8str), &unused, NULL);
 #endif /* VIRTUAL_TERMINAL_SEQUENCES */
                 *front = *back;
                 back++;
@@ -1570,6 +1663,25 @@ term_clear_screen(void)
 {
     buffer_fill_to_end(console.back_buffer, &clear_cell, 0, 0);
     home();
+}
+
+void
+term_curs_set(int visibility)
+{
+    static int vis = -1;
+
+    if (vis == visibility)
+        return;
+
+    static CONSOLE_CURSOR_INFO cursorinfo = { 0, 0 };
+
+    if (!cursorinfo.dwSize) {
+        GetConsoleCursorInfo(console.hConOut, &cursorinfo);
+        vis = cursorinfo.bVisible ? 1 : 0;
+    }
+    cursorinfo.bVisible = visibility ? (BOOL) TRUE : (BOOL) FALSE;
+    SetConsoleCursorInfo(console.hConOut, &cursorinfo);
+    vis = visibility;
 }
 
 void
@@ -1619,6 +1731,7 @@ tty_delay_output(void)
     while (goal > clock()) {
         k = junk; /* Do nothing */
     }
+    nhUse(k);
 }
 
 /*
@@ -1848,6 +1961,7 @@ toggle_mouse_support(void)
 #endif /* VIRTUAL_TERMINAL_SEQUENCES */
                 break;
         case 0:
+                FALLTHROUGH;
                 /*FALLTHRU*/
         default:
 #ifndef VIRTUAL_TERMINAL_SEQUENCES
@@ -2010,9 +2124,9 @@ win32con_debug_keystrokes(void)
     xputs("\n");
     while (!valid || ch != 27) {
         nocmov(ttyDisplay->curx, ttyDisplay->cury);
-        ReadConsoleInput(console.hConIn, &ir, 1, &count);
-        if ((ir.EventType == KEY_EVENT) && ir.Event.KeyEvent.bKeyDown)
-            ch = process_keystroke(&ir, &valid, iflags.num_pad, 1);
+        ReadConsoleInput(console.hConIn, &gbl_ir, 1, &count);
+        if ((gbl_ir.EventType == KEY_EVENT) && gbl_ir.Event.KeyEvent.bKeyDown)
+            ch = process_keystroke(&gbl_ir, &valid, (uchar) iflags.num_pad, 1);
     }
     (void) doredraw();
 }
@@ -2056,7 +2170,7 @@ map_subkeyvalue(char *op)
     key_overrides[idx] = val;
 }
 
-
+#if 0
 /* fatal error */
 /*VARARGS1*/
 void consoletty_error
@@ -2075,6 +2189,7 @@ VA_DECL(const char *, s)
     VA_END();
     exit(EXIT_FAILURE);
 }
+#endif
 
 void
 synch_cursor(void)
@@ -2082,13 +2197,16 @@ synch_cursor(void)
     really_move_cursor();
 }
 
+#ifndef VIRTUAL_TERMINAL_SEQUENCES
 static int CALLBACK EnumFontCallback(
-    const LOGFONTW * lf, const TEXTMETRICW * tm, DWORD fontType, LPARAM lParam)
+    const LOGFONTW * lf, const TEXTMETRICW * tm UNUSED,
+    DWORD fontType UNUSED, LPARAM lParam)
 {
     LOGFONTW * lf_ptr = (LOGFONTW *) lParam;
     *lf_ptr = *lf;
     return 0;
 }
+#endif
 
 /* check_and_set_font ensures that the current font will render the symbols
  * that are currently being used correctly.  If they will not be rendered
@@ -2113,15 +2231,12 @@ check_and_set_font(void)
 #endif
 }
 
+#ifndef VIRTUAL_TERMINAL_SEQUENCES
 /* check_font_widths returns TRUE if all glyphs in current console font
  * fit within the width of a single console cell.
  */
 boolean
-#ifndef VIRTUAL_TERMINAL_SEQUENCES
 check_font_widths(void)
-#else /* VIRTUAL_TERMINAL_SEQUENCES */
-check_font_widths(void)
-#endif /* VIRTUAL_TERMINAL_SEQUENCES */
 {
     CONSOLE_FONT_INFOEX console_font_info;
     console_font_info.cbSize = sizeof(console_font_info);
@@ -2189,7 +2304,7 @@ check_font_widths(void)
 
     int wcUsedCount = 0;
     wchar_t wcUsed[256];
-    for (int i = 0; i < sizeof(used); i++)
+    for (int i = 0; i < (int) sizeof(used); i++)
         if (used[i])
             wcUsed[wcUsedCount++] = cp437[i];
 
@@ -2218,6 +2333,7 @@ clean_up:
 
     return all_glyphs_fit;
 }
+#endif
 
 /* set_known_good_console_font sets the code page and font used by the console
  * to settings know to work well with NetHack.  It also saves the original
@@ -2431,7 +2547,7 @@ void nethack_enter_consoletty(void)
 {
 #ifdef VIRTUAL_TERMINAL_SEQUENCES
     char buf[BUFSZ], *bp, *localestr;
-    BOOL success;
+    BOOL apisuccess;
 #endif /* VIRTUAL_TERMINAL_SEQUENCES */
 #if 0
     /* set up state needed by early_raw_print() */
@@ -2511,7 +2627,7 @@ void nethack_enter_consoletty(void)
     buffer_fill_to_end(console.back_buffer, &clear_cell, 0, 0);
 
     /* determine whether OS version has unicode support */
-    console.has_unicode = ((GetVersion() & 0x80000000) == 0);
+    console.has_unicode = (IsWindows8OrGreater());
 
 #ifdef VIRTUAL_TERMINAL_SEQUENCES
     /* store the original code page*/
@@ -2525,7 +2641,7 @@ void nethack_enter_consoletty(void)
 
     /* store the original font */
     console.orig_font_info.cbSize = sizeof(console.orig_font_info);
-    success = GetCurrentConsoleFontEx(console.hConOut,
+    apisuccess = GetCurrentConsoleFontEx(console.hConOut,
                                       FALSE, &console.orig_font_info);
     console.font_info = console.orig_font_info;
 
@@ -2542,9 +2658,9 @@ void nethack_enter_consoletty(void)
     console.code_page = console.orig_code_page;
     if (console.has_unicode) {
         if (console.code_page != 437)
-            success = SetConsoleOutputCP(437);
+            apisuccess = SetConsoleOutputCP(437);
     } else if (console.code_page != 1252) {
-        success = SetConsoleOutputCP(1252);
+        apisuccess = SetConsoleOutputCP(1252);
     }
     console.code_page = GetConsoleOutputCP();
 #endif /* VIRTUAL_TERMINAL_SEQUENCES */
@@ -2626,6 +2742,7 @@ void nethack_enter_consoletty(void)
 #endif /* VIRTUAL_TERMINAL_SEQUENCES */
     console.current_nhcolor = NO_COLOR;
     console.is_ready = TRUE;
+    nhUse(apisuccess);
 }
 #endif /* TTY_GRAPHICS */
 
@@ -2651,7 +2768,7 @@ VA_DECL(const char *, fmt)
         if (console.cursor.Y > console.height - 4) {
             xputs("Hit <Enter> to continue.");
             while (pgetchar() != '\n')
-                ;
+               ;
             raw_clear_screen();
             set_console_cursor(1, 0);
         }
@@ -2684,7 +2801,7 @@ VA_DECL(const char *, fmt)
 
 #ifdef QWERTZ_SUPPORT
 /* when 'numberpad' is 0 and Cmd.swap_yz is True
-   (signaled by setting 0x10 on boolean numpad argument)
+   (signaled by setting 0x10 on uchar numberpad argument)
    treat keypress of numpad 7 as 'z' rather than 'y' */
 static boolean qwertz = FALSE;
 #endif
@@ -2905,10 +3022,10 @@ set_keyhandling_via_option(void)
 
 int
 default_processkeystroke(
-    HANDLE hConIn,
+    HANDLE hConIn UNUSED,
     INPUT_RECORD *ir,
     boolean *valid,
-    boolean numberpad,
+    uchar numberpad,
     int portdebug)
 {
     int k = 0;
@@ -3070,12 +3187,12 @@ default_kbhit(HANDLE hConIn, INPUT_RECORD *ir)
     return retval;
 }
 
-int 
+int
 default_checkinput(
     HANDLE hConIn,
     INPUT_RECORD *ir,
     DWORD *count,
-    boolean numpad,
+    uchar numberpad,
     int mode,
     int *mod,
     coord *cc)
@@ -3087,8 +3204,8 @@ default_checkinput(
     boolean valid = 0, done = 0;
 
 #ifdef QWERTZ_SUPPORT
-    if (numpad & 0x10) {
-        numpad &= ~0x10;
+    if (numberpad & 0x10) {
+        numberpad &= ~0x10;
         qwertz = TRUE;
     } else {
         qwertz = FALSE;
@@ -3105,21 +3222,21 @@ default_checkinput(
         ReadConsoleInput(hConIn, ir, 1, count);
         if (mode == 0) {
             if ((ir->EventType == KEY_EVENT) && ir->Event.KeyEvent.bKeyDown) {
-                ch = default_processkeystroke(hConIn, ir, &valid, numpad, 0);
+                ch = default_processkeystroke(hConIn, ir, &valid, numberpad, 0);
                 done = valid;
             }
         } else {
-            if (count > 0) {
+            if (*count > 0) {
                 if (ir->EventType == KEY_EVENT
                     && ir->Event.KeyEvent.bKeyDown) {
 #ifdef QWERTZ_SUPPORT
                     if (qwertz)
-                        numpad |= 0x10;
+                        numberpad |= 0x10;
 #endif
-                    ch = default_processkeystroke(hConIn, ir, &valid, numpad, 0);
+                    ch = default_processkeystroke(hConIn, ir, &valid, numberpad, 0);
 #ifdef QWERTZ_SUPPORT
-                    numpad &= ~0x10;
-#endif                    
+                    numberpad &= ~0x10;
+#endif
                     if (valid)
                         return ch;
                 } else if (ir->EventType == MOUSE_EVENT) {
@@ -3333,7 +3450,7 @@ is_altseq(unsigned long shiftstate)
 
     case RIGHT_ALT_PRESSED:
     case RIGHT_ALT_PRESSED | LEFT_ALT_PRESSED:
-        return (GetVersion() & 0x80000000) == 0;
+        return (IsWindows8OrGreater());
 
     default:
         return 0;
@@ -3344,7 +3461,7 @@ int ray_processkeystroke(
     HANDLE hConIn,
     INPUT_RECORD *ir,
     boolean *valid,
-    boolean numberpad,
+    uchar numberpad,
     int portdebug)
 {
     int keycode, vk;
@@ -3531,7 +3648,7 @@ ray_checkinput(
     HANDLE hConIn,
     INPUT_RECORD *ir,
     DWORD *count,
-    boolean numpad,
+    uchar numberpad,
     int mode,
     int *mod,
     coord *cc)
@@ -3543,8 +3660,8 @@ ray_checkinput(
     boolean valid = 0, done = 0;
 
 #ifdef QWERTZ_SUPPORT
-    if (numpad & 0x10) {
-        numpad &= ~0x10;
+    if (numberpad & 0x10) {
+        numberpad &= ~0x10;
         qwertz = TRUE;
     } else {
         qwertz = FALSE;
@@ -3566,22 +3683,22 @@ ray_checkinput(
                 ReadConsoleInput(hConIn, ir, 1, count);
         } else {
             ch = 0;
-            if (count > 0) {
+            if (*count > 0) {
                 if (ir->EventType == KEY_EVENT
                     && ir->Event.KeyEvent.bKeyDown) {
 #ifdef QWERTZ_SUPPORT
                     if (qwertz)
-                        numpad |= 0x10;
+                        numberpad |= 0x10;
 #endif
-                    ch = ray_processkeystroke(hConIn, ir, &valid, numpad,
+                    ch = ray_processkeystroke(hConIn, ir, &valid, numberpad,
 #ifdef PORTDEBUG
                                           1);
 #else
                                           0);
 #endif
 #ifdef QWERTZ_SUPPORT
-                    numpad &= ~0x10;
-#endif                    
+                    numberpad &= ~0x10;
+#endif
                     if (valid)
                         return ch;
                 } else {
@@ -3601,7 +3718,7 @@ ray_checkinput(
                             else if (ir->Event.MouseEvent.dwButtonState
                                      & RIGHTBUTTON)
                                 *mod = CLICK_2;
-#if 0 /* middle button */       
+#if 0 /* middle button */
                             else if (ir->Event.MouseEvent.dwButtonState & MIDBUTTON)
                                 *mod = CLICK_3;
 #endif
@@ -3699,12 +3816,12 @@ ray_kbhit(
  *    shift values below.
  */
 
-int 
+int
 nh340_processkeystroke(
-    HANDLE hConIn,
+    HANDLE hConIn UNUSED,
     INPUT_RECORD *ir,
     boolean *valid,
-    boolean numberpad,
+    uchar numberpad,
     int portdebug)
 {
     int keycode, vk;
@@ -3850,7 +3967,7 @@ nh340_checkinput(
     HANDLE hConIn,
     INPUT_RECORD *ir,
     DWORD *count,
-    boolean numpad,
+    uchar numberpad,
     int mode,
     int *mod,
     coord *cc)
@@ -3862,8 +3979,8 @@ nh340_checkinput(
     boolean valid = 0, done = 0;
 
 #ifdef QWERTZ_SUPPORT
-    if (numpad & 0x10) {
-        numpad &= ~0x10;
+    if (numberpad & 0x10) {
+        numberpad &= ~0x10;
         qwertz = TRUE;
     } else {
         qwertz = FALSE;
@@ -3882,19 +3999,19 @@ nh340_checkinput(
             if ((ir->EventType == KEY_EVENT) && ir->Event.KeyEvent.bKeyDown) {
 #ifdef QWERTZ_SUPPORT
                 if (qwertz)
-                    numpad |= 0x10;
+                    numberpad |= 0x10;
 #endif
-                ch = nh340_processkeystroke(hConIn, ir, &valid, numpad, 0);
+                ch = nh340_processkeystroke(hConIn, ir, &valid, numberpad, 0);
 #ifdef QWERTZ_SUPPORT
-                numpad &= ~0x10;
-#endif                    
+                numberpad &= ~0x10;
+#endif
                 done = valid;
             }
         } else {
-            if (count > 0) {
+            if (*count > 0) {
                 if (ir->EventType == KEY_EVENT
                     && ir->Event.KeyEvent.bKeyDown) {
-                    ch = nh340_processkeystroke(hConIn, ir, &valid, numpad, 0);
+                    ch = nh340_processkeystroke(hConIn, ir, &valid, numberpad, 0);
                     if (valid)
                         return ch;
                 } else if (ir->EventType == MOUSE_EVENT) {

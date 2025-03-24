@@ -1,4 +1,4 @@
-/* NetHack 3.7	hack.h	$NHDT-Date: 1725653009 2024/09/06 20:03:29 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.262 $ */
+/* NetHack 3.7	hack.h	$NHDT-Date: 1736530208 2025/01/10 09:30:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.266 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Pasi Kallinen, 2017. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -29,13 +29,11 @@
 #include "mkroom.h"
 #include "obj.h"
 #include "quest.h"
-#include "rect.h"
 #include "region.h"
 #include "rm.h"
 #include "selvar.h"
 #include "sndprocs.h"
 #include "spell.h"
-#include "sym.h"
 #include "sys.h"
 #include "timeout.h"
 #include "winprocs.h"
@@ -347,7 +345,6 @@ enum digcheck_result {
     DIGCHECK_FAIL_OBJ_POOL_OR_TRAP
 };
 
-    
 
 /* Dismount: causes for why you are no longer riding */
 enum dismount_types {
@@ -442,6 +439,7 @@ enum earlyarg {
     , ARG_DUMPENUMS
 #endif
     , ARG_DUMPGLYPHIDS
+    , ARG_DUMPMONGEN
 #ifdef WIN32
     , ARG_WINDOWS
 #endif
@@ -673,6 +671,7 @@ struct mvitals {
     uchar born;
     uchar died;
     uchar mvflags;
+    Bitfield(seen_close, 1);
 };
 
 
@@ -768,6 +767,7 @@ struct role_filter {
     boolean roles[NUM_ROLES + 1];
     short mask;
 };
+#define NUM_RACES (5)
 
 enum saveformats {
     invalid = 0,
@@ -859,6 +859,14 @@ typedef struct strbuf {
     char  *str;
     char   buf[256];
 } strbuf_t;
+
+enum stoning_checks {
+    st_gloves    = 0x1,  /* wearing gloves? */
+    st_corpse    = 0x2,  /* is it a corpse obj? */
+    st_petrifies = 0x4,  /* does the corpse petrify on touch? */
+    st_resists   = 0x8,  /* do you have stoning resistance? */
+    st_all = (st_gloves | st_corpse | st_petrifies | st_resists)
+};
 
 struct trapinfo {
     struct obj *tobj;
@@ -1248,11 +1256,12 @@ typedef uint32_t mmflags_nht;     /* makemon MM_ flags */
 /* flag for suppressing perm_invent update when name gets assigned */
 #define ONAME_SKIP_INVUPD 0x0200U /* don't call update_inventory() */
 
-/* Flags to control find_mid() */
+/* Flags to control find_mid() and whereis_mon() */
 #define FM_FMON 0x01    /* search the fmon chain */
 #define FM_MIGRATE 0x02 /* search the migrating monster chain */
 #define FM_MYDOGS 0x04  /* search gm.mydogs */
-#define FM_EVERYWHERE (FM_FMON | FM_MIGRATE | FM_MYDOGS)
+#define FM_YOU 0x08     /* check for gy.youmonst */
+#define FM_EVERYWHERE (FM_YOU | FM_FMON | FM_MIGRATE | FM_MYDOGS)
 
 /* Flags to control pick_[race,role,gend,align] routines in role.c */
 #define PICK_RANDOM 0

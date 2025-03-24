@@ -1,4 +1,4 @@
-/* NetHack 3.7	role.c	$NHDT-Date: 1711734229 2024/03/29 17:43:49 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.100 $ */
+/* NetHack 3.7	role.c	$NHDT-Date: 1737607158 2025/01/22 20:39:18 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.107 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985-1999. */
 /*-Copyright (c) Robert Patrick Rankin, 2012. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -24,6 +24,9 @@
  *
  * God names use a leading underscore to flag goddesses.
  */
+
+/* NUM_ROLES is defined in hack.h */
+
 const struct Role roles[NUM_ROLES+1] = {
     { { "Archeologist", 0 },
       { { "Digger", 0 },
@@ -573,7 +576,9 @@ const struct Role roles[NUM_ROLES+1] = {
 };
 
 /* Table of all races */
-const struct Race races[] = {
+
+/* NUM_RACES is defined in hack.h */
+const struct Race races[NUM_RACES + 1] = {
     {
         "human",
         "human",
@@ -1357,6 +1362,7 @@ clearrolefilter(int which)
     switch (which) {
     case RS_filter:
         gr.rfilter.mask = 0; /* clear race, gender, and alignment filters */
+        FALLTHROUGH;
         /*FALLTHRU*/
     case RS_ROLE:
         for (i = 0; i < SIZE(roles) - 1; ++i)
@@ -1561,7 +1567,7 @@ root_plselection_prompt(
         if (donefirst)
             Strcat(buf, " ");
         Strcat(buf, "character");
-        donefirst = TRUE;
+        /*donefirst = TRUE;*/
     }
     /* <your lawful female gnomish cavewoman> || <your lawful female gnome>
      *    || <your lawful female character>
@@ -2175,7 +2181,7 @@ genl_player_selection(void)
     /*NOTREACHED*/
 }
 
-#if defined(TTY_GRAPHICS) || defined(CURSES_GRAPHICS)
+#if defined(TTY_GRAPHICS) || defined(CURSES_GRAPHICS) || defined(SHIM_GRAPHICS)
 /* ['#else' far below] */
 
 staticfn boolean reset_role_filtering(void);
