@@ -2644,18 +2644,23 @@ in_container(struct obj *obj)
         }
     }
     if (Icebox && !age_is_relative(obj)) {
-        obj->age = svm.moves - obj->age; /* actual age */
-        /* stop any corpse timeouts when frozen */
-        if (obj->otyp == CORPSE) {
-            if (obj->timed) {
-                (void) stop_timer(ROT_CORPSE, obj_to_any(obj));
-                (void) stop_timer(REVIVE_MON, obj_to_any(obj));
+        if (obj->otyp == COOLER_BAG) {
+            obj->on_ice = 1;
+        } else {
+            // ICE_BOX
+            obj->age = svm.moves - obj->age; /* actual age */
+            /* stop any corpse timeouts when frozen */
+            if (obj->otyp == CORPSE) {
+                if (obj->timed) {
+                    (void) stop_timer(ROT_CORPSE, obj_to_any(obj));
+                    (void) stop_timer(REVIVE_MON, obj_to_any(obj));
+                }
+                /* if this is the corpse of a cancelled ice troll, uncancel it */
+                if (obj->corpsenm == PM_ICE_TROLL && has_omonst(obj))
+                    OMONST(obj)->mcan = 0;
+            } else if (obj->globby && obj->timed) {
+                (void) stop_timer(SHRINK_GLOB, obj_to_any(obj));
             }
-            /* if this is the corpse of a cancelled ice troll, uncancel it */
-            if (obj->corpsenm == PM_ICE_TROLL && has_omonst(obj))
-                OMONST(obj)->mcan = 0;
-        } else if (obj->globby && obj->timed) {
-            (void) stop_timer(SHRINK_GLOB, obj_to_any(obj));
         }
     } else if (Is_mbag(gc.current_container) && mbag_explodes(obj, 0)) {
         livelog_printf(LL_ACHIEVE, "just blew up %s bag of holding", uhis());
@@ -2782,6 +2787,10 @@ out_container(struct obj *obj)
 void
 removed_from_icebox(struct obj *obj)
 {
+    if (obj->otyp == COOLER_BAG) {
+        obj->on_ice = 0;
+        return;
+    }
     if (!age_is_relative(obj)) {
         obj->age = svm.moves - obj->age; /* actual age */
         if (obj->otyp == CORPSE) {

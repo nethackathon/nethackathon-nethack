@@ -385,11 +385,9 @@ mkbox_cnts(struct obj *box)
             }
             otmp = mksobj(item_type, TRUE, FALSE);
             otmp->age = 0L;
-            if (otmp->timed) {
-                (void) stop_timer(ROT_CORPSE, obj_to_any(otmp));
-                (void) stop_timer(REVIVE_MON, obj_to_any(otmp));
-                (void) stop_timer(SHRINK_GLOB, obj_to_any(otmp));
-            }
+            /* Instead of stopping the timer, let's use the on_ice property
+             * to slow down the timer for rotting */
+            otmp->on_ice = 1;
         } else if (box->otyp == BAG_OF_BAGS) {
             int bag_n = rn2(100);
             int bag_type;
@@ -1468,9 +1466,15 @@ item_on_ice(struct obj *item)
 
     otmp = item;
     /* if in a container, it might be nested so find outermost one since
-       that's the item whose location needs to be checked */
-    while (otmp->where == OBJ_CONTAINED)
+       that's the item whose location needs to be checked
+       If any container is a cooler bag, the item is on ice
+     */
+    while (otmp->where == OBJ_CONTAINED) {
         otmp = otmp->ocontainer;
+        if (otmp->otyp == COOLER_BAG) {
+          return SET_ON_ICE;
+        }
+    }
 
     if (get_obj_location(otmp, &ox, &oy, BURIED_TOO)) {
         switch (otmp->where) {
