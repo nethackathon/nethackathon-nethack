@@ -37,6 +37,7 @@ staticfn int in_container(struct obj *);
 staticfn int out_container(struct obj *);
 staticfn long mbag_item_gone(boolean, struct obj *, boolean);
 staticfn int stash_ok(struct obj *);
+staticfn int bag_pet(void);
 staticfn void explain_container_prompt(boolean);
 staticfn int traditional_loot(boolean);
 staticfn int menu_loot(int, boolean);
@@ -2729,6 +2730,44 @@ ck_bag(struct obj *obj)
     return (gc.current_container && obj != gc.current_container);
 }
 
+static boolean
+unbag_pet(struct obj *content)
+{
+    struct monst *pet_mon = get_bagged_pet(content);
+    struct monst *mon;
+    if (!pet_mon)
+        return FALSE;
+
+    if (pet_mon == gm.migrating_mons)
+        gm.migrating_mons = pet_mon->nmon;
+    else
+        for (mon = gm.migrating_mons; mon; mon = mon->nmon)
+            if (mon->nmon == pet_mon) {
+                mon->nmon = pet_mon->nmon;
+                break;
+            }
+
+    // Prevent untaming and wandering off on arrival. This also prevents healing but whatever.
+    pet_mon->mlstmv = svm.moves;
+
+    mon_arrive(pet_mon, -1);
+    content->leashmon = -1;
+    obfree(content, NULL);
+    return TRUE;
+}
+
+void
+pet_escapes_bag(struct obj *bag, struct obj *content, struct monst *pet, const char *petdesc)
+{
+    char *bagname = doname(bag);
+    obj_extract_self(content);
+    unbag_pet(content);
+    if (petdesc)
+        pline("%s gets %s and jumps out of %s.", Monnam(pet), petdesc, bagname);
+    else
+        pline("%s jumps out of %s.", Monnam(pet), bagname);
+}
+
 /* Returns: -1 to stop, 1 item was removed, 0 item was not removed. */
 staticfn int
 out_container(struct obj *obj)
@@ -2764,6 +2803,8 @@ out_container(struct obj *obj)
 
     if (Icebox)
         removed_from_icebox(obj);
+    if (unbag_pet(obj))
+        return 1;
 
     if (!obj->unpaid && !carried(gc.current_container)
         && costly_spot(gc.current_container->ox, gc.current_container->oy)) {
@@ -2963,6 +3004,122 @@ stash_ok(struct obj *obj)
      * which case extract in_container()'s logic.) */
 
     return GETOBJ_SUGGEST;
+}
+
+int
+get_bagged_pet_otyp(struct monst *pet)
+{
+    if (pet->data == &mons[PM_LITTLE_DOG])
+        return BAGGED_PUPPY;
+    else if (pet->data == &mons[PM_KITTEN])
+        return BAGGED_KITTEN;
+    else
+        return STRANGE_OBJECT;
+}
+
+staticfn int
+bag_pet(void)
+{
+    struct monst *mtmp = NULL;
+    int petotyp;
+    struct obj *otmp;
+    int petx, pety;
+    int ret;
+
+    if (gc.current_container->where != OBJ_INVENT) {
+        You("need to hold this bag in your %s.", makeplural(body_part(HAND)));
+        return 0;
+    }
+
+    if (!getdir("Put in whom? (in what direction)"))
+        return 0;
+
+    if (!u.dx && !u.dy && !u.dz) {
+        pline("Exactly what are you trying to accomplish?");
+        return 0;
+    }
+
+    if (u.usteed && u.dz > 0) {
+        // Rest of the game only applies "he/she" to humanoids but here promote the likes
+        // of dragons and ki-rin from "it" to "him/her".
+        pline("%s looks at you and rolls %s %s.", Monnam(u.usteed),
+              is_animal(u.usteed->data) ? "its" : u.usteed->female ? "her" : "his",
+              makeplural(mbodypart(u.usteed, EYE)));
+        return 0;
+    }
+
+    petx = u.ux + u.dx;
+    pety = u.uy + u.dy;
+    if (isok(petx, pety))
+        mtmp = m_at(petx, pety);
+    if (!mtmp || mtmp->mundetected) {
+        pline("There is no one there.");
+        return 0;
+    }
+    if (!can_reach_floor(FALSE)) {
+        cant_reach_floor(petx, pety, FALSE, FALSE);
+        return 0;
+    }
+    if (!mtmp->mtame) {
+        pline("%s won't cooperate.", Monnam(mtmp));
+        return 0;
+    }
+    if (!is_domestic(mtmp->data) || !EDOG(mtmp)) {
+        pline("%s does not like bags.", Monnam(mtmp));
+        return 0;
+    }
+
+    petotyp = get_bagged_pet_otyp(mtmp);
+    if (petotyp == STRANGE_OBJECT) {
+        pline("%s won't fit into the bag.", Monnam(mtmp));
+        return 0;
+    }
+
+    if (mtmp->mleashed) {
+        pline("Cannot put %s into the bag while it's leashed.", mon_nam(mtmp));
+        return 0;
+    }
+
+    if (mtmp->meating) {
+        pline("%s is busy eating.", Monnam(mtmp));
+        return 0;
+    }
+
+    if (svm.moves >= EDOG(mtmp)->hungrytime) {
+        beg(mtmp);
+        return 0;
+    }
+
+    for (otmp = gc.current_container->cobj; otmp; otmp = otmp->nobj)
+        if (get_bagged_pet(otmp)) {
+            pline("There is already %s in the bag.", doname(otmp));
+            return 0;
+        }
+
+    otmp = mksobj(petotyp, FALSE, FALSE);
+    otmp->leashmon = mtmp->m_id;
+    if (has_mgivenname(mtmp))
+        oname(otmp, MGIVENNAME(mtmp), ONAME_SKIP_INVUPD);
+    addinv(otmp);
+    ret = in_container(otmp);
+    if (ret) {
+        m_into_limbo(mtmp);
+        newsym(petx, pety);
+    } else {
+        freeinv(otmp);
+        obfree(otmp, NULL);
+    }
+    return ret;
+}
+
+struct monst *
+get_bagged_pet(struct obj *pet_item)
+{
+    if ((pet_item->otyp != BAGGED_PUPPY) && (pet_item->otyp != BAGGED_KITTEN))
+        return NULL;
+    if (pet_item->leashmon < 0)
+        return NULL;
+    return find_mid(pet_item->leashmon, FM_MIGRATE);
 }
 
 int
@@ -3202,6 +3359,11 @@ use_container(
         }
     }
 
+    if (c == 'p') {
+        if (bag_pet())
+            used = 1;
+    }
+
  containerdone:
     if (used) {
         /* Not completely correct; if we put something in without knowing
@@ -3400,7 +3562,7 @@ in_or_out_menu(
     boolean more_containers)
 {
     /* underscore is not a choice; it's used to skip element [0] */
-    static const char lootchars[] = "_:oibrsnq", abc_chars[] = "_:abcdenq";
+    static const char lootchars[] = "_:oibrsnqp", abc_chars[] = "_:abcdenqp";
     winid win;
     anything any;
     menu_item *pick_list;
@@ -3443,6 +3605,12 @@ in_or_out_menu(
                  ATR_NONE, clr, buf, MENU_ITEMFLAGS_NONE);
         any.a_int = 6; /* 's' */
         Sprintf(buf, "stash one item into %s", thesimpleoname(obj));
+        add_menu(win, &nul_glyphinfo, &any, menuselector[any.a_int], 0,
+                 ATR_NONE, clr, buf, MENU_ITEMFLAGS_NONE);
+    }
+    if (obj->otyp == DESIGNER_BAG) {
+        any.a_int = 9;
+        Sprintf(buf, "Put in a pet");
         add_menu(win, &nul_glyphinfo, &any, menuselector[any.a_int], 0,
                  ATR_NONE, clr, buf, MENU_ITEMFLAGS_NONE);
     }
@@ -3763,6 +3931,14 @@ tipcontainer(struct obj *box) /* or bag */
                 /* abbreviated drop format is no longer appropriate */
                 terse = FALSE;
                 continue;
+            } else if (unbag_pet(otmp)) {
+                if (!terse) {
+                    pline("%s %s to the %s.", Doname2(otmp),
+                          otense(otmp, "drop"), surface(ox, oy));
+                } else {
+                    pline("%s%c", doname(otmp), nobj ? ',' : '.');
+                    iflags.last_msg = PLNMSG_OBJNAM_ONLY;
+                }                continue;
             }
             if (maybeshopgoods) {
                 addtobill(otmp, FALSE, FALSE, TRUE);

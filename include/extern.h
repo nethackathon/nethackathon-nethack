@@ -115,6 +115,9 @@ extern void unleash_all(void);
 extern boolean leashable(struct monst *) NONNULLARG1;
 extern boolean next_to_u(void);
 extern struct obj *get_mleash(struct monst *) NONNULLARG1;
+extern int get_bagged_pet_otyp(struct monst *) NONNULLARG1;
+extern struct monst *get_bagged_pet(struct obj *pet_item) NONNULLARG1;
+extern struct monst *get_pet_in_bag(struct obj *bag, struct obj **pet_item) NONNULLARG1;
 extern const char *beautiful(void);
 extern void check_leash(coordxy, coordxy);
 extern boolean um_dist(coordxy, coordxy, xint16);
@@ -771,6 +774,7 @@ extern int dog_move(struct monst *, int) NONNULLARG1;
 extern boolean could_reach_item(struct monst *, coordxy, coordxy) NONNULLARG1;
 extern void finish_meating(struct monst *) NONNULLARG1;
 extern void quickmimic(struct monst *) NONNULLARG1;
+extern void bagged_pets_hunger(void);
 
 /* ### dokick.c ### */
 
@@ -2374,6 +2378,8 @@ extern boolean allow_all(struct obj *) NO_NNARGS;
 extern boolean allow_category(struct obj *) NONNULLARG1;
 extern boolean is_worn_by_type(struct obj *) NONNULLARG1;
 extern int ck_bag(struct obj *) NONNULLARG1;
+extern void pet_escapes_bag(struct obj *bag, struct obj *content, struct monst *pet,
+                            const char *petdesc) NONNULLARG123;
 extern void removed_from_icebox(struct obj *) NONNULLARG1;
 /* reset_justpicked() is sometimes passed gi.invent
  * which can be null */

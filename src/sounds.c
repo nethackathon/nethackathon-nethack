@@ -10,6 +10,8 @@ staticfn boolean morgue_mon_sound(struct monst *);
 staticfn boolean zoo_mon_sound(struct monst *);
 staticfn boolean temple_priest_sound(struct monst *);
 staticfn boolean mon_is_gecko(struct monst *);
+staticfn int domonnoise(struct monst *);
+staticfn boolean chat_to_bagged_pet(void);
 staticfn int dochat(void);
 staticfn struct monst *responsive_mon_at(int, int);
 staticfn int mon_in_room(struct monst *, int);
@@ -1252,6 +1254,42 @@ dotalk(void)
     return result;
 }
 
+staticfn boolean
+chat_to_bagged_pet(void)
+{
+    struct obj *bag;
+    struct monst *pet;
+    winid win = WIN_ERR;
+    anything any;
+    menu_item *pick_list = (menu_item *) 0;
+    int selected;
+
+    for (bag = gi.invent; bag; bag = bag->nobj)
+        if (get_pet_in_bag(bag, NULL)) {
+            if (win == WIN_ERR) {
+                win = create_nhwindow(NHW_MENU);
+                start_menu(win, MENU_BEHAVE_STANDARD);
+            }
+            any.a_obj = bag;
+            add_menu(win, &nul_glyphinfo, &any, 0, 0, ATR_NONE, NO_COLOR,
+                        doname(bag), MENU_ITEMFLAGS_NONE);
+        }
+
+    if (win != WIN_ERR) {
+        end_menu(win, "Talk to pet in which bag?");
+        selected = select_menu(win, PICK_ANY, &pick_list);
+        destroy_nhwindow(win);
+        if (selected > 0) {
+            bag = pick_list[selected - 1].item.a_obj;
+            pet = get_pet_in_bag(bag, NULL);
+            if (pet)
+                domonnoise(pet);
+        }
+        return TRUE;
+    }
+    return FALSE;
+}
+
 staticfn int
 dochat(void)
 {
@@ -1269,7 +1307,8 @@ dochat(void)
         return ECMD_OK;
     }
     if (u.uswallow) {
-        pline("They won't hear you out there.");
+        if (!chat_to_bagged_pet())
+            pline("They won't hear you out there.");
         return ECMD_OK;
     }
     if (Underwater) {
@@ -1317,7 +1356,8 @@ dochat(void)
             return 1;
         }
          */
-        pline("Talking to yourself is a bad habit for a dungeoneer.");
+        if (!chat_to_bagged_pet())
+            pline("Talking to yourself is a bad habit for a dungeoneer.");
         return ECMD_OK;
     }
 

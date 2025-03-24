@@ -4993,6 +4993,14 @@ readobjnam(char *bp, struct obj *no_wish)
         case MAGIC_LAMP:
             d.typ = OIL_LAMP;
             break;
+        case BAGGED_PUPPY:
+            d.typ = CORPSE;
+            d.mntmp = PM_LITTLE_DOG;
+            break;
+        case BAGGED_KITTEN:
+            d.typ = CORPSE;
+            d.mntmp = PM_KITTEN;
+            break;
         default:
             /* catch any other non-wishable objects (venom) */
             if (objects[d.typ].oc_nowish)

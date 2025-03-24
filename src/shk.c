@@ -1141,10 +1141,15 @@ obfree(struct obj *obj, struct obj *merge)
         delete_contents(obj);
     if (Is_container(obj))
         maybe_reset_pick(obj);
+    // A gucci bag with a pet inside gets destroyed somehow
+    shkp = get_bagged_pet(obj);
+    if (shkp) {
+        discard_minvent(shkp, FALSE);
+        dealloc_monst(shkp);
+    }
+    shkp = 0;
     if (obj->otyp == BOULDER)
         obj->next_boulder = 0;
-
-    shkp = 0;
     if (obj->unpaid) {
         /* look for a shopkeeper who owns this object */
         for (shkp = next_shkp(fmon, TRUE); shkp;

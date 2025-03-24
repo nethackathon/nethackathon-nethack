@@ -197,6 +197,7 @@ moveloop_core(void)
             mvl_wtcap = encumber_msg();
 
             svc.context.mon_moving = TRUE;
+            bagged_pets_hunger();
             do {
                 monscanmove = movemon();
                 if (u.umovement >= NORMAL_SPEED)
