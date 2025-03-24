@@ -45,9 +45,9 @@
         const char *    ordin           (int)
         char *          sitoa           (int)
         int             sgn             (int)
-        int             distmin         (int, int, int, int)
-        int             dist2           (int, int, int, int)
-        boolean         online2         (int, int)
+        int             distmin         (coordxy, coordxy, coordxy, coordxy)
+        int             dist2           (coordxy, coordxy, coordxy, coordxy)
+        boolean         online2         (coordxy, coordxy)
         int             strncmpi        (const char *, const char *, int)
         char *          strstri         (const char *, const char *)
         boolean         fuzzymatch      (const char *, const char *,
@@ -934,6 +934,24 @@ case_insensitive_comp(const char *s1, const char *s2)
             break;
     }
     return u1 - u2;
+}
+
+boolean
+copy_bytes(int ifd, int ofd)
+{
+    char buf[BUFSIZ];
+    int nfrom, nto;
+
+    do {
+        nto = 0;
+        nfrom = read(ifd, buf, BUFSIZ);
+        /* read can return -1 */
+        if (nfrom >= 0 && nfrom <= BUFSIZ)
+            nto = write(ofd, buf, nfrom);
+        if (nto != nfrom || nfrom < 0)
+            return FALSE;
+    } while (nfrom == BUFSIZ);
+    return TRUE;
 }
 
 /*hacklib.c*/

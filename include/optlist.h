@@ -167,6 +167,8 @@ static int optfn_##a(int, int, boolean, char *, char *);
     NHOPTB(ascii_map, Advanced, 0, opt_in, set_in_game,
                 ascii_map_Def, Yes, No, No, NoAlias, &iflags.wc_ascii_map,
            Term_False, "show map as text")
+    NHOPTO("autocompletions", Advanced, o_autocomplete, BUFSZ, opt_in, set_in_game,
+                No, Yes, No, NoAlias, "edit autocompletions")
     NHOPTB(autodescribe, Advanced, 0, opt_out, set_in_game,
            On, Yes, No, No, NoAlias, &iflags.autodescribe, Term_False,
            "describe terrain under cursor")
@@ -237,13 +239,13 @@ static int optfn_##a(int, int, boolean, char *, char *);
 #ifdef CRASHREPORT
     NHOPTC(crash_email, Advanced, PL_NSIZ, opt_in, set_in_game,
                 No, Yes, No, No, NoAlias,
-		"email address for reporting")
+                "email address for reporting")
     NHOPTC(crash_name, Advanced, PL_NSIZ, opt_in, set_in_game,
                 No, Yes, No, No, NoAlias,
-		"your name for reporting")
+                "your name for reporting")
     NHOPTC(crash_urlmax, Advanced, PL_NSIZ, opt_in, set_in_game,
                 No, Yes, No, No, NoAlias,
-		"length of longest url we can generate")
+                "length of longest url we can generate")
 #endif
 #ifdef CURSES_GRAPHICS
     NHOPTC(cursesgraphics, Advanced, 70, opt_in, set_in_config,
@@ -548,6 +550,9 @@ static int optfn_##a(int, int, boolean, char *, char *);
     NHOPTC(paranoid_confirmation, Advanced, 28, opt_in, set_in_game,
                 Yes, Yes, Yes, Yes, "prayconfirm",
                 "extra prompting in certain situations")
+    NHOPTB(pauper, Advanced, 0, opt_in, set_in_config,
+           Off, Yes, No, No, NoAlias, &u.uroleplay.pauper, Term_False,
+           "start your character without any items")
     NHOPTB(perm_invent, Advanced, 0, opt_in, set_in_game,
                 Off, Yes, No, No, NoAlias, &iflags.perm_invent, Term_Off,
                 "show persistent inventory window")

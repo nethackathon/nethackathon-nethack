@@ -108,8 +108,6 @@ extern void curses_getlin(const char *question, char *input);
 extern int curses_get_ext_cmd(void);
 extern void curses_number_pad(int state);
 extern void curses_delay_output(void);
-extern void curses_start_screen(void);
-extern void curses_end_screen(void);
 extern void curses_outrip(winid wid, int how, time_t when);
 extern void genl_outrip(winid tmpwin, int how, time_t when);
 extern void curses_preference_update(const char *pref);
@@ -119,7 +117,7 @@ extern win_request_info *curses_ctrl_nhwindow(winid, int, win_request_info *);
 
 /* curswins.c */
 
-extern WINDOW *curses_create_window(int wid, int width, int height, orient orientation);
+extern WINDOW *curses_create_window(int, int, int, orient);
 extern void curses_set_wid_colors(int wid, WINDOW *win);
 extern void curses_parse_wid_colors(int wid, char *fg, char *bg);
 extern void curses_destroy_win(WINDOW *win);

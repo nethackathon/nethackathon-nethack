@@ -40,7 +40,7 @@ dowatersnakes(void)
     int num = rn1(5, 2);
     struct monst *mtmp;
 
-    if (!(gm.mvitals[PM_WATER_MOCCASIN].mvflags & G_GONE)) {
+    if (!(svm.mvitals[PM_WATER_MOCCASIN].mvflags & G_GONE)) {
         if (!Blind) {
             pline("An endless stream of %s pours forth!",
                   Hallucination ? makeplural(rndmonnam(NULL)) : "snakes");
@@ -65,7 +65,7 @@ dowaterdemon(void)
 {
     struct monst *mtmp;
 
-    if (!(gm.mvitals[PM_WATER_DEMON].mvflags & G_GONE)) {
+    if (!(svm.mvitals[PM_WATER_DEMON].mvflags & G_GONE)) {
         if ((mtmp = makemon(&mons[PM_WATER_DEMON], u.ux, u.uy,
                             MM_NOMSG)) != 0) {
             if (!Blind)
@@ -95,7 +95,7 @@ dowaternymph(void)
 {
     struct monst *mtmp;
 
-    if (!(gm.mvitals[PM_WATER_NYMPH].mvflags & G_GONE)
+    if (!(svm.mvitals[PM_WATER_NYMPH].mvflags & G_GONE)
         && (mtmp = makemon(&mons[PM_WATER_NYMPH], u.ux, u.uy,
                            MM_NOMSG)) != 0) {
         if (!Blind)
@@ -152,7 +152,7 @@ gush(coordxy x, coordxy y, genericptr_t poolcnt)
     levl[x][y].flags = 0;
     /* No kelp! */
     del_engr_at(x, y);
-    water_damage_chain(gl.level.objects[x][y], TRUE);
+    water_damage_chain(svl.level.objects[x][y], TRUE);
 
     if ((mtmp = m_at(x, y)) != 0)
         (void) minliquid(mtmp);
@@ -317,18 +317,20 @@ drinkfountain(void)
             dowaterdemon();
             break;
         case 24: { /* Maybe curse some items */
-            struct obj *obj;
+            struct obj *obj, *nextobj;
             int buc_changed = 0;
 
             pline("This water's no good!");
             morehungry(rn1(20, 11));
             exercise(A_CON, FALSE);
             /* this is more severe than rndcurse() */
-            for (obj = gi.invent; obj; obj = obj->nobj)
+            for (obj = gi.invent; obj; obj = nextobj) {
+                nextobj = obj->nobj;
                 if (obj->oclass != COIN_CLASS && !obj->cursed && !rn2(5)) {
                     curse(obj);
                     ++buc_changed;
                 }
+            }
             if (buc_changed)
                 update_inventory();
             break;
@@ -359,6 +361,7 @@ drinkfountain(void)
                 dofindgem();
                 break;
             }
+            FALLTHROUGH;
             /*FALLTHRU*/
         case 28: /* Water Nymph */
             dowaternymph();
@@ -418,7 +421,8 @@ dipfountain(struct obj *obj)
 
         if (u.ualign.type != A_LAWFUL) {
             /* Ha!  Trying to cheat her. */
-            pline("A freezing mist rises from the %s and envelopes the sword.",
+            pline("A freezing mist rises from the %s"
+                  " and envelopes the sword.",
                   hliquid("water"));
             pline_The("fountain disappears!");
             curse(obj);
@@ -493,6 +497,7 @@ dipfountain(struct obj *obj)
             dofindgem();
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 25: /* Water gushes forth */
         dogushforth(FALSE);
@@ -507,13 +512,14 @@ dipfountain(struct obj *obj)
         pline("An urge to take a bath overwhelms you.");
         {
             long money = money_cnt(gi.invent);
-            struct obj *otmp;
+            struct obj *otmp, *nextobj;
 
             if (money > 10) {
                 /* Amount to lose.  Might get rounded up as fountains don't
                  * pay change... */
                 money = somegold(money) / 10;
-                for (otmp = gi.invent; otmp && money > 0; otmp = otmp->nobj)
+                for (otmp = gi.invent; otmp && money > 0; otmp = nextobj) {
+                    nextobj = otmp->nobj;
                     if (otmp->oclass == COIN_CLASS) {
                         int denomination = objects[otmp->otyp].oc_cost;
                         long coin_loss =
@@ -524,6 +530,7 @@ dipfountain(struct obj *obj)
                         if (!otmp->quan)
                             delobj(otmp);
                     }
+                }
                 You("lost some of your gold in the fountain!");
                 CLEAR_FOUNTAIN_LOOTED(u.ux, u.uy);
                 exercise(A_WIS, FALSE);
@@ -641,7 +648,7 @@ drinksink(void)
         /* boiling water burns considered fire damage */
         break;
     case 3:
-        if (gm.mvitals[PM_SEWER_RAT].mvflags & G_GONE)
+        if (svm.mvitals[PM_SEWER_RAT].mvflags & G_GONE)
             pline_The("sink seems quite dirty.");
         else {
             mtmp = makemon(&mons[PM_SEWER_RAT], u.ux, u.uy, MM_NOMSG);
@@ -683,7 +690,7 @@ drinksink(void)
         break;
     case 7:
         pline_The("%s moves as though of its own will!", hliquid("water"));
-        if ((gm.mvitals[PM_WATER_ELEMENTAL].mvflags & G_GONE)
+        if ((svm.mvitals[PM_WATER_ELEMENTAL].mvflags & G_GONE)
             || !makemon(&mons[PM_WATER_ELEMENTAL], u.ux, u.uy, MM_NOMSG))
             pline("But it quiets down.");
         break;
@@ -722,6 +729,7 @@ drinksink(void)
             pline("From the murky drain, a hand reaches up... --oops--");
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     default:
         You("take a sip of %s %s.",
@@ -793,6 +801,7 @@ dipsink(struct obj *obj)
             try_call = TRUE;
             break;
         }
+        FALLTHROUGH;
         /* FALLTHRU */
     case POT_GAIN_LEVEL:
     case POT_GAIN_ENERGY:

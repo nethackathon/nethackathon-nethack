@@ -1,4 +1,4 @@
-/* NetHack 3.7	wizcmds.c	$NHDT-Date: 1709675219 2024/03/05 21:46:59 $  $NHDT-Branch: keni-mdlib-followup $:$NHDT-Revision: 1.713 $ */
+/* NetHack 3.7	wizcmds.c	$NHDT-Date: 1736530208 2025/01/10 09:30:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.21 $ */
 /*-Copyright (c) Robert Patrick Rankin, 2024. */
 /* NetHack may be freely redistributed.  See license for details. */
 
@@ -20,6 +20,7 @@ staticfn void mon_chain(winid, const char *, struct monst *, boolean, long *,
 staticfn void contained_stats(winid, const char *, long *, long *);
 staticfn void misc_stats(winid, long *, long *);
 staticfn void you_sanity_check(void);
+staticfn void levl_sanity_check(void);
 staticfn void makemap_unmakemon(struct monst *, boolean);
 staticfn int QSORTCALLBACK migrsort_cmp(const genericptr, const genericptr);
 staticfn void list_migrating_mons(d_level *);
@@ -68,7 +69,7 @@ RESTORE_WARNING_FORMAT_NONLITERAL
 
 /* used when wiz_makemap() gets rid of monsters for the old incarnation of
    a level before creating a new incarnation of it */
-void
+staticfn void
 makemap_unmakemon(struct monst *mtmp, boolean migratory)
 {
     int ndx = monsndx(mtmp->data);
@@ -76,9 +77,9 @@ makemap_unmakemon(struct monst *mtmp, boolean migratory)
     /* uncreate any unique monster so that it is eligible to be remade
        on the new incarnation of the level; ignores DEADMONSTER() [why?] */
     if (mtmp->data->geno & G_UNIQ)
-        gm.mvitals[ndx].mvflags &= ~G_EXTINCT;
-    if (gm.mvitals[ndx].born)
-        gm.mvitals[ndx].born--;
+        svm.mvitals[ndx].mvflags &= ~G_EXTINCT;
+    if (svm.mvitals[ndx].born)
+        svm.mvitals[ndx].born--;
 
     /* vault is going away; get rid of guard who might be in play or
        be parked at <0,0>; for the latter, might already be flagged as
@@ -276,8 +277,8 @@ wiz_kill(void)
                 Sprintf(qbuf, "%s?", Role_if(PM_SAMURAI) ? "Perform seppuku"
                                                          : "Commit suicide");
                 if (paranoid_query(TRUE, qbuf)) {
-                    Sprintf(gk.killer.name, "%s own player", uhis());
-                    gk.killer.format = KILLED_BY;
+                    Sprintf(svk.killer.name, "%s own player", uhis());
+                    svk.killer.format = KILLED_BY;
                     done(DIED);
                 }
                 break;
@@ -318,12 +319,12 @@ wiz_kill(void)
                    gas spore whose explosion kills any other monsters we
                    need to have the mon_moving flag be True in order to
                    avoid blaming or crediting hero for their deaths */
-                gc.context.mon_moving = TRUE;
+                svc.context.mon_moving = TRUE;
                 pline("%s is %s.", upstart(Mn),
                       nonliving(mtmp->data) ? "destroyed" : "killed");
                 /* Null second arg suppresses the usual message */
                 monkilled(mtmp, (char *) 0, AD_PHYS);
-                gc.context.mon_moving = FALSE;
+                svc.context.mon_moving = FALSE;
             }
             /* end targetting loop if an engulfer dropped hero onto a level-
                changing trap */
@@ -444,16 +445,17 @@ wiz_flip_level(void)
 int
 wiz_level_change(void)
 {
-    char buf[BUFSZ] = DUMMY;
+    char buf[BUFSZ], dummy = '\0';
     int newlevel = 0;
     int ret;
 
+    buf[0] = '\0'; /* in case EDIT_GETLIN is enabled */
     getlin("To what experience level do you want to be set?", buf);
     (void) mungspaces(buf);
     if (buf[0] == '\033' || buf[0] == '\0')
         ret = 0;
     else
-        ret = sscanf(buf, "%d", &newlevel);
+        ret = sscanf(buf, "%d%c", &newlevel, &dummy);
 
     if (ret != 1) {
         pline1(Never_mind);
@@ -480,6 +482,7 @@ wiz_level_change(void)
         while (u.ulevel < newlevel)
             pluslvl(FALSE);
     }
+    /* blessed full healing or restore ability won't fix any lost levels */
     u.ulevelmax = u.ulevel;
     return ECMD_OK;
 }
@@ -549,8 +552,14 @@ wiz_fuzzer(void)
         pline("The fuzz tester will make NetHack execute random keypresses.");
         There("is no conventional way out of this mode.");
     }
-    if (paranoid_query(TRUE, "Do you want to start fuzz testing?"))
-        iflags.debug_fuzzer = TRUE; /* Thoth, take the reins */
+    if (paranoid_query(TRUE, "Do you want to start fuzz testing?")) {
+        /* Thoth, take the reins */
+        if (y_n("Do you want to call panic() after impossible()?") == 'n') {
+            iflags.debug_fuzzer = fuzzer_impossible_continue;
+        } else {
+            iflags.debug_fuzzer = fuzzer_impossible_panic;
+        }
+    }
     return ECMD_OK;
 }
 
@@ -736,48 +745,48 @@ wiz_map_levltyp(void)
             /* alignment currently omitted to save space */
         }
         /* level features */
-        if (gl.level.flags.nfountains)
+        if (svl.level.flags.nfountains)
             Sprintf(eos(dsc), " %c:%d", defsyms[S_fountain].sym,
-                    (int) gl.level.flags.nfountains);
-        if (gl.level.flags.nsinks)
+                    (int) svl.level.flags.nfountains);
+        if (svl.level.flags.nsinks)
             Sprintf(eos(dsc), " %c:%d", defsyms[S_sink].sym,
-                    (int) gl.level.flags.nsinks);
-        if (gl.level.flags.has_vault)
+                    (int) svl.level.flags.nsinks);
+        if (svl.level.flags.has_vault)
             Strcat(dsc, " vault");
-        if (gl.level.flags.has_shop)
+        if (svl.level.flags.has_shop)
             Strcat(dsc, " shop");
-        if (gl.level.flags.has_temple)
+        if (svl.level.flags.has_temple)
             Strcat(dsc, " temple");
-        if (gl.level.flags.has_court)
+        if (svl.level.flags.has_court)
             Strcat(dsc, " throne");
-        if (gl.level.flags.has_zoo)
+        if (svl.level.flags.has_zoo)
             Strcat(dsc, " zoo");
-        if (gl.level.flags.has_morgue)
+        if (svl.level.flags.has_morgue)
             Strcat(dsc, " morgue");
-        if (gl.level.flags.has_barracks)
+        if (svl.level.flags.has_barracks)
             Strcat(dsc, " barracks");
-        if (gl.level.flags.has_beehive)
+        if (svl.level.flags.has_beehive)
             Strcat(dsc, " hive");
-        if (gl.level.flags.has_swamp)
+        if (svl.level.flags.has_swamp)
             Strcat(dsc, " swamp");
         /* level flags */
-        if (gl.level.flags.noteleport)
+        if (svl.level.flags.noteleport)
             Strcat(dsc, " noTport");
-        if (gl.level.flags.hardfloor)
+        if (svl.level.flags.hardfloor)
             Strcat(dsc, " noDig");
-        if (gl.level.flags.nommap)
+        if (svl.level.flags.nommap)
             Strcat(dsc, " noMMap");
-        if (!gl.level.flags.hero_memory)
+        if (!svl.level.flags.hero_memory)
             Strcat(dsc, " noMem");
-        if (gl.level.flags.shortsighted)
+        if (svl.level.flags.shortsighted)
             Strcat(dsc, " shortsight");
-        if (gl.level.flags.graveyard)
+        if (svl.level.flags.graveyard)
             Strcat(dsc, " graveyard");
-        if (gl.level.flags.is_maze_lev)
+        if (svl.level.flags.is_maze_lev)
             Strcat(dsc, " maze");
-        if (gl.level.flags.is_cavernous_lev)
+        if (svl.level.flags.is_cavernous_lev)
             Strcat(dsc, " cave");
-        if (gl.level.flags.arboreal)
+        if (svl.level.flags.arboreal)
             Strcat(dsc, " tree");
         if (Sokoban)
             Strcat(dsc, " sokoban-rules");
@@ -806,7 +815,7 @@ wiz_map_levltyp(void)
             Strcat(dsc, " endgame");
         else {
             /* somebody's added a dungeon branch we're not expecting */
-            const char *brname = gd.dungeons[u.uz.dnum].dname;
+            const char *brname = svd.dungeons[u.uz.dnum].dname;
 
             if (!brname || !*brname)
                 brname = "unknown";
@@ -1047,9 +1056,9 @@ wiz_intrinsic(void)
                 break;
             case WARN_OF_MON:
                 if (!Warn_of_mon) {
-                    gc.context.warntype.speciesidx = PM_GRID_BUG;
-                    gc.context.warntype.species
-                                       = &mons[gc.context.warntype.speciesidx];
+                    svc.context.warntype.speciesidx = PM_GRID_BUG;
+                    svc.context.warntype.species
+                                     = &mons[svc.context.warntype.speciesidx];
                 }
                 goto def_feedback;
             case GLIB:
@@ -1057,6 +1066,7 @@ wiz_intrinsic(void)
                    so needs more than simple incr_itimeout() but we want
                    the pline() issued with that */
                 make_glib((int) newtimeout);
+                FALLTHROUGH;
                 /*FALLTHRU*/
             default:
  def_feedback:
@@ -1072,6 +1082,10 @@ wiz_intrinsic(void)
                 float_vs_flight();
             else if (p == PROT_FROM_SHAPE_CHANGERS)
                 rescham();
+            if (p == WWALKING || p == LEVITATION || p == FLYING) {
+                if (u.uinwater)
+                    (void) pooleffects(FALSE);
+            }
         }
         if (n >= 1)
             free((genericptr_t) pick_list);
@@ -1193,7 +1207,7 @@ contained_stats(
 
     count_obj(gi.invent, &count, &size, FALSE, TRUE);
     count_obj(fobj, &count, &size, FALSE, TRUE);
-    count_obj(gl.level.buriedobjlist, &count, &size, FALSE, TRUE);
+    count_obj(svl.level.buriedobjlist, &count, &size, FALSE, TRUE);
     count_obj(gm.migrating_objs, &count, &size, FALSE, TRUE);
     /* DEADMONSTER check not required in this loop since they have no
      * inventory */
@@ -1232,6 +1246,8 @@ size_monst(struct monst *mtmp, boolean incl_wsegs)
             sz += (int) sizeof (struct emin);
         if (EDOG(mtmp))
             sz += (int) sizeof (struct edog);
+        if (EBONES(mtmp))
+            sz += (int) sizeof (struct ebones);
         /* mextra->mcorpsenm doesn't point to more memory */
     }
     return sz;
@@ -1317,7 +1333,7 @@ misc_stats(
     }
 
     count = size = 0L;
-    for (sd = gl.level.damagelist; sd; sd = sd->next) {
+    for (sd = svl.level.damagelist; sd; sd = sd->next) {
         ++count;
         size += (long) sizeof *sd;
     }
@@ -1340,7 +1356,7 @@ misc_stats(
     }
 
     count = size = 0L;
-    for (k = gk.killer.next; k; k = k->next) {
+    for (k = svk.killer.next; k; k = k->next) {
         ++count;
         size += (long) sizeof *k;
     }
@@ -1354,7 +1370,7 @@ misc_stats(
     }
 
     count = size = 0L;
-    for (bi = gl.level.bonesinfo; bi; bi = bi->next) {
+    for (bi = svl.level.bonesinfo; bi; bi = bi->next) {
         ++count;
         size += (long) sizeof *bi;
     }
@@ -1401,9 +1417,43 @@ you_sanity_check(void)
         if (u.ustuck != mtmp)
             impossible("sanity_check: you over monster");
     }
+    /* [should we also check for (u.uhp < 1), (Upolyd && u.mh < 1),
+       and (u.uen < 0) here?] */
+    if (u.uhp > u.uhpmax) {
+        impossible("current hero health (%d) better than maximum? (%d)",
+                   u.uhp, u.uhpmax);
+        u.uhp = u.uhpmax;
+    }
+    if (Upolyd && u.mh > u.mhmax) {
+        impossible(
+              "current hero health as monster (%d) better than maximum? (%d)",
+                   u.mh, u.mhmax);
+        u.mh = u.mhmax;
+    }
+    if (u.uen > u.uenmax) {
+        impossible("current hero energy (%d) better than maximum? (%d)",
+                   u.uen, u.uenmax);
+        u.uen = u.uenmax;
+    }
 
     check_wornmask_slots();
     (void) check_invent_gold("invent");
+}
+
+staticfn void
+levl_sanity_check(void)
+{
+    coordxy x, y;
+
+    if (Underwater)
+        return; /* Underwater uses different vision */
+
+    for (y = 0; y < ROWNO; y++) {
+        for (x = 1; x < COLNO; x++) {
+            if ((does_block(x, y, &levl[x][y]) ? 1 : 0) != get_viz_clear(x, y))
+                impossible("levl[%i][%i] vision blocking", x, y);
+        }
+    }
 }
 
 void
@@ -1417,6 +1467,7 @@ sanity_check(void)
         iflags.sanity_no_check = FALSE;
         return;
     }
+    program_state.in_sanity_check++;
     you_sanity_check();
     obj_sanity_check();
     timer_sanity_check();
@@ -1425,6 +1476,8 @@ sanity_check(void)
     bc_sanity_check();
     trap_sanity_check();
     engraving_sanity_check();
+    levl_sanity_check();
+    program_state.in_sanity_check--;
 }
 
 /* qsort() comparison routine for use in list_migrating_mons() */
@@ -1579,7 +1632,7 @@ wiz_show_stats(void)
     obj_chain(win, "invent", gi.invent, TRUE,
               &total_obj_count, &total_obj_size);
     obj_chain(win, "fobj", fobj, TRUE, &total_obj_count, &total_obj_size);
-    obj_chain(win, "buried", gl.level.buriedobjlist, FALSE,
+    obj_chain(win, "buried", svl.level.buriedobjlist, FALSE,
               &total_obj_count, &total_obj_size);
     obj_chain(win, "migrating obj", gm.migrating_objs, FALSE,
               &total_obj_count, &total_obj_size);
@@ -1778,6 +1831,7 @@ wiz_migrate_mons(void)
     char inbuf[BUFSZ];
     struct permonst *ptr;
     struct monst *mtmp;
+    boolean use_random_mon = TRUE;
 #endif
     d_level tolevel;
 
@@ -1791,27 +1845,35 @@ wiz_migrate_mons(void)
     list_migrating_mons(&tolevel);
 
 #ifdef DEBUG_MIGRATING_MONS
-    inbuf[0] = '\033', inbuf[1] = '\0';
+    inbuf[0] = inbuf[1] = '\0';
     if (tolevel.dnum || tolevel.dlevel)
         getlin("How many random monsters to migrate to next level? [0]",
                inbuf);
     else
         pline("Can't get there from here.");
-    if (*inbuf == '\033')
+    if (*inbuf == '\033' || *inbuf == '\0')
         return ECMD_OK;
 
     mcount = atoi(inbuf);
+    if (mcount < 0) {
+        use_random_mon = FALSE;
+        mcount *= -1;
+    }
     if (mcount < 1)
         mcount = 0;
     else if (mcount > ((COLNO - 1) * ROWNO))
         mcount = (COLNO - 1) * ROWNO;
 
     while (mcount > 0) {
-        ptr = rndmonst();
-        mtmp = makemon(ptr, 0, 0, MM_NOMSG);
+        if (use_random_mon) {
+            ptr = rndmonst();
+            mtmp = makemon(ptr, 0, 0, MM_NOMSG);
+        } else {
+            mtmp = fmon;
+        }
         if (mtmp)
             migrate_to_level(mtmp, ledger_no(&tolevel), MIGR_RANDOM,
-                             (coord *) 0);
+                                 (coord *) 0);
         mcount--;
     }
 #endif /* DEBUG_MIGRATING_MONS */
@@ -1827,7 +1889,7 @@ wiz_custom(void)
     if (wizard) {
         static const char wizcustom[] = "#wizcustom";
         winid win;
-        char buf[BUFSZ], bufa[BUFSZ];  
+        char buf[BUFSZ], bufa[BUFSZ];
         int n;
 #if 0
         int j, glyph;

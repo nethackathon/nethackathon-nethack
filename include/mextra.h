@@ -1,4 +1,4 @@
-/* NetHack 3.7	mextra.h	$NHDT-Date: 1596498545 2020/08/03 23:49:05 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.30 $ */
+/* NetHack 3.7	mextra.h	$NHDT-Date: 1720717969 2024/07/11 17:12:49 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.40 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Michael Allison, 2006. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -50,7 +50,7 @@
  *              src/makemon.c:  if (mmflags & MM_XX) newXX(mtmp);
  *              your new code:  mon = makemon(&mons[mnum], x, y, MM_XX);
  *
- *       7. Adjust size_monst() in src/cmd.c appropriately.
+ *       7. Adjust size_monst() in src/wizcmds.c appropriately.
  *       8. Adjust dealloc_mextra() in src/mon.c to clean up
  *          properly during monst deallocation.
  *       9. Adjust copy_mextra() in src/mon.c to make duplicate
@@ -75,6 +75,7 @@ struct fakecorridor {
 };
 
 struct egd {
+    unsigned parentmid;   /* make clobber-detection possible */
     int fcbeg, fcend;     /* fcend: first unused pos */
     int vroom;            /* room number of the vault */
     coordxy gdx, gdy;     /* goal of guard's walk */
@@ -92,6 +93,7 @@ struct egd {
  **     formerly epri.h -- temple priest extension
  */
 struct epri {
+    unsigned parentmid;   /* make clobber-detection possible */
     aligntyp shralign; /* alignment of priest's shrine */
     schar shroom;      /* index in rooms */
     coord shrpos;      /* position of shrine */
@@ -113,18 +115,18 @@ struct epri {
 struct bill_x {
     unsigned bo_id;
     boolean useup;
-    boolean queuedpay;
     long price; /* price per unit */
     long bquan; /* amount used up */
 };
 
 struct eshk {
+    unsigned parentmid;   /* make clobber-detection possible */
     long robbed;          /* amount stolen by most recent customer */
     long credit;          /* amount credited to customer */
     long debit;           /* amount of debt for using unpaid items */
     long loan;            /* shop-gold picked (part of debit) */
-    int shoptype;         /* the value of gr.rooms[shoproom].rtype */
-    schar shoproom;       /* index in gr.rooms; set by inshop() */
+    int shoptype;         /* the value of svr.rooms[shoproom].rtype */
+    schar shoproom;       /* index in svr.rooms; set by inshop() */
     schar unused;         /* to force alignment for stupid compilers */
     boolean following;    /* following customer since he owes us sth */
     boolean surcharge;    /* angry shk inflates prices */
@@ -146,6 +148,7 @@ struct eshk {
  **     formerly emin.h -- minion extension
  */
 struct emin {
+    unsigned parentmid;   /* make clobber-detection possible */
     aligntyp min_align; /* alignment of minion */
     boolean renegade;   /* hostile co-aligned priest or Angel */
 };
@@ -166,6 +169,7 @@ enum dogfood_types {
 };
 
 struct edog {
+    unsigned parentmid;       /* make clobber-detection possible */
     long droptime;            /* moment dog dropped object */
     unsigned dropdist;        /* dist of dropped obj from @ */
     int apport;               /* amount of training */
@@ -179,6 +183,22 @@ struct edog {
 };
 
 /***
+ **     extension tracking a player's remnant monster (ghost, mummy etc.)
+ */
+struct ebones {
+    unsigned parentmid;     /* make clobber-detection possible */
+    uchar role;             /* index into roles[] */
+    uchar race;             /* index into races[] */
+    align oldalign;         /* character alignment */
+    uchar deathlevel;       /* level when dying (m_lev may differ) */
+    schar luck;             /* luck when dying */
+    short mnum;             /* monster type */
+    Bitfield(female, 1);    /* was female */
+    Bitfield(demigod, 1);   /* had killed wiz or invoked */
+    Bitfield(crowned, 1);   /* had been crowned */
+};
+
+/***
  **     mextra.h -- collection of all monster extensions
  */
 struct mextra {
@@ -188,6 +208,7 @@ struct mextra {
     struct eshk *eshk;
     struct emin *emin;
     struct edog *edog;
+    struct ebones *ebones;
     int mcorpsenm; /* obj->corpsenm for mimic posing as statue or corpse,
                     * obj->spe (fruit index) for one posing as a slime mold,
                     * or an alignment mask for one posing as an altar */
@@ -199,6 +220,7 @@ struct mextra {
 #define ESHK(mon) ((mon)->mextra->eshk)
 #define EMIN(mon) ((mon)->mextra->emin)
 #define EDOG(mon) ((mon)->mextra->edog)
+#define EBONES(mon) ((mon)->mextra->ebones)
 #define MCORPSENM(mon) ((mon)->mextra->mcorpsenm)
 
 #define has_mgivenname(mon) ((mon)->mextra && MGIVENNAME(mon))
@@ -207,6 +229,7 @@ struct mextra {
 #define has_eshk(mon)  ((mon)->mextra && ESHK(mon))
 #define has_emin(mon)  ((mon)->mextra && EMIN(mon))
 #define has_edog(mon)  ((mon)->mextra && EDOG(mon))
+#define has_ebones(mon) ((mon)->mextra && EBONES(mon))
 #define has_mcorpsenm(mon) ((mon)->mextra && MCORPSENM(mon) != NON_PM)
 
 #endif /* MEXTRA_H */

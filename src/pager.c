@@ -1,4 +1,4 @@
-/* NetHack 3.7	pager.c	$NHDT-Date: 1713334816 2024/04/17 06:20:16 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.274 $ */
+/* NetHack 3.7	pager.c	$NHDT-Date: 1737013431 2025/01/15 23:43:51 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.287 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2018. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -50,7 +50,8 @@ staticfn void domenucontrols(void);
 extern void port_help(void);
 #endif
 staticfn char *setopt_cmd(char *) NONNULL NONNULLARG1;
-staticfn boolean add_quoted_engraving(coordxy, coordxy, char *) NONNULLARG3;
+staticfn boolean add_quoted_engraving(coordxy, coordxy, char *, boolean)
+                                                                  NONNULLARG3;
 
 enum checkfileflags {
     chkfilNone     = 0,
@@ -115,11 +116,13 @@ self_lookat(char *outbuf)
     Sprintf(outbuf, "%s%s%s called %s",
             /* being blinded may hide invisibility from self */
             (Invis && (senseself() || !Blind)) ? "invisible " : "", race,
-            pmname(&mons[u.umonnum], Ugender), gp.plname);
+            pmname(&mons[u.umonnum], Ugender), svp.plname);
     if (u.usteed)
         Sprintf(eos(outbuf), ", mounted on %s", y_monnam(u.usteed));
-    if (u.uundetected || (Upolyd && U_AP_TYPE))
-        mhidden_description(&gy.youmonst, MHID_PREFIX | MHID_ARTICLE,
+    if (u.uundetected || (Upolyd && U_AP_TYPE)
+        || visible_region_at(u.ux, u.uy))
+        mhidden_description(&gy.youmonst,
+                            MHID_PREFIX | MHID_ARTICLE | MHID_REGION,
                             eos(outbuf));
     if (Punished)
         Sprintf(eos(outbuf), ", chained to %s",
@@ -187,12 +190,15 @@ mhidden_description(
 {
     struct obj *otmp;
     const char *what;
+    NhRegion *reg;
+    size_t buflen;
     boolean incl_prefix = (mhid_flags & MHID_PREFIX) != 0,
             incl_article = (mhid_flags & MHID_ARTICLE) != 0,
-            show_altmon = (mhid_flags & MHID_ALTMON) != 0;
+            show_altmon = (mhid_flags & MHID_ALTMON) != 0,
+            force_region = (mhid_flags & MHID_REGION) != 0;
     boolean fakeobj, isyou = (mon == &gy.youmonst);
     coordxy x = isyou ? u.ux : mon->mx, y = isyou ? u.uy : mon->my;
-    int glyph = (gl.level.flags.hero_memory && !isyou) ? levl[x][y].glyph
+    int glyph = (svl.level.flags.hero_memory && !isyou) ? levl[x][y].glyph
                                                        : glyph_at(x, y);
 
     *outbuf = '\0';
@@ -220,7 +226,7 @@ mhidden_description(
 
             if (fakeobj && otmp) {
                 otmp->where = OBJ_FREE; /* object_from_map set to OBJ_FLOOR */
-                dealloc_obj(otmp);
+                dealloc_obj(otmp); /* has no contents */
             }
         } else {
             Strcat(outbuf, something);
@@ -251,21 +257,48 @@ mhidden_description(
                 Strcat(outbuf, " in murky water");
         }
     }
+
+    /* FIXME: <x,y> isn't right when looking at long worm tails */
+    if ((reg = visible_region_at(x, y)) != 0
+        && (buflen = strlen(outbuf)) < BUFSZ - 1) {
+        int r = (u.xray_range > 1) ? u.xray_range : 1;
+
+        /* at present, hero must be next to the monster; being able to see
+           from the hero's spot to the monster's spot would be much better,
+           but a visible region marks all its spots as can't-be-seen, so
+           this monster's spot is !cansee and !couldsee [maybe we need an
+           additional vision bit for "hero's side of edge of gas cloud"?] */
+        if (distu(x, y) <= r * (r + 1) || force_region) {
+            int rglyph = reg->glyph;
+            boolean poison_gas = (glyph_is_cmap(rglyph)
+                                  && glyph_to_cmap(rglyph) == S_poisoncloud);
+
+            Snprintf(eos(outbuf), BUFSZ - buflen, ", in a cloud of %s",
+                     poison_gas ? "poison gas" : "vapor");
+        }
+    }
 }
 
 /* extracted from lookat(); also used by namefloorobj() */
 boolean
-object_from_map(int glyph, coordxy x, coordxy y, struct obj **obj_p)
+object_from_map(
+    int glyph,
+    coordxy x, coordxy y,
+    struct obj **obj_p)
 {
     boolean fakeobj = FALSE, mimic_obj = FALSE;
     struct monst *mtmp;
     struct obj *otmp;
-    int glyphotyp = glyph_to_obj(glyph);
+    int glyphotyp = glyph_is_object(glyph) ? glyph_to_obj(glyph)
+                    /* if not an object, probably a detected chest trap */
+                    : glyph_is_cmap(glyph) /* assume trapped chest|door */
+                      ? (sobj_at(CHEST, x, y) ? CHEST : LARGE_BOX)
+                      : STRANGE_OBJECT;
 
     *obj_p = (struct obj *) 0;
     /* TODO: check inside containers in case glyph came from detection */
     if ((otmp = sobj_at(glyphotyp, x, y)) == 0)
-        for (otmp = gl.level.buriedobjlist; otmp; otmp = otmp->nobj)
+        for (otmp = svl.level.buriedobjlist; otmp; otmp = otmp->nobj)
             if (otmp->ox == x && otmp->oy == y && otmp->otyp == glyphotyp)
                 break;
 
@@ -280,16 +313,18 @@ object_from_map(int glyph, coordxy x, coordxy y, struct obj **obj_p)
     if (!otmp || otmp->otyp != glyphotyp) {
         /* this used to exclude STRANGE_OBJECT; now caller deals with it */
         otmp = mksobj(glyphotyp, FALSE, FALSE);
-        if (!otmp)
-            return FALSE;
+        /* even though we pass False for mksobj()'s 'init' arg, corpse-rot,
+           egg-hatch, and figurine-transform timers get initialized */
+        if (otmp->timed)
+            obj_stop_timers(otmp);
         fakeobj = TRUE;
         if (otmp->oclass == COIN_CLASS)
             otmp->quan = 2L; /* to force pluralization */
         else if (otmp->otyp == SLIME_MOLD)
-            otmp->spe = gc.context.current_fruit; /* give it a type */
+            otmp->spe = svc.context.current_fruit; /* give it a type */
         if (mtmp && has_mcorpsenm(mtmp)) { /* mimic as corpse/statue */
             if (otmp->otyp == SLIME_MOLD)
-                /* override gc.context.current_fruit to avoid
+                /* override svc.context.current_fruit to avoid
                      look, use 'O' to make new named fruit, look again
                    giving different results when current_fruit changes */
                 otmp->spe = MCORPSENM(mtmp);
@@ -344,7 +379,7 @@ look_at_object(
                      : obj_descr[STRANGE_OBJECT].oc_name);
         if (fakeobj) {
             otmp->where = OBJ_FREE; /* object_from_map set it to OBJ_FLOOR */
-            dealloc_obj(otmp), otmp = 0;
+            dealloc_obj(otmp), otmp = NULL; /* has no contents */
         }
     } else
         Strcpy(buf, something); /* sanity precaution */
@@ -424,8 +459,9 @@ look_at_monster(
 
     /* we know the hero sees a monster at this location, but if it's shown
        due to persistent monster detection he might remember something else */
-    if (mtmp->mundetected || M_AP_TYPE(mtmp))
-        mhidden_description(mtmp, MHID_PREFIX | MHID_ARTICLE, eos(buf));
+    if (mtmp->mundetected || M_AP_TYPE(mtmp) || visible_region_at(x, y))
+        mhidden_description(mtmp, MHID_PREFIX | MHID_ARTICLE | MHID_REGION,
+                            eos(buf));
 
     if (monbuf) {
         unsigned how_seen = howmonseen(mtmp);
@@ -474,8 +510,8 @@ look_at_monster(
                 if (Hallucination) {
                     Strcat(monbuf, "paranoid delusion");
                 } else {
-                    unsigned long mW = (gc.context.warntype.obj
-                                        | gc.context.warntype.polyd),
+                    unsigned long mW = (svc.context.warntype.obj
+                                        | svc.context.warntype.polyd),
                                   m2 = mtmp->data->mflags2;
                     const char *whom = ((mW & M2_HUMAN & m2) ? "human"
                                         : (mW & M2_ELF & m2) ? "elf"
@@ -507,7 +543,7 @@ waterbody_name(coordxy x, coordxy y)
 {
     static char pooltype[40];
     schar ltyp;
-    boolean hallucinate = Hallucination && !gp.program_state.gameover;
+    boolean hallucinate = Hallucination && !program_state.gameover;
 
     if (!isok(x, y))
         return "drink"; /* should never happen */
@@ -580,6 +616,8 @@ ice_descr(coordxy x, coordxy y, char *outbuf)
     } else {
         long time_left = spot_time_left(x, y, MELT_ICE_AWAY);
 
+        /* other, real ice thickness/strength terminology exists but seems
+           to be too unfamiliar for nethack's use */
         iflags.ice_rating = !time_left ? 0                /* solid */
                             : (time_left > 1000L) ? 1     /* sturdy */
                               : (time_left > 100L) ? 2    /* steady */
@@ -649,8 +687,6 @@ lookat(coordxy x, coordxy y, char *buf, char *monbuf)
         Sprintf(buf, "interior of %s", mon_nam(u.ustuck));
         pm = u.ustuck->data;
     } else if (glyph_is_monster(glyph)) {
-        gb.bhitpos.x = x;
-        gb.bhitpos.y = y;
         if ((mtmp = m_at(x, y)) != 0) {
             look_at_monster(buf, monbuf, mtmp, x, y);
             pm = mtmp->data;
@@ -668,6 +704,8 @@ lookat(coordxy x, coordxy y, char *buf, char *monbuf)
         int warnindx = glyph_to_warning(glyph);
 
         Strcpy(buf, def_warnsyms[warnindx].explanation);
+    } else if (glyph_is_invisible(glyph)) {
+        Strcpy(buf, invisexplain); /* redundant; handled by caller */
     } else if (glyph_is_nothing(glyph)) {
         Strcpy(buf, "dark part of a room");
     } else if (glyph_is_unexplored(glyph)) {
@@ -678,11 +716,7 @@ lookat(coordxy x, coordxy y, char *buf, char *monbuf)
         } else {
             Strcpy(buf, "unexplored area");
         }
-    } else if (glyph_is_invisible(glyph)) {
-        /* already handled */
-    } else if (!glyph_is_cmap(glyph)) {
-        Strcpy(buf, "unexplored area");
-    } else {
+    } else if (glyph_is_cmap(glyph)) {
         int amsk;
         aligntyp algn;
         short symidx = glyph_to_cmap(glyph);
@@ -713,8 +747,9 @@ lookat(coordxy x, coordxy y, char *buf, char *monbuf)
                    Is_airlevel(&u.uz) ? "cloudy area" : "fog/vapor cloud");
             break;
         case S_pool:
-        case S_water:
+        case S_water: /* was Plane of Water, now that or "wall of water" */
         case S_lava:
+        case S_lavawall:
         case S_ice: /* for hallucination; otherwise defsyms[] would be fine */
             Strcpy(buf, waterbody_name(x, y));
             break;
@@ -735,11 +770,14 @@ lookat(coordxy x, coordxy y, char *buf, char *monbuf)
                 Strcpy(buf, "stone");
                 break;
             }
+            FALLTHROUGH;
             /*FALLTHRU*/
         default:
             Strcpy(buf, defsyms[symidx].explanation);
             break;
         }
+    } else { /* not mon, obj, trap, or cmap */
+        Strcpy(buf, "unexplored area");
     }
     return (pm && !Hallucination) ? pm : (struct permonst *) 0;
 }
@@ -1102,7 +1140,7 @@ add_cmap_descr(
         if (absidx == S_pool)
             idx = S_pool;
     } else if (absidx == S_pool || idx == S_water
-               || idx == S_lava || idx == S_ice) {
+               || idx == S_lava || idx == S_lavawall || idx == S_ice) {
         /* replace some descriptions (x_str) with waterbody_name() */
         schar save_ltyp = levl[cc.x][cc.y].typ;
         long save_prop = EHalluc_resistance;
@@ -1121,26 +1159,34 @@ add_cmap_descr(
                it's not pool so must be one of water/lava/ice to get here */
             levl[cc.x][cc.y].typ = (idx == S_water) ? WATER
                                    : (idx == S_lava) ? LAVAPOOL
-                                     : ICE;
+                                     : (idx == S_lavawall) ? LAVAWALL
+                                       : ICE;
         }
         EHalluc_resistance = 1;
         Strcpy(mbuf, waterbody_name(cc.x, cc.y));
         EHalluc_resistance = save_prop;
         levl[cc.x][cc.y].typ = save_ltyp;
 
-        /* shorten the feedback for farlook/quicklook: "a pool or ..." */
+        /* shorten the feedback for farlook/quicklook: "pool or ..." */
         if (!strcmp(mbuf, "pool of water"))
             mbuf[4] = '\0';
         else if (!strcmp(mbuf, "molten lava"))
             Strcpy(mbuf, "lava");
         x_str = mbuf;
+        /* avoid "an ice" and so forth; "a pool", "a moat", and
+           "a wall of ..." are grammatically correct but make
+           "a pool or a moat or a wall of water" become too verbose */
         article = !(!strncmp(x_str, "water", 5)
                     || !strncmp(x_str, "ice", 3)
+                    || !strncmp(x_str, "pool", 4)
+                    || !strncmp(x_str, "moat", 4)
                     || !strncmp(x_str, "lava", 4)
                     || !strncmp(x_str, "swamp", 5)
                     || !strncmp(x_str, "molten", 6)
                     || !strncmp(x_str, "shallow", 7)
                     || !strncmp(x_str, "limitless", 9)
+                    || !strncmp(x_str, "wall of lava", 12)
+                    || !strncmp(x_str, "wall of water", 13)
                     /* ice while hallucinating */
                     || !strncmp(x_str, "frozen", 6)
                     /* thawing ice ("solid ice", "thin ice", &c) */
@@ -1192,7 +1238,7 @@ do_screen_description(
         skipped_venom = 0, found = 0; /* count of matching syms found */
     boolean hit_trap, need_to_look = FALSE,
             submerged = (Underwater && !Is_waterlevel(&u.uz)),
-            hallucinate = (Hallucination && !gp.program_state.gameover);
+            hallucinate = (Hallucination && !program_state.gameover);
     const char *x_str;
     nhsym tmpsym;
     glyph_info glyphinfo = nul_glyphinfo;
@@ -1379,15 +1425,24 @@ do_screen_description(
     for (hit_trap = FALSE, i = 0; i < MAXPCHARS; i++) {
         /*
          * Index hackery:  we want
-         *   "a pool or a moat or a wall of water or lava"
+         *   "pool or moat or wall of water or lava or wall of lava"
          * rather than
-         *   "a pool or a moat or lava or a wall of water"
+         *   "pool or moat or lava or wall of lava or wall of water"
          * but S_lava comes before S_water so 'i' reaches it sooner.
          * Use 'alt_i' for the rest of the loop to behave as if their
          * places were swapped.
+         * This was much simpler when it just exchanged water and lava.
+         * Now it rotates water to the first of (lava, lavawall, water)
+         * lava to the middle of (lava, lavawall, water), and lavawall
+         * to last of (lava, lavawall, water); other values are used
+         * as-is.
+         * If S_water (and corresponding tile) were renumbered, this
+         * hackery could go away.
          */
-        alt_i = ((i != S_water && i != S_lava) ? i /* as-is */
-                 : (S_water + S_lava - i)); /* swap water and lava */
+        alt_i = (i == S_lava) ? S_water /* do water first (of these 3) */
+                : (i == S_lavawall) ? S_lava /* process lava second */
+                  : (i == S_water) ? S_lavawall /* and wall of lava third */
+                    : i; /* other; handle in defsyms[] order */
         x_str = defsyms[alt_i].explanation;
         /* cmap includes beams, shield effects, swallow boundaries, and
            explosions; skip all of those */
@@ -1424,7 +1479,9 @@ do_screen_description(
 
             if (alt_i == S_altar || is_cmap_trap(alt_i)
                 || (hallucinate && (alt_i == S_water /* S_pool already done */
-                                    || alt_i == S_lava || alt_i == S_ice))
+                                    || alt_i == S_lava
+                                    || alt_i == S_lavawall
+                                    || alt_i == S_ice))
                 || alt_i == S_engroom || alt_i == S_engrcorr
                 || alt_i == S_grave) /* 'need_to_look' to report engraving */
                 need_to_look = TRUE;
@@ -1436,11 +1493,11 @@ do_screen_description(
         x_str = def_warnsyms[i].explanation;
         if (sym == (looked ? gw.warnsyms[i] : def_warnsyms[i].sym)) {
             if (!found) {
-                Sprintf(out_str, "%s%s", prefix, def_warnsyms[i].explanation);
-                *firstmatch = def_warnsyms[i].explanation;
+                Sprintf(out_str, "%s%s", prefix, x_str);
+                *firstmatch = x_str;;
                 found++;
             } else {
-                found += append_str(out_str, def_warnsyms[i].explanation);
+                found += append_str(out_str, x_str);
             }
             /* Kludge: warning trumps boulders on the display.
                Reveal the boulder too or player can get confused */
@@ -1529,7 +1586,7 @@ do_screen_description(
                 *firstmatch = look_buf;
             if (*(*firstmatch)) {
                 Sprintf(temp_buf, " (%s", *firstmatch);
-                (void) add_quoted_engraving(cc.x, cc.y, temp_buf);
+                (void) add_quoted_engraving(cc.x, cc.y, temp_buf, FALSE);
                 Strcat(temp_buf, ")");
                 (void) strncat(out_str, temp_buf,
                                BUFSZ - strlen(out_str) - 1);
@@ -1548,7 +1605,10 @@ do_screen_description(
 
 /* when farlook is reporting on an engraving, include its text */
 staticfn boolean
-add_quoted_engraving(coordxy x, coordxy y, char *buf)
+add_quoted_engraving(
+    coordxy x, coordxy y,
+    char *buf,
+    boolean force) /* True: '/e' or '/E', False: '//' or ';' */
 {
     char temp_buf[BUFSZ];
     struct engr *ep = engr_at(x, y);
@@ -1565,7 +1625,10 @@ add_quoted_engraving(coordxy x, coordxy y, char *buf)
      * or object) that happens to be on top of an engraving, so we won't
      * append the engraving text.
      */
-    if (!ep || (!floorengr && !headstone))
+    if (!ep)
+        return FALSE;
+
+    if (!floorengr && !headstone && !force)
         return FALSE;
 
     if (ep->eread)
@@ -1581,7 +1644,7 @@ add_quoted_engraving(coordxy x, coordxy y, char *buf)
 }
 
 /* also used by getpos hack in getpos.c */
-const char what_is_an_unknown_object[] = "an unknown object";
+const char what_is_a_location[] = "a monster, object or location";
 
 int
 do_look(int mode, coord *click_cc)
@@ -1615,7 +1678,6 @@ do_look(int mode, coord *click_cc)
 
     if (!clicklook) {
         if (quick) {
-            from_screen = TRUE; /* yes, we want to use the cursor */
             i = 'y';
         } else {
             menu_item *pick_list = (menu_item *) 0;
@@ -1780,18 +1842,17 @@ do_look(int mode, coord *click_cc)
     do {
         /* Reset some variables. */
         pm = (struct permonst *) 0;
-        found = 0;
         out_str[0] = '\0';
 
         if (from_screen || clicklook) {
             if (from_screen) {
                 if (flags.verbose)
                     pline("Please move the cursor to %s.",
-                          what_is_an_unknown_object);
+                          what_is_a_location);
                 else
-                    pline("Pick an object.");
+                    pline("Pick %s.", what_is_a_location);
 
-                ans = getpos(&cc, quick, what_is_an_unknown_object);
+                ans = getpos(&cc, quick, what_is_a_location);
                 if (ans < 0 || cc.x < 0)
                     break; /* done */
                 flags.verbose = FALSE; /* only print long question once */
@@ -1879,8 +1940,6 @@ look_all(
                 if (glyph_is_monster(glyph)) {
                     struct monst *mtmp;
 
-                    gb.bhitpos.x = x; /* [is this actually necessary?] */
-                    gb.bhitpos.y = y;
                     if (u_at(x, y) && canspotself()) {
                         (void) self_lookat(lookbuf);
                         ++count;
@@ -2032,16 +2091,19 @@ look_engrs(boolean nearby)
     winid win;
     struct engr *e;
     char lookbuf[BUFSZ], outbuf[BUFSZ];
-    nhsym sym;
     coordxy x, y, lo_x, lo_y, hi_x, hi_y;
     boolean is_headstone;
+    nhsym sym;
     int glyph, count = 0;
 
     win = create_nhwindow(NHW_TEXT);
     look_region_nearby(&lo_x, &lo_y, &hi_x, &hi_y, nearby);
+    /*assert(lo_x >= 1 && lo_y >= 0 && hi_x < MAXCO && hi_y < MAXLI);*/
     for (y = lo_y; y <= hi_y; y++) {
         for (x = lo_x; x <= hi_x; x++) {
             lookbuf[0] = '\0';
+            if (!levl[x][y].seenv)
+                continue;
             /* this won't find remembered engravings which aren't there
                anymore (in case the hero is unaware that they're gone;
                scuffed away by monster movement or deleted during shop
@@ -2049,14 +2111,9 @@ look_engrs(boolean nearby)
             e = engr_at(x, y);
             if (!e)
                 continue;
-            glyph = glyph_at(x, y);
-            sym = ((levl[x][y].typ == GRAVE || gl.lastseentyp[x][y] == GRAVE)
-                   ? S_grave
-                   : (levl[x][y].typ == CORR) ? S_engrcorr
-                     : S_engroom);
-            is_headstone = (sym == S_grave);
-            Sprintf(lookbuf, "(%s", is_headstone ? "grave" : "engraving");
-            (void) add_quoted_engraving(x, y, lookbuf);
+            is_headstone = IS_GRAVE(svl.lastseentyp[x][y]);
+            Sprintf(lookbuf, " (%s", is_headstone ? "grave" : "engraving");
+            (void) add_quoted_engraving(x, y, lookbuf, TRUE);
             /* the paren is used by farlook and add_quoted_engraving()
                expected to see it; we don't want it here */
             if (is_headstone) {
@@ -2064,21 +2121,21 @@ look_engrs(boolean nearby)
                 (void) strsubst(lookbuf, "(grave whose ", "");
             } else {
                 (void) strsubst(lookbuf, "(engraving with ", "");
-                (void) strsubst(lookbuf, "(engraving that ", "one that ");
+                (void) strsubst(lookbuf, "(engraving ", "engraving ");
             }
 
-            if (glyph_is_cmap(glyph) && !glyph_is_trap(glyph)) {
+            glyph = glyph_at(x, y);
+            sym = glyph_is_cmap(glyph) ? glyph_to_cmap(glyph) : SYM_NOTHING;
+            if (is_cmap_engraving(sym) || sym == S_grave) {
                 /* engraving or grave+headstone shown on the map */
                 ++count;
-            } else if (e->eread || is_headstone) {
+            } else {
                 /* engraving or grave covered by object(s) */
                 Snprintf(eos(lookbuf), sizeof lookbuf - strlen(lookbuf),
                          ", obscured by %s", encglyph(glyph));
                 glyph = is_headstone ? cmap_to_glyph(S_grave)
                                      : engraving_to_glyph(e);
                 ++count;
-            } else {
-                continue;
             }
             if (*lookbuf) { /* (redundant) */
                 char coordbuf[20], cmode;
@@ -2100,7 +2157,7 @@ look_engrs(boolean nearby)
                                   : (cmode == GPCOORDS_MAP) ? "%8s  "
                                       : "%12s  ",
                         coord_desc(x, y, coordbuf, cmode));
-                Sprintf(eos(outbuf), "%s  ", encglyph(glyph));
+                Sprintf(eos(outbuf), "%s ", encglyph(glyph));
                 /* guard against potential overflow */
                 lookbuf[sizeof lookbuf - 1 - strlen(outbuf)] = '\0';
                 Strcat(outbuf, lookbuf);

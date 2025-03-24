@@ -53,7 +53,6 @@ Version     _WIN_32IE   Platform/IE
 /*#define COMCTL_URL
  * "http://www.microsoft.com/msdownload/ieplatform/ie/comctrlx86.asp"*/
 
-ATTRNORETURN extern void nethack_exit(int) NORETURN;
 static TCHAR *_get_cmd_arg(TCHAR *pCmdLine);
 static HRESULT GetComCtlVersion(LPDWORD pdwMajor, LPDWORD pdwMinor);
 BOOL WINAPI
@@ -73,7 +72,7 @@ int GUILaunched = TRUE;     /* We tell shared startup code in windmain.c
 
 // Forward declarations of functions included in this code module:
 extern boolean main(int, char **);
-static void __cdecl mswin_moveloop(void *);
+//static void __cdecl mswin_moveloop(void *);
 
 #define MAX_CMDLINE_PARAM 255
 
@@ -82,13 +81,16 @@ static void __cdecl mswin_moveloop(void *);
 #pragma warning( disable : 28251)
 #endif
 
+extern int nethackw_main(int argc, char *argv[]);
+
+static char *argv[MAX_CMDLINE_PARAM];
+
 int APIENTRY
 WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         int nCmdShow)
 {
     INITCOMMONCONTROLSEX InitCtrls;
     int argc;
-    char *argv[MAX_CMDLINE_PARAM];
     size_t len;
     TCHAR *p;
     TCHAR wbuf[BUFSZ];
@@ -128,7 +130,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     windowprocs.win_wait_synch = mswin_wait_synch;
 
     win10_init();
-    early_init(0, NULL);	/* Change as needed to support CRASHREPORT */
+    early_init(0, NULL);  /* Change as needed to support CRASHREPORT */
 
     /* init application structure */
     _nethack_app.hApp = hInstance;
@@ -163,6 +165,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
 
     _nethack_app.bNoHScroll = FALSE;
     _nethack_app.bNoVScroll = FALSE;
+    if (_nethack_app.saved_text)
+        free(_nethack_app.saved_text), _nethack_app.saved_text = 0;
     _nethack_app.saved_text = strdup("");
 
     _nethack_app.bAutoLayout = TRUE;
@@ -210,14 +214,14 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     for (argc = 1; p && argc < MAX_CMDLINE_PARAM; argc++) {
         len = _tcslen(p);
         if (len > 0) {
-            argv[argc] = _strdup(NH_W2A(p, buf, BUFSZ));
+            argv[argc] = strdup(NH_W2A(p, buf, BUFSZ));
         } else {
-            argv[argc] = "";
+            argv[argc] = strdup("");
         }
         p = _get_cmd_arg(NULL);
     }
     GetModuleFileName(NULL, wbuf, BUFSZ);
-    argv[0] = _strdup(NH_W2A(wbuf, buf, BUFSZ));
+    argv[0] = strdup(NH_W2A(wbuf, buf, BUFSZ));
 
     if (argc == 2) {
         TCHAR *savefile = strdup(argv[1]);
@@ -232,8 +236,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
             if (*p) {
                 if (strcmp(p + 1, "NetHack-saved-game") == 0) {
                     *p = '\0';
-                    argv[1] = "-u";
-                    argv[2] = _strdup(name);
+                    argv[1] = strdup("-u");
+                    argv[2] = strdup(name);
                     argc = 3;
                 }
             }
@@ -241,14 +245,34 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine,
         free(savefile);
     }
     GUILaunched = 1;
-    /* let main do the argument processing */
-#ifndef __MINGW32__
-    main(argc, argv);
-#else
-    int mingw_main(int argc, char *argv[]);
-    mingw_main(argc, argv);
-#endif
+    /* let nethackw_main do the argument processing */
+    nethackw_main(argc, argv);
+    /* not reached */
     return 0;
+}
+
+extern void free_menu_data(void);
+
+void
+free_winmain_stuff(void)
+{
+    int cnt;
+
+    for (cnt = 0; cnt < MAX_CMDLINE_PARAM; ++cnt) {
+        if (argv[cnt])
+            free((genericptr_t) argv[cnt]), argv[cnt] = 0;
+    }
+    if (_nethack_app.saved_text)
+        free((genericptr_t) _nethack_app.saved_text),
+            _nethack_app.saved_text = 0;
+    for (cnt = 0; cnt < MAXWINDOWS; ++cnt) {
+        if (windowdata[cnt].address) {
+            if (!windowdata[cnt].isstatic)
+                free(windowdata[cnt].address);
+            windowdata[cnt].address = 0;
+        }
+    }
+    free_menu_data();
 }
 
 #ifdef _MSC_VER
@@ -302,7 +326,7 @@ _get_cmd_arg(TCHAR *pCmdLine)
     } else {
         pArgs = NULL;
     }
-
+    nhUse(bQuoted);
     return pRetArg;
 }
 

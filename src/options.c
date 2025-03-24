@@ -1,19 +1,19 @@
-/* NetHack 3.7	options.c	$NHDT-Date: 1710792444 2024/03/18 20:07:24 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.723 $ */
+/* NetHack 3.7	options.c	$NHDT-Date: 1737556914 2025/01/22 06:41:54 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.753 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Michael Allison, 2008. */
 /* NetHack may be freely redistributed.  See license for details. */
 
-#ifdef OPTION_LISTS_ONLY /* (AMIGA) external program for opt lists */
+#ifndef OPTION_LISTS_ONLY
+#include "hack.h"
+#include "tcap.h"
+#else /* OPTION_LISTS_ONLY: (AMIGA) external program for opt lists */
 #include "config.h"
 #include "objclass.h"
 #include "flag.h"
 NEARDATA struct flag flags; /* provide linkage */
 NEARDATA struct instance_flags iflags; /* provide linkage */
+NEARDATA struct accessibility_data a11y;
 #define static
-#else
-#include "hack.h"
-#include "tcap.h"
-#include <ctype.h>
 #endif
 
 #define BACKWARD_COMPAT
@@ -478,8 +478,19 @@ parseoptions(
     using_alias = FALSE;
     go.opt_initial = tinitial;
     go.opt_from_file = tfrom_file;
-    if ((op = strchr(opts, ',')) != 0) {
+    /*
+     * Process elements of comma-separated list in right to left order.
+     * When some options are set interactively--notably various compound
+     * options that issue a prompt for a value--they use parseoptions()
+     * to handle setting the new value.  For those, 'tinitial' is False
+     * and if user tries to supply a comma-separated list, it will be
+     * treated as part of the current option, probably failing to parse.
+     */
+    if (tinitial && (op = strchr(opts, ',')) != 0) {
         *op++ = 0;
+        /* current element remains pending while the rest of the line gets
+           handled recursively; if the rest of line contains any commas,
+           then the process will recurse deeper as it is processed */
         if (!parseoptions(op, go.opt_initial, go.opt_from_file))
             retval = FALSE;
     }
@@ -578,7 +589,7 @@ parseoptions(
     }
 
     /* allow optfn's to test whether they were called from parseoptions() */
-    gp.program_state.in_parseoptions++;
+    program_state.in_parseoptions++;
 
     if (got_match && matchidx >= 0) {
         duplicate = duplicate_opt_detection(matchidx);
@@ -604,8 +615,8 @@ parseoptions(
         }
     }
 
-    if (gp.program_state.in_parseoptions > 0)
-        gp.program_state.in_parseoptions--;
+    if (program_state.in_parseoptions > 0)
+        program_state.in_parseoptions--;
 
 #if 0
     /* This specialization shouldn't be needed any longer because each of
@@ -1279,11 +1290,12 @@ optfn_crash_urlmax(
         return optn_ok;
     }
     if (req == do_set) {
-        if ((op = string_for_opt(opts, FALSE))
-            != empty_optstr) {
+        if ((op = string_for_opt(opts, FALSE)) != empty_optstr) {
             int temp = atoi(op);
-            if(temp < 75){
-                config_error_add("Invalid value %d for crash_urlmax.  Minimum value is 75.",temp);
+
+            if (temp < 75){
+                config_error_add("Invalid value %d for crash_urlmax. "
+                                 " Minimum value is 75.", temp);
                 return optn_err;
             }
             gc.crash_urlmax = temp;
@@ -1695,7 +1707,7 @@ optfn_fruit(
             f = fruit_from_name(op, FALSE, &fnum);
             if (!f) {
                 if (!flags.made_fruit)
-                    forig = fruit_from_name(gp.pl_fruit, FALSE, (int *) 0);
+                    forig = fruit_from_name(svp.pl_fruit, FALSE, (int *) 0);
 
                 if (!forig && fnum >= 100) {
                     config_error_add(
@@ -1705,19 +1717,19 @@ optfn_fruit(
             }
         }
  goodfruit:
-        nmcpy(gp.pl_fruit, op, PL_FSIZ);
-        sanitize_name(gp.pl_fruit);
+        nmcpy(svp.pl_fruit, op, PL_FSIZ);
+        sanitize_name(svp.pl_fruit);
         /* OBJ_NAME(objects[SLIME_MOLD]) won't work for this after
            initialization; it gets changed to generic "fruit" */
-        if (!*gp.pl_fruit)
-            nmcpy(gp.pl_fruit, "slime mold", PL_FSIZ);
+        if (!*svp.pl_fruit)
+            nmcpy(svp.pl_fruit, "slime mold", PL_FSIZ);
         if (!go.opt_initial) {
             /* if 'forig' is nonNull, we replace it rather than add
                a new fruit; it can only be nonNull if no fruits have
                been created since the previous name was put in place */
-            (void) fruitadd(gp.pl_fruit, forig);
+            (void) fruitadd(svp.pl_fruit, forig);
             if (give_opt_msg)
-                pline("Fruit is now \"%s\".", gp.pl_fruit);
+                pline("Fruit is now \"%s\".", svp.pl_fruit);
         }
         /* If initial, then initoptions is allowed to do it instead
          * of here (initoptions always has to do it even if there's
@@ -1727,7 +1739,7 @@ optfn_fruit(
         return optn_ok;
     }
     if (req == get_val || req == get_cnf_val) {
-        Sprintf(opts, "%s", gp.pl_fruit);
+        Sprintf(opts, "%s", svp.pl_fruit);
         return optn_ok;
     }
     return optn_ok;
@@ -2446,13 +2458,13 @@ optfn_name(
 
         if ((op = string_for_env_opt(allopt[optidx].name, opts, FALSE))
             != empty_optstr) {
-            nmcpy(gp.plname, op, PL_NSIZ);
+            nmcpy(svp.plname, op, PL_NSIZ);
         } else
             return optn_err;
         return optn_ok;
     }
     if (req == get_val || req == get_cnf_val) {
-        Sprintf(opts, "%s", gp.plname);
+        Sprintf(opts, "%s", svp.plname);
         return optn_ok;
     }
     return optn_ok;
@@ -3439,6 +3451,9 @@ optfn_roguesymset(
     }
     if (req == do_set) {
         if (op != empty_optstr) {
+            if (gs.symset[ROGUESET].name)
+                free((genericptr_t) gs.symset[ROGUESET].name),
+                    gs.symset[ROGUESET].name = 0;
             gs.symset[ROGUESET].name = dupstr(op);
             if (!read_sym_file(ROGUESET)) {
                 clear_symsetentry(ROGUESET, TRUE);
@@ -3491,7 +3506,7 @@ optfn_role(
                 config_error_add("Unknown %s '%s'", allopt[optidx].name, op);
                 return optn_err;
             }
-            nmcpy(gp.pl_character, op, PL_NSIZ); /* Backwards compat */
+            nmcpy(svp.pl_character, op, PL_NSIZ); /* Backwards compat */
             saveoptstr(optidx, rolestring(flags.initrole, roles, name.m));
         }
         return optn_ok;
@@ -3534,7 +3549,8 @@ optfn_runmode(
                 return optn_err;
             }
         } else {
-            config_error_add("Value is mandatory for %s", allopt[optidx].name);
+            config_error_add("Value is mandatory for %s",
+                             allopt[optidx].name);
             return optn_err;
         }
         return optn_ok;
@@ -3608,6 +3624,7 @@ optfn_scores(
                                      allopt[optidx].name);
                     return optn_silenterr;
                 }
+                FALLTHROUGH;
                 /*FALLTHRU*/
             default:
                 config_error_add("Unknown %s parameter '%s'",
@@ -3724,8 +3741,11 @@ optfn_soundlib(
          */
         if ((op = string_for_env_opt(allopt[optidx].name, opts, FALSE))
             != empty_optstr) {
+            enum soundlib_ids option_id;
 
             get_soundlib_name(soundlibbuf, WINTYPELEN);
+            option_id = soundlib_id_from_opt(op);
+            gc.chosen_soundlib = option_id;
             assign_soundlib(gc.chosen_soundlib);
         } else
             return optn_err;
@@ -4053,6 +4073,9 @@ optfn_symset(
     }
     if (req == do_set) {
         if (op != empty_optstr) {
+            if (gs.symset[PRIMARYSET].name)
+                free((genericptr_t) gs.symset[PRIMARYSET].name),
+                     gs.symset[PRIMARYSET].name = 0;
             gs.symset[PRIMARYSET].name = dupstr(op);
             if (!read_sym_file(PRIMARYSET)) {
                 clear_symsetentry(PRIMARYSET, TRUE);
@@ -5161,6 +5184,10 @@ optfn_boolean(
 
         /* After the change */
         switch (optidx) {
+        case opt_pauper:
+            /* pauper implies nudist */
+            u.uroleplay.nudist = u.uroleplay.pauper;
+            break;
         case opt_ascii_map:
             iflags.wc_tiled_map = negated;
             break;
@@ -5274,6 +5301,9 @@ optfn_boolean(
         case opt_rest_on_space:
             update_rest_on_space();
             break;
+        case opt_accessiblemsg:
+            a11y.msg_loc.x = a11y.msg_loc.y = 0;
+            break;
         default:
             break;
         }
@@ -5354,7 +5384,11 @@ can_set_perm_invent(void)
         iflags.perminv_mode = InvOptOn;
 
 #ifdef TTY_PERM_INVENT
-    if (WINDOWPORT(tty) && !go.opt_initial) {
+    if ((WINDOWPORT(tty)
+#ifdef WIN32
+         || WINDOWPORT(safestartup)
+#endif
+         ) && !go.opt_initial) {
         perm_invent_toggled(FALSE);
         /* perm_invent_toggled()
            -> sync_perminvent()
@@ -5370,6 +5404,20 @@ can_set_perm_invent(void)
 #endif
     return TRUE;
 }
+
+
+#ifdef TTY_PERM_INVENT
+void
+check_perm_invent_again(void)
+{
+    if (iflags.perm_invent_pending) {
+        iflags.perm_invent = FALSE;
+        if (can_set_perm_invent())
+           iflags.perm_invent = TRUE;
+        iflags.perm_invent_pending = FALSE;
+    }
+}
+#endif
 
 staticfn int
 handler_menustyle(void)
@@ -5647,9 +5695,11 @@ handler_msg_window(void)
         for (i = 0; i < SIZE(menutype); i++) {
             if (i < 2 && is_curses)
                 continue;
-            Sprintf(buf, "%-12.12s%c%.60s", msgwind[i][0], sep, msgwind[i][1]);
+            Sprintf(buf, "%-12.12s%c%.60s", msgwind[i][0], sep,
+                    msgwind[i][1]);
             any.a_char = c = *msgwind[i][0];
-            add_menu(tmpwin, &nul_glyphinfo, &any, *buf, 0, ATR_NONE, clr, buf,
+            add_menu(tmpwin, &nul_glyphinfo, &any, *buf, 0,
+                     ATR_NONE, clr, buf,
                      (c == iflags.prevmsg_window) ? MENU_ITEMFLAGS_SELECTED
                                                   : MENU_ITEMFLAGS_NONE);
             /* second line is prefixed by spaces that "c - " would use */
@@ -5943,7 +5993,8 @@ handler_runmode(void)
 staticfn int
 handler_petattr(void)
 {
-    int tmp = query_attr("Select pet highlight attribute", iflags.wc2_petattr);
+    int tmp
+        = query_attr("Select pet highlight attribute", iflags.wc2_petattr);
 
     if (tmp != -1) {
         iflags.wc2_petattr = tmp;
@@ -6912,6 +6963,11 @@ initoptions(void)
      */
 #endif
 #endif /* SYSCF */
+
+    /* Carry out options that got deferred from early_options */
+    if (gd.deferred_showpaths)
+        do_deferred_showpaths(0);  /* does not return */
+
     initoptions_finish();
 }
 
@@ -6925,7 +6981,7 @@ initoptions_init(void)
     int i;
     boolean have_branch = (nomakedefs.git_branch && *nomakedefs.git_branch);
 
-    go.opt_phase = builtin_opt;		// Did I need to move this here?
+    go.opt_phase = builtin_opt;    /* Did I need to move this here? */
     memcpy(allopt, allopt_init, sizeof(allopt));
     determine_ambiguities();
 
@@ -7081,7 +7137,7 @@ initoptions_init(void)
 
     /* since this is done before init_objects(), do partial init here */
     objects[SLIME_MOLD].oc_name_idx = SLIME_MOLD;
-    nmcpy(gp.pl_fruit, OBJ_NAME(objects[SLIME_MOLD]), PL_FSIZ);
+    nmcpy(svp.pl_fruit, OBJ_NAME(objects[SLIME_MOLD]), PL_FSIZ);
 }
 
 /*
@@ -7168,7 +7224,7 @@ initoptions_finish(void)
         free((genericptr_t) gc.cmdline_rcfile), gc.cmdline_rcfile = 0;
     /*[end of nethackrc handling]*/
 
-    (void) fruitadd(gp.pl_fruit, (struct fruit *) 0);
+    (void) fruitadd(svp.pl_fruit, (struct fruit *) 0);
     /*
      * Remove "slime mold" from list of object names.  This will
      * prevent it from being wished unless it's actually present
@@ -7714,7 +7770,7 @@ parse_role_opt(
     char **opp)
 {
     static char neg_opt[] = "!"; /* not 'const' but never modified */
-    char *preval, *op = *opp;
+    char *preval, *op;
     int which = (optidx == opt_role) ? RS_ROLE
                 : (optidx == opt_race) ? RS_RACE
                   : (optidx == opt_gender) ? RS_GENDER
@@ -7801,7 +7857,7 @@ parse_role_opt(
                    if it's ok, replace it with canonical form */
                 saveoptstr(optidx, op);
                 *opp = op;
-                ok = TRUE;
+                /*ok = TRUE; // redundant*/
                 /* don't return yet; value might be a list that follows
                    this with something else which might make it invalid */
             }
@@ -7977,7 +8033,7 @@ fruitadd(char *str, struct fruit *replace_fruit)
     struct fruit *f;
     int highest_fruit_id = 0, globpfx;
     char buf[PL_FSIZ], altname[PL_FSIZ];
-    boolean user_specified = (str == gp.pl_fruit);
+    boolean user_specified = (str == svp.pl_fruit);
     /* if not user-specified, then it's a fruit name for a fruit on
      * a bones level or from orctown raider's loot...
      */
@@ -7993,21 +8049,22 @@ fruitadd(char *str, struct fruit *replace_fruit)
            they already received it in their original game;
            str==pl_fruit but makesingular() creates a copy
            so we need to copy that back into pl_fruit */
-        nmcpy(gp.pl_fruit, makesingular(str), PL_FSIZ);
+        nmcpy(svp.pl_fruit, makesingular(str), PL_FSIZ);
 
         /* disallow naming after other foods (since it'd be impossible
          * to tell the difference); globs might have a size prefix which
          * needs to be skipped in order to match the object type name
          */
-        globpfx = (!strncmp(gp.pl_fruit, "small ", 6)
-                   || !strncmp(gp.pl_fruit, "large ", 6)) ? 6
-                  : (!strncmp(gp.pl_fruit, "medium ", 7)) ? 7
-                    : (!strncmp(gp.pl_fruit, "very large ", 11)) ? 11
+        globpfx = (!strncmp(svp.pl_fruit, "small ", 6)
+                   || !strncmp(svp.pl_fruit, "large ", 6)) ? 6
+                  : (!strncmp(svp.pl_fruit, "medium ", 7)) ? 7
+                    : (!strncmp(svp.pl_fruit, "very large ", 11)) ? 11
                       : 0;
-        for (i = gb.bases[FOOD_CLASS]; objects[i].oc_class == FOOD_CLASS; i++) {
-            if (!strcmp(OBJ_NAME(objects[i]), gp.pl_fruit)
-                || (globpfx > 0
-                    && !strcmp(OBJ_NAME(objects[i]), &gp.pl_fruit[globpfx]))) {
+        for (i = svb.bases[FOOD_CLASS]; objects[i].oc_class == FOOD_CLASS;
+             i++) {
+            if (!strcmp(OBJ_NAME(objects[i]), svp.pl_fruit)
+                || (globpfx > 0 && !strcmp(OBJ_NAME(objects[i]),
+                                           &svp.pl_fruit[globpfx]))) {
                 found = TRUE;
                 break;
             }
@@ -8015,7 +8072,7 @@ fruitadd(char *str, struct fruit *replace_fruit)
         if (!found) {
             char *c;
 
-            for (c = gp.pl_fruit; *c >= '0' && *c <= '9'; c++)
+            for (c = svp.pl_fruit; *c >= '0' && *c <= '9'; c++)
                 continue;
             if (!*c || isspace((uchar) *c))
                 numeric = TRUE;
@@ -8024,22 +8081,22 @@ fruitadd(char *str, struct fruit *replace_fruit)
             /* these checks for applying food attributes to actual items
                are case sensitive; "glob of foo" is caught by 'found'
                if 'foo' is a valid glob; when not valid, allow it as-is */
-            || !strncmp(gp.pl_fruit, "cursed ", 7)
-            || !strncmp(gp.pl_fruit, "uncursed ", 9)
-            || !strncmp(gp.pl_fruit, "blessed ", 8)
-            || !strncmp(gp.pl_fruit, "partly eaten ", 13)
-            || (!strncmp(gp.pl_fruit, "tin of ", 7)
-                && (!strcmp(gp.pl_fruit + 7, "spinach")
-                    || ismnum(name_to_mon(gp.pl_fruit + 7, (int *) 0))))
-            || !strcmp(gp.pl_fruit, "empty tin")
-            || (!strcmp(gp.pl_fruit, "glob")
-                || (globpfx > 0 && !strcmp("glob", &gp.pl_fruit[globpfx])))
-            || ((str_end_is(gp.pl_fruit, " corpse")
-                 || str_end_is(gp.pl_fruit, " egg"))
-                && ismnum(name_to_mon(gp.pl_fruit, (int *) 0)))) {
-            Strcpy(buf, gp.pl_fruit);
-            Strcpy(gp.pl_fruit, "candied ");
-            nmcpy(gp.pl_fruit + 8, buf, PL_FSIZ - 8);
+            || !strncmp(svp.pl_fruit, "cursed ", 7)
+            || !strncmp(svp.pl_fruit, "uncursed ", 9)
+            || !strncmp(svp.pl_fruit, "blessed ", 8)
+            || !strncmp(svp.pl_fruit, "partly eaten ", 13)
+            || (!strncmp(svp.pl_fruit, "tin of ", 7)
+                && (!strcmp(svp.pl_fruit + 7, "spinach")
+                    || ismnum(name_to_mon(svp.pl_fruit + 7, (int *) 0))))
+            || !strcmp(svp.pl_fruit, "empty tin")
+            || (!strcmp(svp.pl_fruit, "glob")
+                || (globpfx > 0 && !strcmp("glob", &svp.pl_fruit[globpfx])))
+            || ((str_end_is(svp.pl_fruit, " corpse")
+                 || str_end_is(svp.pl_fruit, " egg"))
+                && ismnum(name_to_mon(svp.pl_fruit, (int *) 0)))) {
+            Strcpy(buf, svp.pl_fruit);
+            Strcpy(svp.pl_fruit, "candied ");
+            nmcpy(svp.pl_fruit + 8, buf, PL_FSIZ - 8);
         }
         *altname = '\0';
         /* This flag indicates that a fruit has been made since the
@@ -8054,7 +8111,7 @@ fruitadd(char *str, struct fruit *replace_fruit)
             /* replace_fruit is already part of the fruit chain;
                update it in place rather than looking it up again */
             f = replace_fruit;
-            copynchars(f->fname, gp.pl_fruit, PL_FSIZ - 1);
+            copynchars(f->fname, svp.pl_fruit, PL_FSIZ - 1);
             goto nonew;
         }
     } else {
@@ -8085,7 +8142,7 @@ fruitadd(char *str, struct fruit *replace_fruit)
     gf.ffruit = f;
  nonew:
     if (user_specified)
-        gc.context.current_fruit = f->fid;
+        svc.context.current_fruit = f->fid;
     return f->fid;
 }
 
@@ -8141,6 +8198,28 @@ optfn_o_bind_keys(
     }
     if (req == do_handler) {
         handler_rebind_keys();
+    }
+    return optn_ok;
+}
+
+staticfn int
+optfn_o_autocomplete(
+    int optidx UNUSED, int req, boolean negated UNUSED,
+    char *opts, char *op UNUSED)
+{
+    if (req == do_init) {
+        return optn_ok;
+    }
+    if (req == do_set) {
+    }
+    if (req == get_val || req == get_cnf_val) {
+        if (!opts)
+            return optn_err;
+        Sprintf(opts, n_currently_set, count_autocompletions());
+        return optn_ok;
+    }
+    if (req == do_handler) {
+        handler_change_autocompletions();
     }
     return optn_ok;
 }
@@ -8521,7 +8600,7 @@ doset_simple(void)
             adjust_menu_promptstyle(WIN_INVEN, &iflags.menu_headings);
         if (go.opt_update_basic_palette) {
 #ifdef CHANGE_COLOR
-	    change_palette();
+            change_palette();
 #endif
             go.opt_update_basic_palette = FALSE;
         }
@@ -8575,8 +8654,7 @@ doset(void) /* changing options via menu by Per Liboriussen */
     anything any;
     menu_item *pick_list;
     int indexoffset, startpass, endpass;
-    boolean setinitial = FALSE, fromfile = FALSE,
-            gavehelp = FALSE, skiphelp = !iflags.cmdassist;
+    boolean gavehelp = FALSE, skiphelp = !iflags.cmdassist;
     int clr = NO_COLOR;
 
     if (iflags.menu_requested) {
@@ -8600,7 +8678,8 @@ doset(void) /* changing options via menu by Per Liboriussen */
             "For a brief explanation of how this works, type '?' to select",
             "the next menu choice, then press <enter> or <return>.",
             NULL, /* actual '?' menu entry gets inserted here */
-            "[To suppress this menu help, toggle off the 'cmdassist' option.]",
+            ("[To suppress this menu help,"
+             " toggle off the 'cmdassist' option.]"),
             "",
         };
         any = cg.zeroany;
@@ -8609,7 +8688,7 @@ doset(void) /* changing options via menu by Per Liboriussen */
                 Sprintf(buf, "%4s%.75s", "", helptext[i]);
                 add_menu_str(tmpwin, buf);
             } else {
-                any.a_int = HELP_IDX + 1; /* processing pick_list subtracts 1 */
+                any.a_int = HELP_IDX + 1; /* handling pick_list subtracts 1 */
                 add_menu(tmpwin, &nul_glyphinfo, &any, '?', '?', ATR_NONE,
                          clr, "view help for options menu",
                          MENU_ITEMFLAGS_SKIPINVERT);
@@ -8733,7 +8812,7 @@ doset(void) /* changing options via menu by Per Liboriussen */
                 /* boolean option */
                 Sprintf(buf, "%s%s", *allopt[opt_indx].addr ? "!" : "",
                         allopt[opt_indx].name);
-                (void) parseoptions(buf, setinitial, fromfile);
+                (void) parseoptions(buf, FALSE, FALSE);
             } else {
                 /* compound option */
                 int k = opt_indx, reslt;
@@ -8757,7 +8836,7 @@ doset(void) /* changing options via menu by Per Liboriussen */
                     (void) strncat(eos(buf), abuf,
                                    (sizeof buf - 1 - strlen(buf)));
                     /* pass the buck */
-                    (void) parseoptions(buf, setinitial, fromfile);
+                    (void) parseoptions(buf, FALSE, FALSE);
                 }
             }
             if (wc_supported(allopt[opt_indx].name)
@@ -9018,7 +9097,6 @@ handle_add_list_remove(const char *optname, int numtotal)
     };
     int clr = NO_COLOR;
 
-    opt_idx = 0;
     tmpwin = create_nhwindow(NHW_MENU);
     start_menu(tmpwin, MENU_BEHAVE_STANDARD);
     any = cg.zeroany;
@@ -9214,7 +9292,8 @@ static const char *opt_intro[] = {
 #endif
     "or press \"O\" while playing and use the menu.",
     "",
- "Boolean options (which can be negated by prefixing them with '!' or \"no\"):",
+    ("Boolean options (which can be negated by prefixing them"
+     " with '!' or \"no\"):"),
     (char *) 0
 };
 
@@ -9537,7 +9616,7 @@ next_opt(winid datawin, const char *str)
     if (!*str) {
         s = eos(buf);
         if (s > &buf[1] && s[-2] == ',')
-            Strcpy(s - 2, "."); /* replace last ", " */
+            s[-2] = '.', s[-1] = '\0'; /* replace ending ", " with "." */
         i = COLNO;              /* (greater than COLNO - 2) */
     } else {
         i = Strlen(buf) + Strlen(str) + 2;
@@ -9779,6 +9858,16 @@ wc_set_font_name(int opttype, char *fontname)
     return;
 }
 
+static char **fgp[] = { &iflags.wcolors[wcolor_menu].fg,
+                        &iflags.wcolors[wcolor_message].fg,
+                        &iflags.wcolors[wcolor_status].fg,
+                        &iflags.wcolors[wcolor_text].fg };
+static char **bgp[] = { &iflags.wcolors[wcolor_menu].bg,
+                        &iflags.wcolors[wcolor_message].bg,
+                        &iflags.wcolors[wcolor_status].bg,
+                        &iflags.wcolors[wcolor_text].bg };
+int options_set_window_colors_flag = 0;
+
 staticfn int
 wc_set_window_colors(char *op)
 {
@@ -9786,14 +9875,7 @@ wc_set_window_colors(char *op)
      *  menu white/black message green/yellow status white/blue text
      * white/black
      */
-    static char **fgp[] = { &iflags.wcolors[wcolor_menu].fg,
-                            &iflags.wcolors[wcolor_message].fg,
-                            &iflags.wcolors[wcolor_status].fg,
-                            &iflags.wcolors[wcolor_text].fg };
-    static char **bgp[] = { &iflags.wcolors[wcolor_menu].bg,
-                            &iflags.wcolors[wcolor_message].bg,
-                            &iflags.wcolors[wcolor_status].bg,
-                            &iflags.wcolors[wcolor_text].bg };
+
     int j;
     int32 clr;
     char buf[BUFSZ];
@@ -9875,7 +9957,22 @@ wc_set_window_colors(char *op)
                              wn);
         }
     }
+    options_set_window_colors_flag = 1;
     return 1;
+}
+
+void
+options_free_window_colors(void)
+{
+    int j;
+
+    for (j = 0; j < WC_COUNT; ++j) {
+        if (*fgp[j])
+            free((genericptr_t) *fgp[j]), *fgp[j] = 0;
+        if (*bgp[j])
+            free((genericptr_t) *bgp[j]), *bgp[j] = 0;
+    }
+    options_set_window_colors_flag = 0;
 }
 
 /* set up for wizard mode if player or save file has requested it;
@@ -9887,7 +9984,7 @@ set_playmode(void)
 {
     if (wizard) {
         if (authorize_wizard_mode())
-            gp.plnamelen = (int) strlen(strcpy(gp.plname, "wizard"));
+            gp.plnamelen = (int) strlen(strcpy(svp.plname, "wizard"));
         else
             wizard = FALSE; /* not allowed or not available */
         /* try explore mode if we didn't make it into wizard mode */

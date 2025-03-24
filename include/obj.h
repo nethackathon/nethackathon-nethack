@@ -1,4 +1,4 @@
-/* NetHack 3.7	obj.h	$NHDT-Date: 1633802062 2021/10/09 17:54:22 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.94 $ */
+/* NetHack 3.7	obj.h	$NHDT-Date: 1718999845 2024/06/21 19:57:25 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.116 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Michael Allison, 2006. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -82,9 +82,12 @@ struct obj {
 #define OBJ_ONBILL 7    /* object on shk bill */
 #define OBJ_LUAFREE 8   /* object has been dealloc'd, but is ref'd by lua */
 #define OBJ_DELETED 9   /* object is marked for deletion by dobjsfree() */
+    /* note: OBJ_xxx values are used in obj_state_names[] in mkobj.c
+       so adding, removing, or renumbering these needs to change that too */
 #define NOBJ_STATES 10
     xint16 timed; /* # of fuses (timers) attached to this obj */
 
+    /* Bitfields currently require 5 bytes minimum */
     Bitfield(cursed, 1);    /* uncursed when neither cursed nor blessed */
     Bitfield(blessed, 1);
     Bitfield(unpaid, 1);    /* owned by shop; valid for objects in hero's
@@ -96,6 +99,12 @@ struct obj {
                              * items on shop floor or in containers there;
                              * implicit for items at any other location
                              * unless carried and explicitly flagged unpaid */
+    Bitfield(recharged, 3); /* number of times it's been recharged */
+    Bitfield(dried_up, 4);  /* number of times a longsword has dried up
+                             * a fountain, tracked for Fountainbane creation */
+#define on_ice recharged    /* corpse on ice */
+    Bitfield(lamplit, 1);   /* a light-source -- can be lit */
+
     Bitfield(known, 1);     /* exact nature known (for instance, charge count
                              * or enchantment); many items have this preset if
                              * they lack anything interesting to discover */
@@ -103,6 +112,14 @@ struct obj {
                              * some types of items always have dknown set */
     Bitfield(bknown, 1);    /* BUC (blessed/uncursed/cursed) known */
     Bitfield(rknown, 1);    /* rustproofing status known */
+    Bitfield(cknown, 1); /* for containers (including statues): the contents
+                          * are known; also applicable to tins; also applies
+                          * to horn of plenty but only for empty/non-empty */
+    Bitfield(lknown, 1); /* locked/unlocked status is known; assigned for bags
+                          * and for horn of plenty (when tipping) even though
+                          * they have no locks */
+    Bitfield(tknown, 1); /* trap status known for chests */
+    Bitfield(nomerge, 1);   /* set temporarily to prevent merging */
 
     Bitfield(oeroded, 2);  /* rusted/burnt weapon/armor */
     Bitfield(oeroded2, 2); /* corroded/rotted weapon/armor */
@@ -121,35 +138,23 @@ struct obj {
 /* or accidental tripped rolling boulder trap */
 #define opoisoned otrapped /* object (weapon) is coated with poison */
 
-    Bitfield(recharged, 3); /* number of times it's been recharged */
-    Bitfield(dried_up, 4); /* number of times a longsword has dried up */
-                           /* a fountain, tracked for Fountainbane creation */
-#define on_ice recharged    /* corpse on ice */
-    Bitfield(lamplit, 1);   /* a light-source -- can be lit */
     Bitfield(globby, 1);    /* combines with like types on adjacent squares */
     Bitfield(greased, 1);   /* covered with grease */
-    Bitfield(nomerge, 1);   /* set temporarily to prevent merging */
-    Bitfield(how_lost, 2);  /* stolen by mon or thrown, dropped by hero */
-
     Bitfield(in_use, 1); /* for magic items before useup items */
     Bitfield(bypass, 1); /* mark this as an object to be skipped by bhito() */
-    Bitfield(cknown, 1); /* for containers (including statues): the contents
-                          * are known; also applicable to tins; also applies
-                          * to horn of plenty but only for empty/non-empty */
-    Bitfield(lknown, 1); /* locked/unlocked status is known; assigned for bags
-                          * and for horn of plenty (when tipping) even though
-                          * they have no locks */
     Bitfield(pickup_prev, 1); /* was picked up previously */
     Bitfield(ghostly, 1); /* it just got placed into a bones file */
+    Bitfield(how_lost, 3);  /* stolen by mon or thrown, dropped by hero, etc */
+
+    Bitfield(named_how, 1);  /* source of name per TODO in resetobjs() */
 #if 0
     /* not implemented */
-    Bitfield(tknown, 1); /* trap status known for chests */
     Bitfield(eknown, 1); /* effect known for wands zapped or rings worn when
                           * not seen yet after being picked up while blind
                           * [maybe for remaining stack of used potion too] */
-    /* 7 free bits */
+    /* 5 free bits */
 #else
-    /* 1 free bit */
+    /* 6 free bits */
 #endif
 
     int corpsenm;         /* type of corpse is mons[corpsenm] */
@@ -162,6 +167,7 @@ struct obj {
                                * 1 for others (format as "next boulder") */
     int usecount;           /* overloaded for various things that tally */
 #define spestudied usecount /* # of times a spellbook has been studied */
+#define wishedfor usecount  /* flag for hold_another_object() if from wish */
     unsigned oeaten;        /* nutrition left in food, if partly eaten */
     long age;               /* creation date */
     long owornmask;        /* bit mask indicating which equipment slot(s) an
@@ -302,14 +308,14 @@ struct obj {
 /* Eggs and other food */
 #define MAX_EGG_HATCH_TIME 200 /* longest an egg can remain unhatched */
 #define stale_egg(egg) \
-    ((gm.moves - (egg)->age) > (2 * MAX_EGG_HATCH_TIME))
+    ((svm.moves - (egg)->age) > (2 * MAX_EGG_HATCH_TIME))
 #define ofood(o) ((o)->otyp == CORPSE || (o)->otyp == EGG || (o)->otyp == TIN)
     /* note: sometimes eggs and tins have special corpsenm values that
        shouldn't be used as an index into mons[]                       */
-#define polyfodder(obj) \
+#define polyfood(obj) \
     (ofood(obj) && (obj)->corpsenm >= LOW_PM                            \
      && (pm_to_cham((obj)->corpsenm) != NON_PM                          \
-                    || dmgtype(&mons[(obj)->corpsenm], AD_POLY)))
+         || dmgtype(&mons[(obj)->corpsenm], AD_POLY)))
 #define mlevelgain(obj) (ofood(obj) && (obj)->corpsenm == PM_WRAITH)
 #define mhealup(obj) (ofood(obj) && (obj)->corpsenm == PM_NURSE)
 #define Is_pudding(o) \
@@ -420,8 +426,8 @@ struct obj {
                        || (o)->otyp == AMULET_OF_UNCHANGING)
 
 /* achievement tracking; 3.6.x did this differently */
-#define is_mines_prize(o) ((o)->o_id == gc.context.achieveo.mines_prize_oid)
-#define is_soko_prize(o) ((o)->o_id == gc.context.achieveo.soko_prize_oid)
+#define is_mines_prize(o) ((o)->o_id == svc.context.achieveo.mines_prize_oid)
+#define is_soko_prize(o) ((o)->o_id == svc.context.achieveo.soko_prize_oid)
 
 /* is_art() is now a function in artifact.c */
 /* #define is_art(o,art) ((o) && (o)->oartifact == (art)) */
@@ -464,11 +470,17 @@ struct obj {
 #define POTHIT_MONST_THROW 2 /* thrown by a monster */
 #define POTHIT_OTHER_THROW 3 /* propelled by some other means [scatter()] */
 
-/* tracking how an item left your inventory */
-#define LOST_NONE    0 /* still in inventory, or method not covered below */
-#define LOST_THROWN  1 /* thrown or fired by the hero */
-#define LOST_DROPPED 2 /* dropped or tipped out of a container by the hero */
-#define LOST_STOLEN  3 /* stolen from hero's inventory by a monster */
+/* tracking how an item left your inventory via how_lost field */
+#define LOST_NONE      0 /* still in inventory, or method not covered below */
+#define LOST_THROWN    1 /* thrown or fired by the hero */
+#define LOST_DROPPED   2 /* dropped or tipped out of a container by the hero */
+#define LOST_STOLEN    3 /* stolen from hero's inventory by a monster */
+#define LOSTOVERRIDEMASK 0x3
+#define LOST_EXPLODING 4 /* the object is exploding (i.e. POT_OIL) */
+
+/* tracking how a name got acquired by an object in named_how field */
+#define NAMED_PLAIN 0 /* nothing special, typical naming */
+#define NAMED_KEEP  1 /* historic statue, or stoned/killed monster */
 
 /*
  *  Notes for adding new oextra structures:

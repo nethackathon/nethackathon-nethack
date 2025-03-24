@@ -1,4 +1,4 @@
-/* NetHack 3.7	youprop.h	$NHDT-Date: 1702274029 2023/12/11 05:53:49 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.44 $ */
+/* NetHack 3.7	youprop.h	$NHDT-Date: 1725653018 2024/09/06 20:03:38 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.45 $ */
 /* Copyright (c) 1989 Mike Threepoint                             */
 /* NetHack may be freely redistributed.  See license for details. */
 
@@ -138,6 +138,7 @@
 #define EWounded_legs u.uprops[WOUNDED_LEGS].extrinsic
 #define Wounded_legs (HWounded_legs || EWounded_legs)
 
+/* Sleepy: prone to falling asleep periodically; not necessarily asleep now */
 #define HSleepy u.uprops[SLEEPY].intrinsic
 #define ESleepy u.uprops[SLEEPY].extrinsic
 #define Sleepy (HSleepy || ESleepy)
@@ -155,6 +156,10 @@
 #define ETelepat u.uprops[TELEPAT].extrinsic
 #define Blind_telepat (HTelepat || ETelepat)
 #define Unblind_telepat (ETelepat)
+
+#define HBlnd_resist u.uprops[BLND_RES].intrinsic /* from form */
+#define EBlnd_resist u.uprops[BLND_RES].extrinsic /* wielding Sunsword */
+#define Blnd_resist (HBlnd_resist || EBlnd_resist)
 
 #define HWarning u.uprops[WARNING].intrinsic
 #define EWarning u.uprops[WARNING].extrinsic
@@ -396,8 +401,9 @@
 
 #define Hate_silver (u.ulycn >= LOW_PM || hates_silver(gy.youmonst.data))
 
-/* _Hitchhikers_Guide_to_the_Galaxy_ on uses for 'towel': "wrap it round
+/* _The_Hitchhikers_Guide_to_the_Galaxy_ on uses for 'towel': "wrap it round
    your head to ward off noxious fumes" [we require it to be damp or wet] */
-#define Half_gas_damage (ublindf && ublindf->otyp == TOWEL && ublindf->spe > 0)
+#define Half_gas_damage \
+    (ublindf && ublindf->otyp == TOWEL && ublindf->spe > 0)
 
 #endif /* YOUPROP_H */

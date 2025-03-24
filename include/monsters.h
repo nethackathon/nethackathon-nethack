@@ -1,4 +1,4 @@
-/* NetHack 3.7	monsters.h	$NHDT-Date: 1705092146 2024/01/12 20:42:26 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.119 $ */
+/* NetHack 3.7	monsters.h	$NHDT-Date: 1723945838 2024/08/18 01:50:38 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.124 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Michael Allison, 2006. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -215,8 +215,8 @@
         SIZ(300, 250, MS_BARK, MZ_SMALL), 0, 0,
         M1_ANIMAL | M1_NOHANDS | M1_CARNIVORE, M2_HOSTILE, M3_INFRAVISIBLE,
         2, CLR_BROWN, COYOTE),
-    MON(NAM("werejackal"),
-        S_DOG, LVL(2, 12, 7, 10, -7), (G_NOGEN | G_NOCORPSE),
+    MON(NAM("werejackal"), S_DOG,
+        LVL(2, 12, 7, 10, -7), (G_NOGEN | G_NOCORPSE),
         A(ATTK(AT_BITE, AD_WERE, 1, 4),
           NO_ATTK, NO_ATTK, NO_ATTK, NO_ATTK, NO_ATTK),
         SIZ(300, 250, MS_BARK, MZ_SMALL), MR_POISON, 0,
@@ -271,7 +271,7 @@
         M2_NOPOLY | M2_WERE | M2_HOSTILE, M3_INFRAVISIBLE,
         7, CLR_GRAY, WEREWOLF),
     MON(NAM("winter wolf cub"), S_DOG,
-        LVL(5, 12, 4, 0, -5),
+        LVL(5, 12, 4, 0, 0),
         (G_NOHELL | G_GENO | G_SGROUP | 2),
         A(ATTK(AT_BITE, AD_PHYS, 1, 8), ATTK(AT_BREA, AD_COLD, 1, 6),
           NO_ATTK, NO_ATTK, NO_ATTK, NO_ATTK),
@@ -286,21 +286,21 @@
         M1_ANIMAL | M1_NOHANDS | M1_CARNIVORE, M2_HOSTILE, M3_INFRAVISIBLE,
         8, CLR_BLACK, WARG),
     MON(NAM("winter wolf"), S_DOG,
-        LVL(7, 12, 4, 20, 0), (G_NOHELL | G_GENO | 1),
+        LVL(7, 12, 4, 20, -5), (G_NOHELL | G_GENO | 1),
         A(ATTK(AT_BITE, AD_PHYS, 2, 6), ATTK(AT_BREA, AD_COLD, 2, 6),
           NO_ATTK, NO_ATTK, NO_ATTK, NO_ATTK),
         SIZ(700, 300, MS_BARK, MZ_LARGE), MR_COLD, MR_COLD,
         M1_ANIMAL | M1_NOHANDS | M1_CARNIVORE, M2_HOSTILE | M2_STRONG, 0,
         9, CLR_CYAN, WINTER_WOLF),
     MON(NAM("hell hound pup"), S_DOG,
-        LVL(7, 12, 4, 20, -5), (G_HELL | G_GENO | G_SGROUP | 1),
+        LVL(7, 12, 4, 20, 0), (G_HELL | G_GENO | G_SGROUP | 1),
         A(ATTK(AT_BITE, AD_PHYS, 2, 6), ATTK(AT_BREA, AD_FIRE, 2, 6),
           NO_ATTK, NO_ATTK, NO_ATTK, NO_ATTK),
         SIZ(200, 200, MS_BARK, MZ_SMALL), MR_FIRE, MR_FIRE,
         M1_ANIMAL | M1_NOHANDS | M1_CARNIVORE, M2_HOSTILE, M3_INFRAVISIBLE,
         9, CLR_RED, HELL_HOUND_PUP),
     MON(NAM("hell hound"), S_DOG,
-        LVL(12, 14, 2, 20, 0), (G_HELL | G_GENO | 1),
+        LVL(12, 14, 2, 20, -5), (G_HELL | G_GENO | 1),
         A(ATTK(AT_BITE, AD_PHYS, 3, 6), ATTK(AT_BREA, AD_FIRE, 3, 6),
           NO_ATTK, NO_ATTK, NO_ATTK, NO_ATTK),
         SIZ(600, 300, MS_BARK, MZ_MEDIUM), MR_FIRE, MR_FIRE,
@@ -2694,8 +2694,17 @@
             | M2_SHAPESHIFTER,
         M3_INFRAVISIBLE,
         11, HI_DOMESTIC, DOPPELGANGER),
+    /* 3.7: shopkeepers used to have speed 18, but if/when they were
+       hasted they always got 2 moves per turn and had a tendency to move
+       away from blocking the door and then move right back; since they
+       might start with a potion of speed and drink that as soon as the
+       hero gets close, once inside the shop the hero could have trouble
+       getting out again; also, being slowed still guaranteed one move
+       per turn; reduce their innate speed from 18 to 16 for a hasted
+       speed of 22 rather than 24 and slowed speed of 11 rather than 12;
+       they will still block the shop door, but not as tenaciously */
     MON(NAM("shopkeeper"), S_HUMAN,
-        LVL(12, 18, 0, 50, 0), G_NOGEN,
+        LVL(12, 16, 0, 50, 0), G_NOGEN,
         A(ATTK(AT_WEAP, AD_PHYS, 4, 4), ATTK(AT_WEAP, AD_PHYS, 4, 4),
           NO_ATTK, NO_ATTK, NO_ATTK, NO_ATTK),
         SIZ(WT_HUMAN, 400, MS_SELL, MZ_HUMAN), 0, 0,

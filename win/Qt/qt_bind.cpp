@@ -70,6 +70,8 @@ static struct key_macro_rec {
     { 0, 0U, (const char *) 0, (const char *) 0 }
 };
 
+static QPen *pen = (QPen *) 0;
+
 NetHackQtBind::NetHackQtBind(int& argc, char** argv) :
 #ifdef KDE
     KApplication(argc,argv)
@@ -237,7 +239,7 @@ void NetHackQtBind::qt_askname()
     int ch = -1; // -1 => new game
 
     have_asked = true;
-    str_copy(default_plname, gp.plname, PL_NSIZ);
+    str_copy(default_plname, svp.plname, PL_NSIZ);
 
     // We do it all here (plus qt_plsel.cpp and qt_svsel.cpp),
     // nothing in player_selection().
@@ -252,7 +254,7 @@ void NetHackQtBind::qt_askname()
         NetHackQtSavedGameSelector sgsel((const char **) saved);
         ch = sgsel.choose();
         if (ch >= 0)
-            str_copy(gp.plname, saved[ch], SIZE(gp.plname));
+            str_copy(svp.plname, saved[ch], SIZE(svp.plname));
         // caller needs new lock name even if plname[] hasn't changed
         // because successful get_saved_games() clobbers gs.SAVEF[]
         ::iflags.renameinprogress = TRUE;
@@ -269,6 +271,7 @@ void NetHackQtBind::qt_askname()
             // success; handle plname[] verification below prior to returning
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case -2:
         // Quit
@@ -282,10 +285,10 @@ void NetHackQtBind::qt_askname()
         break;
     }
 
-    if (!*gp.plname)
+    if (!*svp.plname)
         // in case Choose() returns with plname[] empty
-        Strcpy(gp.plname, default_plname);
-    else if (strcmp(gp.plname, default_plname) != 0)
+        Strcpy(svp.plname, default_plname);
+    else if (strcmp(svp.plname, default_plname) != 0)
         // caller needs to set new lock file name
         ::iflags.renameinprogress = TRUE;
     return;
@@ -498,7 +501,7 @@ void NetHackQtBind::qt_update_inventory(int arg UNUSED)
 	main->updateInventory(); // update the paper doll inventory subset
 
     /* doesn't work yet
-    if (gp.program_state.something_worth_saving && iflags.perm_invent)
+    if (program_state.something_worth_saving && iflags.perm_invent)
         display_inventory(NULL, false);
     */
 }
@@ -576,6 +579,45 @@ void NetHackQtBind::qt_raw_print(const char *str)
 void NetHackQtBind::qt_raw_print_bold(const char *str)
 {
     qt_raw_print(str);
+}
+
+const QPen NetHackQtBind::nhcolor_to_pen(uint32_t c)
+{
+    if (!pen) {
+        pen = new QPen[17];
+
+        pen[ 0] = QColor(64, 64, 64);    // black
+        pen[ 1] = QColor(Qt::red);
+        pen[ 2] = QColor(0, 191, 0);     // green
+        pen[ 3] = QColor(127, 127, 0);   // brownish
+        pen[ 4] = QColor(Qt::blue);
+        pen[ 5] = QColor(Qt::magenta);
+        pen[ 6] = QColor(Qt::cyan);
+        pen[ 7] = QColor(Qt::gray);
+        // on tty, "light" variations are "bright" instead; here they're paler
+        pen[ 8] = QColor(Qt::white);     // no color
+        pen[ 9] = QColor(255, 127, 0);   // orange
+        pen[10] = QColor(127, 255, 127); // light green
+        pen[11] = QColor(Qt::yellow);
+        pen[12] = QColor(127, 127, 255); // light blue
+        pen[13] = QColor(255, 127, 255); // light magenta
+        pen[14] = QColor(127, 255, 255); // light cyan
+        pen[15] = QColor(Qt::white);
+        // ? out of range for 0..15
+        pen[16] = QColor(Qt::black);
+    }
+
+#ifdef ENHANCED_SYMBOLS
+    if (c & 0x80000000) {
+        return QColor(
+            (c >> 16) & 0xFF,
+            (c >>  8) & 0xFF,
+            (c >>  0) & 0xFF);
+    } else
+#endif
+    {
+        return pen[c];
+    }
 }
 
 int NetHackQtBind::qt_nhgetch()
@@ -667,7 +709,7 @@ char NetHackQtBind::qt_more()
     // ^C comment in that routine] when the core triggers --More-- via
     //  done2() -> really_done() -> display_nhwindow(WIN_MESSAGE, TRUE)
     // (get rid of this if the exec() loop issue gets properly fixed)
-    if (::gp.program_state.gameover)
+    if (::program_state.gameover)
         return ch; // bypass --More-- and just continue with program exit
 
     NetHackQtMessageWindow *mesgwin = main ? main->GetMessageWindow() : NULL;
@@ -685,6 +727,7 @@ char NetHackQtBind::qt_more()
             switch (ch) {
             case '\0': // hypothetical
                 ch = '\033';
+                FALLTHROUGH;
                 /*FALLTHRU*/
             case ' ':
             case '\n':
@@ -901,15 +944,27 @@ void NetHackQtBind::qt_delay_output()
 #endif
 }
 
-void NetHackQtBind::qt_start_screen()
+#ifdef CHANGE_COLOR
+void NetHackQtBind::qt_change_color(int color, long rgb, int reverse UNUSED)
 {
-    // Ignore.
+    int r, g, b;
+
+    r = (rgb >> 16) & 0xFF;
+    g = (rgb >> 8) & 0xFF;
+    b = rgb & 0xFF;
+    if (!pen) {
+        (void) NetHackQtBind::nhcolor_to_pen(0); /* init pen[] */
+    }
+    pen[color % 16] = QColor(r, g, b);
 }
 
-void NetHackQtBind::qt_end_screen()
+char *
+NetHackQtBind::qt_get_color_string(void)
 {
-    // Ignore.
+    return (char *) 0;
 }
+
+#endif
 
 void NetHackQtBind::qt_outrip(winid wid, int how, time_t when)
 {
@@ -1158,15 +1213,14 @@ struct window_procs Qt_procs = {
     nethack_qt_::NetHackQtBind::qt_get_ext_cmd,
     nethack_qt_::NetHackQtBind::qt_number_pad,
     nethack_qt_::NetHackQtBind::qt_delay_output,
-#ifdef CHANGE_COLOR     /* only a Mac option currently */
-    donull,
-    donull,
+#ifdef CHANGE_COLOR
+    nethack_qt_::NetHackQtBind::qt_change_color,
+#ifdef MAC /* old OS 9, not OSX */
     donull,
     donull,
 #endif
-    /* other defs that really should go away (they're tty specific) */
-    nethack_qt_::NetHackQtBind::qt_start_screen,
-    nethack_qt_::NetHackQtBind::qt_end_screen,
+    nethack_qt_::NetHackQtBind::qt_get_color_string,
+#endif
 #ifdef GRAPHIC_TOMBSTONE
     nethack_qt_::NetHackQtBind::qt_outrip,
 #else

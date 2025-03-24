@@ -1,4 +1,4 @@
-/* NetHack 3.7	mcastu.c	$NHDT-Date: 1705428596 2024/01/16 18:09:56 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.95 $ */
+/* NetHack 3.7	mcastu.c	$NHDT-Date: 1726168598 2024/09/12 19:16:38 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.105 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2011. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -63,9 +63,8 @@ cursetxt(struct monst *mtmp, boolean undirected)
         else
             point_msg = "at you, then curses";
 
-        pline_xy(mtmp->mx, mtmp->my,
-                 "%s points %s.", Monnam(mtmp), point_msg);
-    } else if ((!(gm.moves % 4) || !rn2(4))) {
+        pline_mon(mtmp, "%s points %s.", Monnam(mtmp), point_msg);
+    } else if ((!(svm.moves % 4) || !rn2(4))) {
         if (!Deaf)
             Norep("You hear a mumbled curse.");   /* Deaf-aware */
     }
@@ -85,6 +84,7 @@ choose_magic_spell(int spellval)
     case 23:
         if (Antimagic || Hallucination)
             return MGC_PSI_BOLT;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 22:
     case 21:
@@ -139,6 +139,7 @@ choose_clerical_spell(int spellnum)
     case 14:
         if (rn2(3))
             return CLC_OPEN_WOUNDS;
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 13:
         return CLC_GEYSER;
@@ -245,7 +246,7 @@ castmu(
      */
     if (!foundyou && thinks_it_foundyou
         && !is_undirected_spell(mattk->adtyp, spellnum)) {
-        pline_xy(mtmp->mx, mtmp->my, "%s casts a spell at %s!",
+        pline_mon(mtmp, "%s casts a spell at %s!",
                  canseemon(mtmp) ? Monnam(mtmp) : "Something",
                  is_waterwall(mtmp->mux, mtmp->muy) ? "empty water"
                                                     : "thin air");
@@ -262,7 +263,7 @@ castmu(
         return M_ATTK_MISS;
     }
     if (canspotmon(mtmp) || !is_undirected_spell(mattk->adtyp, spellnum)) {
-        pline_xy(mtmp->mx, mtmp->my, "%s casts a spell%s!",
+        pline_mon(mtmp, "%s casts a spell%s!",
                  canspotmon(mtmp) ? Monnam(mtmp) : "Something",
                  is_undirected_spell(mattk->adtyp, spellnum) ? ""
                  : (Invis && !perceives(mtmp->data)
@@ -343,14 +344,12 @@ castmu(
         break;
     case AD_SPEL: /* wizard spell */
     case AD_CLRC: /* clerical spell */
-    {
         if (mattk->adtyp == AD_SPEL)
             cast_wizard_spell(mtmp, dmg, spellnum);
         else
             cast_cleric_spell(mtmp, dmg, spellnum);
         dmg = 0; /* done by the spell casting functions */
         break;
-    }
     } /* switch */
     if (dmg)
         mdamageu(mtmp, dmg);
@@ -362,10 +361,9 @@ m_cure_self(struct monst *mtmp, int dmg)
 {
     if (mtmp->mhp < mtmp->mhpmax) {
         if (canseemon(mtmp))
-            pline("%s looks better.", Monnam(mtmp));
+            pline_mon(mtmp, "%s looks better.", Monnam(mtmp));
         /* note: player healing does 6d4; this used to do 1d8 */
-        if ((mtmp->mhp += d(3, 6)) > mtmp->mhpmax)
-            mtmp->mhp = mtmp->mhpmax;
+        healmon(mtmp, d(3, 6), 0);
         dmg = 0;
     }
     return dmg;
@@ -389,14 +387,22 @@ touch_of_death(struct monst *mtmp)
         u.mh = 0;
         rehumanize(); /* fatal iff Unchanging */
     } else if (drain >= u.uhpmax) {
-        gk.killer.format = KILLED_BY;
-        Strcpy(gk.killer.name, kbuf);
+        svk.killer.format = KILLED_BY;
+        Strcpy(svk.killer.name, kbuf);
         done(DIED);
     } else {
-        u.uhpmax -= drain;
+        /* HP manipulation similar to poisoned(attrib.c) */
+        int olduhp = u.uhp,
+            uhpmin = minuhpmax(3),
+            newuhpmax = u.uhpmax - drain;
+
+        setuhpmax(max(newuhpmax, uhpmin), FALSE);
+        dmg = adjuhploss(dmg, olduhp); /* reduce pending damage if uhp has
+                                        * already been reduced due to drop
+                                        * in uhpmax */
         losehp(dmg, kbuf, KILLED_BY);
     }
-    gk.killer.name[0] = '\0'; /* not killed if we get here... */
+    svk.killer.name[0] = '\0'; /* not killed if we get here... */
 }
 
 /* give a reason for death by some monster spells */
@@ -442,6 +448,11 @@ death_inflicted_by(
 staticfn void
 cast_wizard_spell(struct monst *mtmp, int dmg, int spellnum)
 {
+    if (dmg < 0) {
+        impossible("monster cast wizard spell (%d) with negative dmg (%d)?",
+                   spellnum, dmg);
+        return;
+    }
     if (dmg == 0 && !is_undirected_spell(AD_SPEL, spellnum)) {
         impossible("cast directed wizard spell (%d) with dmg=0?", spellnum);
         return;
@@ -469,7 +480,7 @@ cast_wizard_spell(struct monst *mtmp, int dmg, int spellnum)
         dmg = 0;
         break;
     case MGC_CLONE_WIZ:
-        if (mtmp->iswiz && gc.context.no_of_wizards == 1) {
+        if (mtmp->iswiz && svc.context.no_of_wizards == 1) {
             pline("Double Trouble...");
             clonewiz();
             dmg = 0;
@@ -545,7 +556,7 @@ cast_wizard_spell(struct monst *mtmp, int dmg, int spellnum)
             losestr(rnd(dmg),
                     death_inflicted_by(kbuf, "strength loss", mtmp),
                     KILLED_BY);
-            gk.killer.name[0] = '\0'; /* not killed if we get here... */
+            svk.killer.name[0] = '\0'; /* not killed if we get here... */
             monstunseesu(M_SEEN_MAGR);
         }
         dmg = 0;
@@ -553,7 +564,7 @@ cast_wizard_spell(struct monst *mtmp, int dmg, int spellnum)
     case MGC_DISAPPEAR: /* makes self invisible */
         if (!mtmp->minvis && !mtmp->invis_blkd) {
             if (canseemon(mtmp))
-                pline("%s suddenly %s!", Monnam(mtmp),
+                pline_mon(mtmp, "%s suddenly %s!", Monnam(mtmp),
                       !See_invisible ? "disappears" : "becomes transparent");
             mon_set_minvis(mtmp);
             if (cansee(mtmp->mx, mtmp->my) && !canspotmon(mtmp))
@@ -621,6 +632,12 @@ staticfn void
 cast_cleric_spell(struct monst *mtmp, int dmg, int spellnum)
 {
     int orig_dmg = 0;
+
+    if (dmg < 0) {
+        impossible("monster cast cleric spell (%d) with negative dmg (%d)?",
+                   spellnum, dmg);
+        return;
+    }
     if (dmg == 0 && !is_undirected_spell(AD_CLRC, spellnum)) {
         impossible("cast directed cleric spell (%d) with dmg=0?", spellnum);
         return;
@@ -772,7 +789,7 @@ cast_cleric_spell(struct monst *mtmp, int dmg, int spellnum)
             fmt = "%s summons %s!";
         }
         if (fmt)
-            pline(fmt, Monnam(mtmp), what);
+            pline_mon(mtmp, fmt, Monnam(mtmp), what);
 
         dmg = 0;
         break;
@@ -929,7 +946,7 @@ spell_would_be_useless(struct monst *mtmp, unsigned int adtyp, int spellnum)
         if (!mcouldseeu && (spellnum == MGC_SUMMON_MONS
                             || (!mtmp->iswiz && spellnum == MGC_CLONE_WIZ)))
             return TRUE;
-        if ((!mtmp->iswiz || gc.context.no_of_wizards > 1)
+        if ((!mtmp->iswiz || svc.context.no_of_wizards > 1)
             && spellnum == MGC_CLONE_WIZ)
             return TRUE;
         /* aggravation (global wakeup) when everyone is already active */
@@ -975,7 +992,7 @@ buzzmu(struct monst *mtmp, struct attack *mattk)
     if (lined_up(mtmp) && rn2(3)) {
         nomul(0);
         if (canseemon(mtmp))
-            pline("%s zaps you with a %s!", Monnam(mtmp),
+            pline_mon(mtmp, "%s zaps you with a %s!", Monnam(mtmp),
                   flash_str(BZ_OFS_AD(mattk->adtyp), FALSE));
         gb.buzzer = mtmp;
         buzz(BZ_M_SPELL(BZ_OFS_AD(mattk->adtyp)), (int) mattk->damn,

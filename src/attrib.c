@@ -1,11 +1,10 @@
-/* NetHack 3.7	attrib.c	$NHDT-Date: 1651908297 2022/05/07 07:24:57 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.86 $ */
+/* NetHack 3.7	attrib.c	$NHDT-Date: 1726168587 2024/09/12 19:16:27 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.129 $ */
 /*      Copyright 1988, 1989, 1990, 1992, M. Stephenson           */
 /* NetHack may be freely redistributed.  See license for details. */
 
 /*  attribute modification routines. */
 
 #include "hack.h"
-#include <ctype.h>
 
 /* part of the output on gain or loss of attribute */
 static const char
@@ -191,7 +190,7 @@ adjattrib(
     disp.botl = TRUE;
     if (msgflg <= 0)
         You_feel("%s%s!", (incr > 1 || incr < -1) ? "very " : "", attrstr);
-    if (gp.program_state.in_moveloop && (ndx == A_STR || ndx == A_CON))
+    if (program_state.in_moveloop && (ndx == A_STR || ndx == A_CON))
         (void) encumber_msg();
     return TRUE;
 }
@@ -242,19 +241,19 @@ losestr(int num, const char *knam, schar k_format)
         losehp(dmg, knam, k_format);
 
         if (Upolyd) {
-            /* if still polymorphed, reduce you-as-monst maxHP; never below 1 */
-            u.mhmax -= min(dmg, u.mhmax - 1);
+            /* when still poly'd, reduce you-as-monst maxHP; never below 1 */
+            setuhpmax(max(u.mhmax - dmg, 1), FALSE); /* acts as setmhmax() */
         } else if (!waspolyd) {
             /* not polymorphed now and didn't rehumanize when taking damage;
                reduce max HP, but not below uhpmin */
             if (u.uhpmax > uhpmin)
-                setuhpmax(max(u.uhpmax - dmg, uhpmin));
+                setuhpmax(max(u.uhpmax - dmg, uhpmin), FALSE);
         }
         disp.botl = TRUE;
     }
 #if 0   /* only possible if uhpmax was already less than uhpmin */
     if (!Upolyd && u.uhpmax < uhpmin) {
-        setuhpmax(min(olduhpmax, uhpmin));
+        setuhpmax(min(olduhpmax, uhpmin), FALSE);
         if (!Drain_resistance)
             losexp(NULL); /* won't be fatal when no 'drainer' is supplied */
     }
@@ -352,17 +351,27 @@ poisoned(
         kprefix = KILLED_BY;
     }
 
+    /*
+     * FIXME:
+     *  this operates on u.uhp[max] even when hero is polymorphed....
+     */
+
     i = !fatal ? 1 : rn2(fatal + (thrown_weapon ? 20 : 0));
     if (i == 0 && typ != A_CHA) {
         /* sometimes survivable instant kill */
-        loss = 6 + d(4, 6);
+        loss = 6 + d(4, 6); /* 6 + 4d6 => 10..34 */
         if (u.uhp <= loss) {
             u.uhp = -1;
             disp.botl = TRUE;
             pline_The("poison was deadly...");
         } else {
             /* survived, but with severe reaction */
-            u.uhpmax = max(3, u.uhpmax - (loss / 2));
+            int olduhp = u.uhp,
+                newuhpmax = u.uhpmax - (loss / 2);
+
+            setuhpmax(max(newuhpmax, minuhpmax(3)), TRUE); /*True: see FIXME*/
+            loss = adjuhploss(loss, olduhp);
+
             losehp(loss, pkiller, kprefix); /* poison damage */
             if (adjattrib(A_CON, (typ != A_CON) ? -1 : -3, TRUE))
                 poisontell(A_CON, TRUE);
@@ -387,8 +396,8 @@ poisoned(
     }
 
     if (u.uhp < 1) {
-        gk.killer.format = kprefix;
-        Strcpy(gk.killer.name, pkiller);
+        svk.killer.format = kprefix;
+        Strcpy(svk.killer.name, pkiller);
         /* "Poisoned by a poisoned ___" is redundant */
         done(strstri(pkiller, "poison") ? DIED : POISONING);
     }
@@ -405,8 +414,10 @@ change_luck(schar n)
         u.uluck = LUCKMAX;
 }
 
+/* decide whether there are more blessed luckstones (plus luck-conferring
+   artifacts) than cursed ones; optionally combine uncursed with blessed */
 int
-stone_luck(boolean parameter) /* So I can't think up of a good name.  So sue me. --KAA */
+stone_luck(boolean include_uncursed)
 {
     struct obj *otmp;
     long bonchance = 0;
@@ -415,9 +426,7 @@ stone_luck(boolean parameter) /* So I can't think up of a good name.  So sue me.
         if (confers_luck(otmp)) {
             if (otmp->cursed)
                 bonchance -= otmp->quan;
-            else if (otmp->blessed)
-                bonchance += otmp->quan;
-            else if (parameter)
+            else if (otmp->blessed || include_uncursed)
                 bonchance += otmp->quan;
         }
 
@@ -501,14 +510,14 @@ exercise(int i, boolean inc_or_dec)
                                                                       : "Con",
                     (inc_or_dec) ? "inc" : "dec", AEXE(i));
     }
-    if (gm.moves > 0 && (i == A_STR || i == A_CON))
+    if (svm.moves > 0 && (i == A_STR || i == A_CON))
         (void) encumber_msg();
 }
 
 staticfn void
 exerper(void)
 {
-    if (!(gm.moves % 10)) {
+    if (!(svm.moves % 10)) {
         /* Hunger Checks */
         int hs = (u.uhunger > 1000) ? SATIATED
                  : (u.uhunger > 150) ? NOT_HUNGRY
@@ -555,7 +564,7 @@ exerper(void)
     }
 
     /* status checks */
-    if (!(gm.moves % 5)) {
+    if (!(svm.moves % 5)) {
         debugpline0("exerper: Status checks");
         if ((HClairvoyant & (INTRINSIC | TIMEOUT)) && !BClairvoyant)
             exercise(A_WIS, TRUE);
@@ -590,11 +599,11 @@ exerchk(void)
     /*  Check out the periodic accumulations */
     exerper();
 
-    if (gm.moves >= gc.context.next_attrib_check) {
+    if (svm.moves >= svc.context.next_attrib_check) {
         debugpline1("exerchk: ready to test. multi = %ld.", gm.multi);
     }
     /*  Are we ready for a test? */
-    if (gm.moves >= gc.context.next_attrib_check && !gm.multi) {
+    if (svm.moves >= svc.context.next_attrib_check && !gm.multi) {
         debugpline0("exerchk: testing.");
         /*
          *      Law of diminishing returns (Part II):
@@ -658,9 +667,9 @@ exerchk(void)
                platform-dependent rounding/truncation for negative vals */
             AEXE(i) = (abs(ax) / 2) * mod_val;
         }
-        gc.context.next_attrib_check += rn1(200, 800);
+        svc.context.next_attrib_check += rn1(200, 800);
         debugpline1("exerchk: next check at %ld.",
-                    gc.context.next_attrib_check);
+                    svc.context.next_attrib_check);
     }
 }
 
@@ -879,7 +888,8 @@ is_innate(int propidx)
            ignore innateness if equipment is going to claim responsibility */
         && !u.uprops[propidx].extrinsic)
         return FROM_ROLE;
-    if (propidx == BLINDED && !haseyes(gy.youmonst.data))
+    if ((propidx == BLINDED && !haseyes(gy.youmonst.data))
+        || (propidx == BLND_RES && (HBlnd_resist & FROMFORM) != 0))
         return FROM_FORM;
     return FROM_NONE;
 }
@@ -887,7 +897,8 @@ is_innate(int propidx)
 DISABLE_WARNING_FORMAT_NONLITERAL
 
 char *
-from_what(int propidx) /* special cases can have negative values */
+from_what(
+    int propidx) /* special cases can have negative values */
 {
     static char buf[BUFSZ];
 
@@ -929,7 +940,7 @@ from_what(int propidx) /* special cases can have negative values */
             else if (innateness == FROM_LYCN)
                 Strcpy(buf, " due to your lycanthropy");
             else if (innateness == FROM_FORM)
-                Strcpy(buf, " from current creature form");
+                Strcpy(buf, " from your creature form");
             else if (propidx == FAST && Very_fast)
                 Sprintf(buf, because_of,
                         ((HFast & TIMEOUT) != 0L) ? "a potion or spell"
@@ -1072,7 +1083,7 @@ newhp(void)
             hp += rnd(gu.urole.hpadv.inrnd);
         if (gu.urace.hpadv.inrnd > 0)
             hp += rnd(gu.urace.hpadv.inrnd);
-        if (gm.moves <= 1L) { /* initial hero; skip for polyself to new man */
+        if (svm.moves == 0) { /* initial hero; skip for polyself to new man */
             /* Initialize alignment stuff */
             u.ualign.type = aligns[flags.initalign].value;
             u.ualign.record = gu.urole.initrecord;
@@ -1135,18 +1146,46 @@ minuhpmax(int altmin)
     return max(u.ulevel, altmin);
 }
 
-/* update u.uhpmax and values of other things that depend upon it */
+/* update u.uhpmax or u.mhmax and values of other things that depend upon
+   whichever of them is relevant */
 void
-setuhpmax(int newmax)
+setuhpmax(int newmax, boolean even_when_polyd)
 {
-    if (newmax != u.uhpmax) {
-        u.uhpmax = newmax;
-        if (u.uhpmax > u.uhppeak)
-            u.uhppeak = u.uhpmax;
-        disp.botl = TRUE;
+    if (!Upolyd || even_when_polyd) {
+        if (newmax != u.uhpmax) {
+            u.uhpmax = newmax;
+            if (u.uhpmax > u.uhppeak)
+                u.uhppeak = u.uhpmax;
+            disp.botl = TRUE;
+        }
+        if (u.uhp > u.uhpmax)
+            u.uhp = u.uhpmax, disp.botl = TRUE;
+    } else { /* Upolyd */
+        if (newmax != u.mhmax) {
+            u.mhmax = newmax;
+            disp.botl = TRUE;
+        }
+        if (u.mh > u.mhmax)
+            u.mh = u.mhmax, disp.botl = TRUE;
     }
-    if (u.uhp > u.uhpmax)
-        u.uhp = u.uhpmax, disp.botl = TRUE;
+}
+
+/* called after setuhpmax() when damage is pending;
+   if uhpmax (or mhmax) has been reduced, it might have caused uhp (or mh)
+   to be reduced too; if so, recalculate pending loss to account for that */
+int
+adjuhploss(
+    int loss, /* pending hp loss */
+    int olduhp) /* does double duty as oldmh when Upolyd */
+{
+    if (!Upolyd) {
+        if (u.uhp < olduhp)
+            loss -= (olduhp - u.uhp);
+    } else {
+        if (u.mh < olduhp)
+            loss -= (olduhp - u.mh);
+    }
+    return max(loss, 1);
 }
 
 /* return the current effective value of a specific characteristic
@@ -1221,7 +1260,8 @@ acurrstr(void)
    to distinguish between observable +0 result and no-visible-effect
    due to an attribute not being able to exceed maximum or minimum */
 boolean
-extremeattr(int attrindx) /* does attrindx's value match its max or min? */
+extremeattr(
+    int attrindx) /* does attrindx's value match its max or min? */
 {
     /* Fixed_abil and racial MINATTR/MAXATTR aren't relevant here */
     int lolimit = 3, hilimit = 25, curval = ACURR(attrindx);
@@ -1272,8 +1312,9 @@ adjalign(int n)
 
 /* change hero's alignment type, possibly losing use of artifacts */
 void
-uchangealign(int newalign,
-             int reason) /* A_CG_CONVERT, A_CG_HELM_ON, or A_CG_HELM_OFF */
+uchangealign(
+    int newalign,
+    int reason) /* A_CG_CONVERT, A_CG_HELM_ON, or A_CG_HELM_OFF */
 {
     aligntyp oldalign = u.ualign.type;
 

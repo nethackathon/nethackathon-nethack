@@ -25,8 +25,9 @@ extern winid WIN_STATUS;
 
 static TCHAR szMainWindowClass[] = TEXT("MSNHMainWndClass");
 static TCHAR szTitle[MAX_LOADSTRING];
+struct window_tracking_data windowdata[MAXWINDOWS];
 extern void mswin_display_splash_window(BOOL);
-
+extern void free_menu_data(void); /* mhmenu.c */
 LRESULT CALLBACK MainWndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK About(HWND, UINT, WPARAM, LPARAM);
 static LRESULT onWMCommand(HWND hWnd, WPARAM wParam, LPARAM lParam);
@@ -208,9 +209,11 @@ MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         data = (PNHMainWindow) malloc(sizeof(NHMainWindow));
         if (!data)
             panic("out of memory");
+
         ZeroMemory(data, sizeof(NHMainWindow));
         data->mapAcsiiModeSave = MAP_MODE_ASCII12x16;
         SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR) data);
+        windowdata[NHW_MAIN].address = (genericptr_t) data;
 
         /* update menu items */
         CheckMenuItem(
@@ -457,16 +460,16 @@ MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     case WM_CLOSE: {
         /* exit gracefully */
-        if (gp.program_state.gameover) {
+        if (program_state.gameover) {
             /* assume the user really meant this, as the game is already
              * over... */
             /* to make sure we still save bones, just set stop printing flag
              */
-            gp.program_state.stopprint++;
+            program_state.stopprint++;
             NHEVENT_KBD(
                 '\033'); /* and send keyboard input as if user pressed ESC */
             /* additional code for this is done in menu and rip windows */
-        } else if (!gp.program_state.something_worth_saving) {
+        } else if (!program_state.something_worth_saving) {
             /* User exited before the game started, e.g. during splash display
              */
             /* Just get out. */
@@ -509,7 +512,7 @@ MainWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         /* clean up */
         free((PNHMainWindow) GetWindowLongPtr(hWnd, GWLP_USERDATA));
         SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR) 0);
-
+        windowdata[NHW_MAIN].address = 0;
         // PostQuitMessage(0);
         exit(1);
         break;
@@ -541,6 +544,7 @@ onMSNHCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
             mswin_select_map_mode(iflags.wc_map_mode);
 
         child = GetNHApp()->windowlist[msg_param->wid].win;
+        nhUse(child);
     } break;
 
     case MSNH_MSG_RANDOM_INPUT: {
@@ -750,14 +754,18 @@ mswin_layout_main_window(HWND changed_child)
     }
     if (IsWindow(changed_child))
         SetForegroundWindow(changed_child);
+    nhUse(data);
 }
+
+VOID CALLBACK FuzzTimerProc( _In_ HWND     hwnd,
+    _In_ UINT     uMsg, _In_ UINT_PTR idEvent,
+    _In_ DWORD    dwTime);
 
 VOID CALLBACK FuzzTimerProc(
     _In_ HWND     hwnd,
-    _In_ UINT     uMsg,
-    _In_ UINT_PTR idEvent,
-    _In_ DWORD    dwTime
-    )
+    _In_ UINT     uMsg UNUSED,
+    _In_ UINT_PTR idEvent UNUSED,
+    _In_ DWORD    dwTime UNUSED)
 {
         INPUT input[16];
         int i_pos = 0;
@@ -842,7 +850,7 @@ onWMCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
     case IDM_SAVE:
         if (iflags.debug_fuzzer)
             break;
-        if (!gp.program_state.gameover && !gp.program_state.done_hup)
+        if (!program_state.gameover && !program_state.done_hup)
             dosave();
         else
             MessageBeep(0);
@@ -1019,7 +1027,8 @@ onWMCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
         pFile = _tfopen(filename, TEXT("wt+,ccs=UTF-8"));
         if (!pFile) {
             TCHAR buf[4096];
-            _stprintf(buf, TEXT("Cannot open %s for writing!"), filename);
+            nh_stprintf(buf, sizeof buf,
+			TEXT("Cannot open %s for writing!"), filename);
             NHMessageBox(hWnd, buf, MB_OK | MB_ICONERROR);
             if (text)
                 free(text);
@@ -1110,6 +1119,7 @@ onWMCommand(HWND hWnd, WPARAM wParam, LPARAM lParam)
     default:
         return 1;
     }
+    nhUse(wmEvent);
     return 0;
 }
 

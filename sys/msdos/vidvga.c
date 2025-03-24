@@ -14,7 +14,6 @@
 #include "font.h"
 
 #include <dos.h>
-#include <ctype.h>
 #include "wintty.h"
 
 #ifdef __GO32__
@@ -291,14 +290,14 @@ void vga_cl_eos(int cy)
 }
 
 void
-vga_tty_end_screen(void)
+vga_term_end_screen(void)
 {
     vga_clear_screen(BACKGROUND_VGA_COLOR);
     vga_SwitchMode(MODETEXT);
 }
 
 void
-vga_tty_startup(int *wid, int *hgt)
+vga_term_startup(int *wid, int *hgt)
 {
     /* code to sense display adapter is required here - MJA */
 
@@ -472,7 +471,7 @@ vga_cliparound(int x, int y UNUSED)
         clipx = clipxmax - (viewport_size - 1);
     }
     if (clipx != oldx) {
-        if (on_level(&u.uz0, &u.uz) && !gp.program_state.restoring)
+        if (on_level(&u.uz0, &u.uz) && !program_state.restoring)
             /* (void) doredraw(); */
             vga_redrawmap(1);
     }
@@ -1158,6 +1157,16 @@ vga_SetPalette(const struct Pixel *p)
         (void) int86(VIDEO_BIOS, &regs, &regs);
         regs.x.bx += 0x0101;
     }
+}
+
+void
+vga_hide_cursor(void)
+{
+}
+
+void
+vga_show_cursor(void)
+{
 }
 
 /*static unsigned char colorbits[]={0x01,0x02,0x04,0x08}; */ /* wrong */

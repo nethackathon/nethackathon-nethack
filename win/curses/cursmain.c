@@ -126,8 +126,6 @@ struct window_procs curses_procs = {
 #endif
     curses_get_color_string,
 #endif
-    curses_start_screen,
-    curses_end_screen,
     genl_outrip,
     curses_preference_update,
     curses_getmsghistory,
@@ -206,6 +204,12 @@ curses_init_nhwindows(
     }
 #endif
 #endif
+
+    /* if anything has already been output by nethack (for instance, warnings
+       about RC file issues), let the player acknowlege it before initscr()
+       erases the screen */
+    if (iflags.raw_printed)
+        curses_wait_synch();
 
 #ifdef XCURSES
     base_term = Xinitscr(*argcp, argv);
@@ -320,9 +324,9 @@ curses_askname(void)
         }
 #endif /* SELECTSAVED */
 
-    curses_line_input_dialog("Who are you?", gp.plname, PL_NSIZ);
-    (void) mungspaces(gp.plname);
-    if (!gp.plname[0] || gp.plname[0] == '\033')
+    curses_line_input_dialog("Who are you?", svp.plname, PL_NSIZ);
+    (void) mungspaces(svp.plname);
+    if (!svp.plname[0] || svp.plname[0] == '\033')
          goto bail;
 
     iflags.renameallowed = TRUE; /* tty uses this, we don't [yet?] */
@@ -776,7 +780,7 @@ curses_update_inventory(int arg)
     }
 
     /* skip inventory updating during character initialization */
-    if (!gp.program_state.in_moveloop && !gp.program_state.gameover)
+    if (!program_state.in_moveloop && !program_state.gameover)
         return;
 
     if (!arg) {
@@ -853,6 +857,25 @@ wait_synch()    -- Wait until all pending output is complete (*flush*() for
 void
 curses_wait_synch(void)
 {
+    if (iflags.raw_printed) {
+#ifndef PDCURSES
+        int chr;
+        /*
+         * If any message has been issued via raw_print(), make the user
+         * acknowledge it.  This might take place before initscr() so
+         * access to curses is limited.  [Despite that, there's probably
+         * a more curses-specific way to handle this. FIXME?]
+         */
+
+        (void) fprintf(stdout, "\nPress <return> to continue: ");
+        (void) fflush(stdout);
+        do {
+            chr = fgetc(stdin);
+        } while (chr > 0 && chr != C('j') && chr != C('m') && chr != '\033');
+#endif
+        iflags.raw_printed = 0;
+    }
+
     if (iflags.window_inited) {
         if (curses_got_output())
             (void) curses_more();
@@ -1001,12 +1024,11 @@ curses_raw_print(const char *str)
 
     if (iflags.window_inited) {
         curses_message_win_puts(str, FALSE);
-    } else {
-        puts(str);
+        return;
     }
-#else
-    puts(str);
 #endif
+    puts(str);
+    iflags.raw_printed++;
 }
 
 /*
@@ -1181,27 +1203,6 @@ curses_delay_output(void)
         napms(50);
     }
 #endif
-}
-
-/*
-start_screen()  -- Only used on Unix tty ports, but must be declared for
-               completeness.  Sets up the tty to work in full-screen
-               graphics mode.  Look at win/tty/termcap.c for an
-               example.  If your window-port does not need this function
-               just declare an empty function.
-*/
-void
-curses_start_screen(void)
-{
-}
-
-/*
-end_screen()    -- Only used on Unix tty ports, but must be declared for
-               completeness.  The complement of start_screen().
-*/
-void
-curses_end_screen(void)
-{
 }
 
 /*

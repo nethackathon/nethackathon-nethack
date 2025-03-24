@@ -1,4 +1,4 @@
-/* NetHack 3.7	flag.h	$NHDT-Date: 1707122958 2024/02/05 08:49:18 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.236 $ */
+/* NetHack 3.7	flag.h	$NHDT-Date: 1715979826 2024/05/17 21:03:46 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.246 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Michael Allison, 2006. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -224,6 +224,12 @@ struct accessibility_data {
             a11y.mon_notices_blocked = 0;                           \
         } } while(0)
 
+enum debug_fuzzer_states {
+    fuzzer_off,
+    fuzzer_impossible_panic,
+    fuzzer_impossible_continue
+};
+
 /*
  * Stuff that really isn't option or platform related and does not
  * get saved and restored.  They are set and cleared during the game
@@ -233,8 +239,7 @@ struct accessibility_data {
 struct instance_flags {
     boolean query_menu;    /* use a menu for yes/no queries */
     boolean showdamage;
-    boolean debug_fuzzer;  /* fuzz testing */
-    boolean defer_plname;  /* X11 hack: askname() might not set gp.plname */
+    boolean defer_plname;  /* X11 hack: askname() might not set svp.plname */
     boolean herecmd_menu;  /* use menu when mouseclick on yourself */
     boolean invis_goldsym; /* gold symbol is ' '? */
     boolean in_lua;        /* executing a lua script */
@@ -244,6 +249,7 @@ struct instance_flags {
                                 * indirectly so we can't use xname_flags() */
     boolean remember_getpos; /* save getpos() positioning in do-again queue */
     boolean sad_feeling;   /* unseen pet is dying */
+    xint8 debug_fuzzer;    /* fuzz testing */
     int at_midnight;       /* only valid during end of game disclosure */
     int at_night;          /* also only valid during end of game disclosure */
     int failing_untrap;    /* move_into_trap() -> spoteffects() -> dotrap() */
@@ -257,6 +263,7 @@ struct instance_flags {
     int override_ID;       /* true to force full identification of objects */
     int parse_config_file_src;  /* hack for parse_config_line() */
     int purge_monsters;    /* # of dead monsters still on fmon list */
+    int raw_printed;       /* count of messages issued before window_inited */
     int suppress_price;    /* controls doname() for unpaid objects */
     unsigned  terrainmode; /* for getpos()'s autodescribe during #terrain */
 #define TER_MAP    0x01U
@@ -312,6 +319,7 @@ struct instance_flags {
     boolean news;             /* print news */
     boolean num_pad;          /* use numbers for movement commands */
     boolean perm_invent;      /* display persistent inventory window */
+    boolean perm_invent_pending;  /* need to try again */
     boolean renameallowed;    /* can change hero name during role selection */
     boolean renameinprogress; /* we are changing hero name */
     boolean sounds;           /* master on/off switch for using soundlib */

@@ -3,7 +3,6 @@
 /* NetHack may be freely redistributed.  See license for details. */
 
 #include "hack.h"
-#include <ctype.h>
 
 #ifdef ENHANCED_SYMBOLS
 
@@ -153,7 +152,8 @@ add_custom_urep_entry(
     const uint8 *utf8str,
     enum graphics_sets which_set)
 {
-    struct symset_customization *gdc = &gs.sym_customizations[which_set][custom_ureps];
+    struct symset_customization *gdc
+        = &gs.sym_customizations[which_set][custom_ureps];
     struct customization_detail *details, *newdetails = 0;
 
 
@@ -164,7 +164,7 @@ add_custom_urep_entry(
         gdc->details_end = 0;
     }
     details = find_matching_customization(customization_name,
-                                            custom_ureps, which_set); /* FIXME */
+                                          custom_ureps, which_set); /* FIXME */
     if (details) {
         while (details) {
             if (details->content.urep.glyphidx == glyphidx) {

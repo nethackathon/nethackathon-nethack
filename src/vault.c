@@ -1,4 +1,4 @@
-/* NetHack 3.7	vault.c	$NHDT-Date: 1657868307 2022/07/15 06:58:27 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.91 $ */
+/* NetHack 3.7	vault.c	$NHDT-Date: 1737622664 2025/01/23 00:57:44 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.113 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2011. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -27,6 +27,7 @@ newegd(struct monst *mtmp)
     if (!EGD(mtmp)) {
         EGD(mtmp) = (struct egd *) alloc(sizeof (struct egd));
         (void) memset((genericptr_t) EGD(mtmp), 0, sizeof (struct egd));
+        EGD(mtmp)->parentmid = mtmp->m_id;
     }
 }
 
@@ -49,7 +50,7 @@ clear_fcorr(struct monst *grd, boolean forceshow)
     coordxy fcx, fcy, fcbeg;
     struct monst *mtmp;
     boolean sawcorridor = FALSE,
-            silently = gp.program_state.stopprint ? TRUE : FALSE;
+            silently = program_state.stopprint ? TRUE : FALSE;
     struct egd *egrd = EGD(grd);
     struct trap *trap;
     struct rm *lev;
@@ -99,8 +100,7 @@ clear_fcorr(struct monst *grd, boolean forceshow)
         }
         del_engr_at(fcx, fcy);
         map_location(fcx, fcy, 1); /* bypass vision */
-        if (!ACCESSIBLE(lev->typ))
-            block_point(fcx, fcy);
+        recalc_block_point(fcx, fcy);
         gv.vision_full_recalc = 1;
         egrd->fcbeg++;
     }
@@ -109,7 +109,7 @@ clear_fcorr(struct monst *grd, boolean forceshow)
     /* only give encased message if hero is still alive (might get here
        via paygd() -> mongone() -> grddead() when game is over;
        died: no message, quit: message) */
-    if (IS_ROCK(levl[u.ux][u.uy].typ) && (Upolyd ? u.mh : u.uhp) > 0
+    if (IS_OBSTRUCTED(levl[u.ux][u.uy].typ) && (Upolyd ? u.mh : u.uhp) > 0
         && !silently)
         You("are encased in rock.");
     return TRUE;
@@ -156,8 +156,8 @@ parkguard(struct monst *grd)
 {
     /* either guard is dead or will now be treated as if so;
        monster traversal loops should skip it */
-    if (grd == gc.context.polearm.hitmon)
-        gc.context.polearm.hitmon = 0;
+    if (grd == svc.context.polearm.hitmon)
+        svc.context.polearm.hitmon = 0;
     if (grd->mx) {
         remove_monster(grd->mx, grd->my);
         newsym(grd->mx, grd->my);
@@ -246,7 +246,7 @@ vault_occupied(char *array)
     char *ptr;
 
     for (ptr = array; *ptr; ptr++)
-        if (gr.rooms[*ptr - ROOMOFFSET].rtype == VAULT)
+        if (svr.rooms[*ptr - ROOMOFFSET].rtype == VAULT)
             return *ptr;
     return '\0';
 }
@@ -495,13 +495,13 @@ invault(void)
 
         if (u.ualign.type == A_LAWFUL
             /* ignore trailing text, in case player includes rank */
-            && strncmpi(buf, gp.plname, (int) strlen(gp.plname)) != 0) {
+            && strncmpi(buf, svp.plname, (int) strlen(svp.plname)) != 0) {
             adjalign(-1); /* Liar! */
         }
 
         if (!strcmpi(buf, "Croesus") || !strcmpi(buf, "Kroisos")
             || !strcmpi(buf, "Creosote")) { /* Discworld */
-            if (!gm.mvitals[PM_CROESUS].died) {
+            if (!svm.mvitals[PM_CROESUS].died) {
                 if (Deaf) {
                     if (!Blind)
                         pline("%s waves goodbye.", noit_Monnam(guard));
@@ -583,8 +583,8 @@ invault(void)
                dug into an empty doorway (which could subsequently have
                been plugged with an intact door by use of locking magic) */
             int vlt = EGD(guard)->vroom;
-            coordxy lowx = gr.rooms[vlt].lx, hix = gr.rooms[vlt].hx;
-            coordxy lowy = gr.rooms[vlt].ly, hiy = gr.rooms[vlt].hy;
+            coordxy lowx = svr.rooms[vlt].lx, hix = svr.rooms[vlt].hx;
+            coordxy lowy = svr.rooms[vlt].ly, hiy = svr.rooms[vlt].hy;
 
             if (x == lowx - 1 && y == lowy - 1)
                 typ = TLCORNER;
@@ -608,6 +608,7 @@ invault(void)
         EGD(guard)->fakecorr[0].ftyp = typ;
         EGD(guard)->fakecorr[0].flags = levl[x][y].flags;
         /* guard's entry point where confrontation with hero takes place */
+        spot_stop_timers(x, y, MELT_ICE_AWAY);
         levl[x][y].typ = DOOR;
         levl[x][y].doormask = D_NODOOR;
         unblock_point(x, y); /* empty doorway doesn't block light */
@@ -623,8 +624,8 @@ move_gold(struct obj *gold, int vroom)
 
     remove_object(gold);
     newsym(gold->ox, gold->oy);
-    nx = gr.rooms[vroom].lx + rn2(2);
-    ny = gr.rooms[vroom].ly + rn2(2);
+    nx = svr.rooms[vroom].lx + rn2(2);
+    ny = svr.rooms[vroom].ly + rn2(2);
     place_object(gold, nx, ny);
     stackobj(gold);
     newsym(nx, ny);
@@ -637,8 +638,8 @@ wallify_vault(struct monst *grd)
     coordxy x, y;
     int vlt = EGD(grd)->vroom;
     char tmp_viz;
-    coordxy lox = gr.rooms[vlt].lx - 1, hix = gr.rooms[vlt].hx + 1,
-          loy = gr.rooms[vlt].ly - 1, hiy = gr.rooms[vlt].hy + 1;
+    coordxy lox = svr.rooms[vlt].lx - 1, hix = svr.rooms[vlt].hx + 1,
+          loy = svr.rooms[vlt].ly - 1, hiy = svr.rooms[vlt].hy + 1;
     struct monst *mon;
     struct obj *gold, *rocks;
     struct trap *trap;
@@ -730,6 +731,7 @@ gd_mv_monaway(struct monst *grd, int nx, int ny)
         }
         if (!rloc(mtmp, RLOC_ERR | RLOC_MSG) || MON_AT(nx, ny))
             m_into_limbo(mtmp);
+        recalc_block_point(nx, ny);
     }
 }
 
@@ -887,7 +889,7 @@ gd_move(struct monst *grd)
 
     if (!on_level(&(egrd->gdlevel), &u.uz))
         return -1;
-    nx = ny = m = n = 0;
+
     if (semi_dead || !grd->mx || egrd->gddone) {
         egrd->gddone = 1;
         return gd_move_cleanup(grd, semi_dead, FALSE);
@@ -958,6 +960,7 @@ gd_move(struct monst *grd)
                 mnexto(grd, RLOC_NOMSG);
                 levl[m][n].typ = egrd->fakecorr[0].ftyp;
                 levl[m][n].flags = egrd->fakecorr[0].flags;
+                recalc_block_point(m, n);
                 del_engr_at(m, n);
                 newsym(m, n);
                 return -1;
@@ -1031,6 +1034,7 @@ gd_move(struct monst *grd)
             }
         }
     }
+    m = n = 0;
     for (fci = egrd->fcbeg; fci < egrd->fcend; fci++)
         if (g_at(egrd->fakecorr[fci].fx, egrd->fakecorr[fci].fy)) {
             m = egrd->fakecorr[fci].fx;
@@ -1210,10 +1214,10 @@ paygd(boolean silently)
         mnexto(grd, RLOC_NOMSG);
         if (!silently)
             pline("%s remits your gold to the vault.", Monnam(grd));
-        gdx = gr.rooms[EGD(grd)->vroom].lx + rn2(2);
-        gdy = gr.rooms[EGD(grd)->vroom].ly + rn2(2);
+        gdx = svr.rooms[EGD(grd)->vroom].lx + rn2(2);
+        gdy = svr.rooms[EGD(grd)->vroom].ly + rn2(2);
         Sprintf(buf, "To Croesus: here's the gold recovered from %s the %s.",
-                gp.plname,
+                svp.plname,
                 pmname(&mons[u.umonster], flags.female ? FEMALE : MALE));
         make_grave(gdx, gdy, buf);
     }

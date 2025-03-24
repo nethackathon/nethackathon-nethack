@@ -1,13 +1,13 @@
-/* NetHack 3.7	polyself.c	$NHDT-Date: 1703845752 2023/12/29 10:29:12 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.207 $ */
+/* NetHack 3.7	polyself.c	$NHDT-Date: 1740534595 2025/02/25 17:49:55 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.223 $ */
 /*      Copyright (C) 1987, 1988, 1989 by Ken Arromdee */
 /* NetHack may be freely redistributed.  See license for details. */
 
 /*
  * Polymorph self routine.
  *
- * Note:  the light source handling code assumes that both gy.youmonst.m_id
- * and gy.youmonst.mx will always remain 0 when it handles the case of the
- * player polymorphed into a light-emitting monster.
+ * Note:  the light source handling code assumes that gy.youmonst.m_id
+ * always remains 1 and gy.youmonst.mx will always remain 0 when it handles
+ * the case of the player polymorphed into a light-emitting monster.
  *
  * Transformation sequences:
  *              /-> polymon                 poly into monster form
@@ -41,6 +41,7 @@ set_uasmon(void)
     boolean was_vampshifter = valid_vampshiftform(gy.youmonst.cham, u.umonnum);
 
     set_mon_data(&gy.youmonst, mdat);
+    gy.youmonst.m_id = 1;
 
     if (Protection_from_shape_changers)
         gy.youmonst.cham = NON_PM;
@@ -58,15 +59,16 @@ set_uasmon(void)
         else                                           \
             u.uprops[PropIndx].intrinsic &= ~FROMFORM; \
     } while (0)
+#define resist_from_form(MRtyp) ((gy.youmonst.data->mresists & (MRtyp)) != 0)
 
-    PROPSET(FIRE_RES, resists_fire(&gy.youmonst));
-    PROPSET(COLD_RES, resists_cold(&gy.youmonst));
-    PROPSET(SLEEP_RES, resists_sleep(&gy.youmonst));
-    PROPSET(DISINT_RES, resists_disint(&gy.youmonst));
-    PROPSET(SHOCK_RES, resists_elec(&gy.youmonst));
-    PROPSET(POISON_RES, resists_poison(&gy.youmonst));
-    PROPSET(ACID_RES, resists_acid(&gy.youmonst));
-    PROPSET(STONE_RES, resists_ston(&gy.youmonst));
+    PROPSET(FIRE_RES, resist_from_form(MR_FIRE));
+    PROPSET(COLD_RES, resist_from_form( MR_COLD));
+    PROPSET(SLEEP_RES, resist_from_form(MR_SLEEP));
+    PROPSET(DISINT_RES, resist_from_form(MR_DISINT));
+    PROPSET(SHOCK_RES, resist_from_form(MR_ELEC));
+    PROPSET(POISON_RES, resist_from_form(MR_POISON));
+    PROPSET(ACID_RES, resist_from_form(MR_ACID));
+    PROPSET(STONE_RES, resist_from_form(MR_STONE));
     {
         /* resists_drli() takes wielded weapon into account; suppress it */
         struct obj *save_uwep = uwep;
@@ -103,13 +105,16 @@ set_uasmon(void)
     PROPSET(REGENERATION, regenerates(mdat));
     PROPSET(REFLECTING, (mdat == &mons[PM_SILVER_DRAGON]));
     PROPSET(BLINDED, !haseyes(mdat));
+    PROPSET(BLND_RES, (dmgtype_fromattack(mdat, AD_BLND, AT_EXPL)
+                       || dmgtype_fromattack(mdat, AD_BLND, AT_GAZE)));
 #undef PROPSET
+#undef resist_from_form
 
     /* whether the player is flying/floating depends on their steed,
        which won't be known during the restore process: but BFlying
        and BStealth should be set correctly already in that case, so
        there's nothing to do */
-    if (!gp.program_state.restoring)
+    if (!program_state.restoring)
         float_vs_flight(); /* maybe toggle (BFlying & I_SPECIAL) */
     polysense();
 
@@ -117,6 +122,8 @@ set_uasmon(void)
     if (VIA_WINDOWPORT())
         status_initialize(REASSESS_ONLY);
 #endif
+    /* we can reset this now, having just done what it is meant to trigger */
+    gw.were_changes = 0L;
 }
 
 /* Levitation overrides Flying; set or clear BFlying|I_SPECIAL */
@@ -228,11 +235,11 @@ polyman(const char *fmt, const char *arg)
         struct kinfo *kptr = find_delayed_killer(POLYMORPH);
 
         if (kptr != (struct kinfo *) 0 && kptr->name[0]) {
-            gk.killer.format = kptr->format;
-            Strcpy(gk.killer.name, kptr->name);
+            svk.killer.format = kptr->format;
+            Strcpy(svk.killer.name, kptr->name);
         } else {
-            gk.killer.format = KILLED_BY;
-            Strcpy(gk.killer.name, "self-genocide");
+            svk.killer.format = KILLED_BY;
+            Strcpy(svk.killer.name, "self-genocide");
         }
         dealloc_killer(kptr);
         done(GENOCIDED);
@@ -275,9 +282,9 @@ change_sex(void)
         u.mfemale = !u.mfemale;
     max_rank_sz(); /* [this appears to be superfluous] */
     if ((Upolyd ? u.mfemale : flags.female) && gu.urole.name.f)
-        Strcpy(gp.pl_character, gu.urole.name.f);
+        Strcpy(svp.pl_character, gu.urole.name.f);
     else
-        Strcpy(gp.pl_character, gu.urole.name.m);
+        Strcpy(svp.pl_character, gu.urole.name.m);
     if (!Upolyd) {
         u.umonnum = u.umonster;
     } else if (u.umonnum == PM_AMOROUS_DEMON) {
@@ -383,7 +390,7 @@ newman(void)
         hpmax = u.ulevel; /* min of 1 HP per level */
     /* retain same proportion for current HP; u.uhp * hpmax / u.uhpmax */
     u.uhp = rounddiv((long) u.uhp * (long) hpmax, u.uhpmax);
-    u.uhpmax = hpmax;
+    setuhpmax(hpmax, TRUE); /* might reduce u.uhp */
     /*
      * Do the same for spell power.
      */
@@ -413,8 +420,8 @@ newman(void)
  dead:      /* we come directly here if experience level went to 0 or less */
             urgent_pline(
                      "Your new form doesn't seem healthy enough to survive.");
-            gk.killer.format = KILLED_BY_AN;
-            Strcpy(gk.killer.name, "unsuccessful polymorph");
+            svk.killer.format = KILLED_BY_AN;
+            Strcpy(svk.killer.name, "unsuccessful polymorph");
             done(DIED);
             /* must have been life-saved to get here */
             newuhs(FALSE);
@@ -617,7 +624,7 @@ polyself(int psflags)
         if (draconian) {
  do_merge:
             mntmp = armor_to_dragon(uarm->otyp);
-            if (!(gm.mvitals[mntmp].mvflags & G_GENOD)) {
+            if (!(svm.mvitals[mntmp].mvflags & G_GENOD)) {
                 unsigned was_lit = uarm->lamplit;
                 int arm_light = artifact_light(uarm) ? arti_light_radius(uarm)
                                                      : 0;
@@ -729,7 +736,7 @@ polymon(int mntmp)
             was_hiding_under = u.uundetected && hides_under(gy.youmonst.data);
     int mlvl, newMaxStr;
 
-    if (gm.mvitals[mntmp].mvflags & G_GENOD) { /* allow G_EXTINCT */
+    if (svm.mvitals[mntmp].mvflags & G_GENOD) { /* allow G_EXTINCT */
         You_feel("rather %s-ish.",
                  pmname(&mons[mntmp], flags.female ? FEMALE : MALE));
         exercise(A_WIS, TRUE);
@@ -1128,6 +1135,15 @@ dropp(struct obj *obj)
     for (otmp = gi.invent; otmp; otmp = otmp->nobj) {
         if (otmp == obj) {
             dropx(obj);
+            /* Note that otmp->nobj is pointing at fobj now,
+             * as a result of:
+             * dropx() -> dropy() -> dropz() -> place_object(),
+             * and no longer pointing at the next obj in inventory.
+             * That would be an issue if this loop were allowed
+             * to continue, but the break statement that
+             * follows prevents the loop from continuing on with
+             * objects on the floor.
+             */
             break;
         }
     }
@@ -1346,8 +1362,8 @@ rehumanize(void)
     /* You can't revert back while unchanging */
     if (Unchanging) {
         if (u.mh < 1) {
-            gk.killer.format = NO_KILLER_PREFIX;
-            Strcpy(gk.killer.name, "killed while stuck in creature form");
+            svk.killer.format = NO_KILLER_PREFIX;
+            Strcpy(svk.killer.name, "killed while stuck in creature form");
             done(DIED);
             /* can get to here if declining to die in explore or wizard
                mode; since we're wearing an amulet of unchanging we can't
@@ -1373,9 +1389,9 @@ rehumanize(void)
         /* can only happen if some bit of code reduces u.uhp
            instead of u.mh while poly'd */
         Your("old form was not healthy enough to survive.");
-        Sprintf(gk.killer.name, "reverting to unhealthy %s form",
+        Sprintf(svk.killer.name, "reverting to unhealthy %s form",
                 gu.urace.adj);
-        gk.killer.format = KILLED_BY;
+        svk.killer.format = KILLED_BY;
         done(DIED);
     }
     nomul(0);
@@ -1439,6 +1455,7 @@ dospit(void)
             break;
         default:
             impossible("bad attack type in dospit");
+            FALLTHROUGH;
             /*FALLTHRU*/
         case AD_ACID:
             otmp = mksobj(ACID_VENOM, TRUE, FALSE);
@@ -1732,8 +1749,8 @@ dogaze(void)
                           l_monnam(mtmp));
                     /* as if gazing at a sleeping anything is fruitful... */
                     urgent_pline("You turn to stone...");
-                    gk.killer.format = KILLED_BY;
-                    Strcpy(gk.killer.name,
+                    svk.killer.format = KILLED_BY;
+                    Strcpy(svk.killer.name,
                            "deliberately meeting Medusa's gaze");
                     done(STONING);
                 }
@@ -1781,7 +1798,7 @@ dohide(void)
     }
     if (hides_under(gy.youmonst.data)) {
         long ct = 0L;
-        struct obj *otmp, *otop = gl.level.objects[u.ux][u.uy];
+        struct obj *otmp, *otop = svl.level.objects[u.ux][u.uy];
 
         if (!otop) {
             There("is nothing to hide under here.");
@@ -2208,9 +2225,9 @@ polysense(void)
 {
     short warnidx = NON_PM;
 
-    gc.context.warntype.speciesidx = NON_PM;
-    gc.context.warntype.species = 0;
-    gc.context.warntype.polyd = 0;
+    svc.context.warntype.speciesidx = NON_PM;
+    svc.context.warntype.species = 0;
+    svc.context.warntype.polyd = 0;
     HWarn_of_mon &= ~FROMRACE;
 
     switch (u.umonnum) {
@@ -2220,13 +2237,13 @@ polysense(void)
         break;
     case PM_VAMPIRE:
     case PM_VAMPIRE_LEADER:
-        gc.context.warntype.polyd = M2_HUMAN | M2_ELF;
+        svc.context.warntype.polyd = M2_HUMAN | M2_ELF;
         HWarn_of_mon |= FROMRACE;
         return;
     }
     if (ismnum(warnidx)) {
-        gc.context.warntype.speciesidx = warnidx;
-        gc.context.warntype.species = &mons[warnidx];
+        svc.context.warntype.speciesidx = warnidx;
+        svc.context.warntype.species = &mons[warnidx];
         HWarn_of_mon |= FROMRACE;
     }
 }
@@ -2235,8 +2252,8 @@ polysense(void)
 boolean
 ugenocided(void)
 {
-    return ((gm.mvitals[gu.urole.mnum].mvflags & G_GENOD)
-            || (gm.mvitals[gu.urace.mnum].mvflags & G_GENOD));
+    return ((svm.mvitals[gu.urole.mnum].mvflags & G_GENOD)
+            || (svm.mvitals[gu.urace.mnum].mvflags & G_GENOD));
 }
 
 /* how hero feels "inside" after self-genocide of role or race */

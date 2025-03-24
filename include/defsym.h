@@ -1,7 +1,6 @@
-/* NetHack 3.7	defsym.h */
+/* NetHack 3.7	defsym.h $NHDT-Date: 1725653007 2024/09/06 20:03:27 $ $NHDT-Branch: NetHack-3.7 $ $NHDT-Revision: 1.25 $ */
 /*      Copyright (c) 2016 by Pasi Kallinen              */
 /* NetHack may be freely redistributed.  See license for details. */
-
 
 /*
     This header is included in multiple places to produce
@@ -34,8 +33,10 @@
      DUMP_ENUMS_OBJCLASS_CLASSES, DUMP_ENUMS_OBJCLASS_SYMS)
 */
 
-#if defined(PCHAR_S_ENUM) || defined(PCHAR_PARSE) \
-    || defined(PCHAR_DRAWING) || defined(PCHAR_TILES) \
+#if defined(PCHAR_S_ENUM)               \
+    || defined(PCHAR_PARSE)             \
+    || defined(PCHAR_DRAWING)           \
+    || defined(PCHAR_TILES)             \
     || defined(DUMP_ENUMS_PCHAR)
 
 /*
@@ -131,6 +132,7 @@
     PCHAR2(35, '\\', S_throne, "throne", "opulent throne", HI_GOLD)
     PCHAR( 36, '{',  S_sink,   "sink", CLR_WHITE)
     PCHAR( 37, '{',  S_fountain, "fountain", CLR_BRIGHT_BLUE)
+    /* the S_pool symbol is used for both POOL terrain and MOAT terrain */
     PCHAR2(38, '}',  S_pool,   "pool", "water", CLR_BLUE)
     PCHAR( 39, '.',  S_ice,    "ice", CLR_CYAN)
     PCHAR( 40, '}',  S_lava,   "molten lava", CLR_RED)
@@ -145,6 +147,8 @@
                                   "raised drawbridge", CLR_BROWN)
     PCHAR( 46, ' ',  S_air,    "air", CLR_CYAN)
     PCHAR( 47, '#',  S_cloud,  "cloud", CLR_GRAY)
+    /* the S_water symbol is used for WATER terrain: wall of water in the
+       dungeon and Plane of Water in the endgame */
     PCHAR( 48, '}',  S_water,  "water", CLR_BRIGHT_BLUE)
     /* end dungeon characters                                          */
     /*                                                                 */
@@ -246,9 +250,12 @@
 #endif /* PCHAR_S_ENUM || PCHAR_PARSE || PCHAR_DRAWING || PCHAR_TILES
         * || DUMP_ENUMS_PCHAR */
 
-#if defined(MONSYMS_S_ENUM) || defined(MONSYMS_DEFCHAR_ENUM) \
-        || defined(MONSYMS_PARSE) || defined(MONSYMS_DRAWING) \
-        || defined(DUMP_ENUMS_MONSYMS) || defined(DUMP_ENUMS_MONSYMS_DEFCHAR)
+#if defined(MONSYMS_S_ENUM)                     \
+    || defined(MONSYMS_DEFCHAR_ENUM)            \
+    || defined(MONSYMS_PARSE)                   \
+    || defined(MONSYMS_DRAWING)                 \
+    || defined(DUMP_ENUMS_MONSYMS)              \
+    || defined(DUMP_ENUMS_MONSYMS_DEFCHAR)
 
 /*
     MONSYM(idx, ch, sym desc)
@@ -280,7 +287,8 @@
 #define MONSYM(idx, ch, basename, sym, desc) { sym, #sym },
 
 #elif defined(DUMP_ENUMS_MONSYMS_DEFCHAR)
-#define MONSYM(idx, ch, basename, sym, desc) { DEF_##basename, "DEF_" #basename },
+#define MONSYM(idx, ch, basename, sym, desc) \
+    { DEF_##basename, "DEF_" #basename },
 
 #endif
 
@@ -362,11 +370,14 @@
         * || MONSYMS_DRAWING || DUMP_ENUMS_MONSYMS)
         * || DUMP_ENUMS_MONSYMS_DEFCHAR */
 
-#if defined(OBJCLASS_S_ENUM) || defined(OBJCLASS_DEFCHAR_ENUM) \
-        || defined(OBJCLASS_CLASS_ENUM) || defined(OBJCLASS_PARSE) \
-        || defined(OBJCLASS_DRAWING) || defined(DUMP_ENUMS_OBJCLASS_DEFCHARS) \
-        || defined(DUMP_ENUMS_OBJCLASS_CLASSES) \
-        || defined(DUMP_ENUMS_OBJCLASS_SYMS)
+#if defined(OBJCLASS_S_ENUM)                    \
+    || defined(OBJCLASS_DEFCHAR_ENUM)           \
+    || defined(OBJCLASS_CLASS_ENUM)             \
+    || defined(OBJCLASS_PARSE)                  \
+    || defined(OBJCLASS_DRAWING)                \
+    || defined(DUMP_ENUMS_OBJCLASS_DEFCHARS)    \
+    || defined(DUMP_ENUMS_OBJCLASS_CLASSES)     \
+    || defined(DUMP_ENUMS_OBJCLASS_SYMS)
 
 /*
     OBJCLASS(idx, ch, basename, sym, name, explain)

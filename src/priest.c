@@ -1,4 +1,4 @@
-/* NetHack 3.7	priest.c	$NHDT-Date: 1693292537 2023/08/29 07:02:17 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.93 $ */
+/* NetHack 3.7	priest.c	$NHDT-Date: 1726862063 2024/09/20 19:54:23 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.103 $ */
 /* Copyright (c) Izchak Miller, Steve Linhart, 1989.              */
 /* NetHack may be freely redistributed.  See license for details. */
 
@@ -20,6 +20,7 @@ newepri(struct monst *mtmp)
     if (!EPRI(mtmp)) {
         EPRI(mtmp) = (struct epri *) alloc(sizeof(struct epri));
         (void) memset((genericptr_t) EPRI(mtmp), 0, sizeof(struct epri));
+        EPRI(mtmp)->parentmid = mtmp->m_id;
     }
 }
 
@@ -91,6 +92,7 @@ move_special(struct monst *mtmp, boolean in_his_shop, schar appr,
             }
         }
     }
+#undef GDIST
     if (mtmp->ispriest && avoid && nix == omx && niy == omy
         && onlineu(omx, omy)) {
         /* might as well move closer as long it's going to stay
@@ -143,7 +145,7 @@ temple_occupied(char *array)
     char *ptr;
 
     for (ptr = array; *ptr; ptr++)
-        if (gr.rooms[*ptr - ROOMOFFSET].rtype == TEMPLE)
+        if (svr.rooms[*ptr - ROOMOFFSET].rtype == TEMPLE)
             return *ptr;
     return '\0';
 }
@@ -243,7 +245,7 @@ priestini(
 
     priest = makemon(prim, px, py, MM_EPRI);
     if (priest) {
-        EPRI(priest)->shroom = (schar) ((sroom - gr.rooms) + ROOMOFFSET);
+        EPRI(priest)->shroom = (schar) ((sroom - svr.rooms) + ROOMOFFSET);
         EPRI(priest)->shralign = Amask2align(levl[sx][sy].altarmask);
         EPRI(priest)->shrpos.x = sx;
         EPRI(priest)->shrpos.y = sy;
@@ -313,19 +315,23 @@ priestname(
     if (!mon->ispriest && !mon->isminion) /* should never happen...  */
         return strcpy(pname, what);       /* caller must be confused */
 
+    /* for high priest(ess), "high" (or "grand" for poohbah) will be inserted
+       [this was done near the end but we want 'what' to be updated sooner] */
+    if (mon->ispriest || aligned_priest || high_priest)
+        what = do_hallu ? "poohbah" : mon->female ? "priestess" : "priest";
+
     *pname = '\0';
     if (article != ARTICLE_NONE && (!do_hallu || !bogon_is_pname(whatcode))) {
         if (article == ARTICLE_YOUR || (article == ARTICLE_A && high_priest))
             article = ARTICLE_THE;
         if (article == ARTICLE_THE) {
-            Strcat(pname, "the ");
+            Strcpy(pname, "the ");
+        } else if (!strcmp(what, "Angel")) {
+            /* bypass just_an(); it would yield "" due to treating capital A
+               as indicating a personal name */
+            Strcpy(pname, "an ");
         } else {
-            char buf2[BUFSZ] = DUMMY;
-
-            /* don't let "Angel of <foo>" fool an() into using "the " */
-            Strcpy(buf2, pname);
-            *buf2 = lowc(*buf2);
-            (void) just_an(pname, buf2);
+            (void) just_an(pname, what);
         }
     }
     /* pname[] contains "" or {"a ","an ","the "} */
@@ -337,24 +343,14 @@ priestname(
     }
     if (mon->isminion && EMIN(mon)->renegade) {
         /* avoid "an renegade Angel" */
-        if (!strcmp(pname, "an ")) /* will fail for "an invisible " */
+        if (!strcmp(pname, "an ") && !mon->minvis)
             Strcpy(pname, "a ");
         Strcat(pname, "renegade ");
     }
 
-    if (mon->ispriest || aligned_priest) { /* high_priest implies ispriest */
-        if (!aligned_priest && !high_priest) {
-            ; /* polymorphed priest; use ``what'' as is */
-        } else {
-            if (high_priest)
-                Strcat(pname, Hallucination ? "grand " : "high ");
-            if (Hallucination)
-                what = "poohbah";
-            else if (mon->female)
-                what = "priestess";
-            else
-                what = "priest";
-        }
+    if (mon->ispriest || aligned_priest) {
+        if (high_priest)
+            Strcat(pname, do_hallu ? "grand " : "high ");
     } else {
         if (mon->mtame && !strcmpi(what, "Angel"))
             Strcat(pname, "guardian ");
@@ -364,7 +360,7 @@ priestname(
     /* same as distant_monnam(), more or less... */
     if (do_hallu || !high_priest || reveal_high_priest
         || !Is_astralevel(&u.uz)
-        || m_next2u(mon) || gp.program_state.gameover) {
+        || m_next2u(mon) || program_state.gameover) {
         Strcat(pname, " of ");
         Strcat(pname, halu_gname(mon_aligntyp(mon)));
     }
@@ -434,7 +430,7 @@ intemple(int roomno)
         sanctum = (priest->data == &mons[PM_HIGH_CLERIC]
                    && (Is_sanctum(&u.uz) || In_endgame(&u.uz)));
         can_speak = !helpless(priest);
-        if (can_speak && !Deaf && gm.moves >= epri_p->intone_time) {
+        if (can_speak && !Deaf && svm.moves >= epri_p->intone_time) {
             unsigned save_priest = priest->ispriest;
 
             /* don't reveal the altar's owner upon temple entry in
@@ -445,7 +441,7 @@ intemple(int roomno)
             pline("%s intones:",
                   canseemon(priest) ? Monnam(priest) : "A nearby voice");
             priest->ispriest = save_priest;
-            epri_p->intone_time = gm.moves + (long) d(10, 500); /* ~2505 */
+            epri_p->intone_time = svm.moves + (long) d(10, 500); /* ~2505 */
             /* make sure that we don't suppress entry message when
                we've just given its "priest intones" introduction */
             epri_p->enter_time = 0L;
@@ -463,7 +459,7 @@ intemple(int roomno)
                 /* repeat visit, or attacked priest before entering */
                 msg1 = "You desecrate this place by your presence!";
             }
-        } else if (gm.moves >= epri_p->enter_time) {
+        } else if (svm.moves >= epri_p->enter_time) {
             Sprintf(buf, "Pilgrim, you enter a %s place!",
                     !shrined ? "desecrated" : "sacred");
             msg1 = buf;
@@ -473,7 +469,7 @@ intemple(int roomno)
             verbalize1(msg1);
             if (msg2)
                 verbalize1(msg2);
-            epri_p->enter_time = gm.moves + (long) d(10, 100); /* ~505 */
+            epri_p->enter_time = svm.moves + (long) d(10, 100); /* ~505 */
         }
         if (!sanctum) {
             if (!shrined || !p_coaligned(priest)
@@ -491,9 +487,9 @@ intemple(int roomno)
             /* give message if we haven't seen it recently or
                if alignment update has caused it to switch from
                forbidding to sense-of-peace or vice versa */
-            if (gm.moves >= *this_time || *other_time >= *this_time) {
+            if (svm.moves >= *this_time || *other_time >= *this_time) {
                 You(msg1, msg2);
-                *this_time = gm.moves + (long) d(10, 20); /* ~55 */
+                *this_time = svm.moves + (long) d(10, 20); /* ~55 */
                 /* avoid being tricked by the RNG:  switch might have just
                    happened and previous random threshold could be larger */
                 if (*this_time <= *other_time)
@@ -524,7 +520,7 @@ intemple(int roomno)
         if (!rn2(5)
             && (mtmp = makemon(&mons[PM_GHOST], u.ux, u.uy, MM_NOMSG))
                    != 0) {
-            int ngen = gm.mvitals[PM_GHOST].born;
+            int ngen = svm.mvitals[PM_GHOST].born;
             if (canspotmon(mtmp))
                 pline("A%s ghost appears next to you%c",
                       ngen < 5 ? "n enormous" : "",
@@ -672,9 +668,9 @@ priest_talk(struct monst *priest)
             SetVoice(priest, 0, 80, 0);
             verbalize("Thy selfless generosity is deeply appreciated.");
             if (money_cnt(gi.invent) < (offer * 2L) && coaligned) {
-                if (strayed && (gm.moves - u.ucleansed) > 5000L) {
+                if (strayed && (svm.moves - u.ucleansed) > 5000L) {
                     u.ualign.record = 0; /* cleanse thee */
-                    u.ucleansed = gm.moves;
+                    u.ucleansed = svm.moves;
                 } else {
                     adjalign(2);
                 }
@@ -769,7 +765,7 @@ ghod_hitsu(struct monst *priest)
 
     ax = x = EPRI(priest)->shrpos.x;
     ay = y = EPRI(priest)->shrpos.y;
-    troom = &gr.rooms[roomno - ROOMOFFSET];
+    troom = &svr.rooms[roomno - ROOMOFFSET];
 
     if (u_at(x, y) || !linedup(u.ux, u.uy, x, y, 1)) {
         if (IS_DOOR(levl[u.ux][u.uy].typ)) {
@@ -900,5 +896,8 @@ restpriest(struct monst *mtmp, boolean ghostly)
             assign_level(&(EPRI(mtmp)->shrlevel), &u.uz);
     }
 }
+
+#undef ALGN_SINNED
+#undef ALGN_PIOUS
 
 /*priest.c*/

@@ -1,4 +1,4 @@
-/* NetHack 3.7	topl.c	$NHDT-Date: 1596498344 2020/08/03 23:45:44 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.72 $ */
+/* NetHack 3.7	topl.c	$NHDT-Date: 1717967339 2024/06/09 21:08:59 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.89 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Michael Allison, 2009. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -184,7 +184,7 @@ remember_topl(void)
         cw->datlen[idx] = (short) len;
     }
     Strcpy(cw->data[idx], gt.toplines);
-    if (!gp.program_state.in_checkpoint) {
+    if (!program_state.in_checkpoint) {
         *gt.toplines = '\0';
         cw->maxcol = cw->maxrow = (idx + 1) % cw->rows;
     }
@@ -499,7 +499,10 @@ tty_yn_function(
                 if (!preserve_case)
                     z = lowc(z);
                 if (digit(z)) {
-                    value = (10 * value) + (z - '0');
+                    long dgt = (long) (z - '0');
+
+                    /* value = (10 * value) + (z - '0'); */
+                    value = AppendLongDigit(value, dgt);
                     if (value < 0)
                         break; /* overflow: try again */
                     digit_string[0] = z;

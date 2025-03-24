@@ -249,6 +249,15 @@ Example:
  local str = nh.ing_suffix("foo");
 
 
+=== is_genocided
+
+Is specific monster type genocided?  Returns a boolean value.
+
+Example:
+
+ local x = nh.is_genocided("vampire");
+
+
 === level_difficulty
 
 Returns an integer value describing the level difficulty.
@@ -531,9 +540,10 @@ Example:
 === exclusion
 
 Exclude an area of the map from being randomly chosen target when
-falling or teleporting into the level.  Multiple exclusions per level are allowed.
+falling or teleporting into the level, or creating a monster.
+Multiple exclusions per level are allowed.
 
-* type is one of "teleport", "teleport-up", or "teleport-down".
+* type is one of "teleport", "teleport-up", "teleport-down", or "monster-generation".
 
 Example:
 
@@ -783,8 +793,9 @@ The hash parameter accepts the following keys:
 | adjacentok     | boolean | is adjacent location ok, if given one is not suitable?
 | ignorewater    | boolean | ignore water when choosing location for the monster
 | countbirth     | boolean | do we count this monster as generated
-| appear_as      | string | monster can appear as object, monster, or terrain. Add "obj:", "mon:", or "ter:" prefix to the value. |
-| inventory      | function | objects generated in the function are given to the monster
+| appear_as      | string | monster can appear as object, monster, or terrain. Add "obj:", "mon:", or "ter:" prefix to the value.
+| inventory      | function | objects generated in the function are given to the monster (any random inventory it gets is discarded unless keep_default_invent is true)
+| keep_default_invent | boolean | if inventory is specified and this is true, those items are in addition to random inventory for this species; if inventory is not specified and this is false, monster gets no starting inventory
 |===
 
 Example:
@@ -839,6 +850,7 @@ The table parameter accepts the following:
 | eroded      | int      | Object erosion
 | locked      | boolean  | Is the object locked?
 | trapped     | boolean  | Is the object trapped?
+| trap_known  | boolean  | If container is trapped, is it obvious?
 | recharged   | boolean  | Is the object recharged?
 | greased     | boolean  | Is the object greased?
 | broken      | boolean  | Is the object broken?
@@ -1002,7 +1014,8 @@ Example:
 
 === trap
 
-Create a trap. The `launchfrom` is relative to the rolling boulder trap coord.
+Create a trap. The `launchfrom` is relative to the rolling boulder trap coord,
+but `teledest` is absolute.
 
 Example:
 
@@ -1011,6 +1024,7 @@ Example:
  des.trap({ type = "web", coord = {2, 2}, spider_on_web = false, seen = true });
  des.trap({ type = "falling rock", victim = false });
  des.trap({ type = "rolling boulder", coord = {7, 5}, launchfrom = {-2, -2} });
+ des.trap({ type = "teleport", coord = {7, 5}, teledest = {2, 2} });
  des.trap("hole", 3, 4);
  des.trap("level teleport", {5, 8});
  des.trap("rust")
@@ -1305,6 +1319,8 @@ Example:
 === room
 
 Create a selection of locations inside the (current) room.
+Does not include the edges of the room, such as its walls.
+Does not do any check on terrain type, so if there are non-ROOM locations inside the room, they remain part of the selection.
 
 Example:
 

@@ -1,10 +1,10 @@
-/* NetHack 3.7	getpos.c	$NHDT-Date: 1708126536 2024/02/16 23:35:36 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.307 $ */
+/* NetHack 3.7	getpos.c	$NHDT-Date: 1723875487 2024/08/17 06:18:07 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.3 $ */
 /*-Copyright (c) Pasi Kallinen, 2023. */
 /* NetHack may be freely redistributed.  See license for details. */
 
 #include "hack.h"
 
-extern const char what_is_an_unknown_object[]; /* from pager.c */
+extern const char what_is_a_location[]; /* from pager.c */
 
 staticfn void getpos_toggle_hilite_state(void);
 staticfn void getpos_getvalids_selection(struct selectionvar *,
@@ -265,7 +265,7 @@ getpos_help(boolean force, const char *goal)
         /* disgusting hack; the alternate selection characters work for any
            getpos call, but only matter for dowhatis (and doquickwhatis,
            also for dotherecmdmenu's simulated mouse) */
-        doing_what_is = (goal == what_is_an_unknown_object);
+        doing_what_is = (goal == what_is_a_location);
         if (doing_what_is) {
             Sprintf(kbuf, "'%s' or '%s' or '%s' or '%s'",
                     visctrl(gc.Cmd.spkeys[NHKF_GETPOS_PICK]),
@@ -465,6 +465,7 @@ gather_locs_interesting(coordxy x, coordxy y, int gloc)
     case GLOC_VALID:
         if (getpos_getvalid)
             return (*getpos_getvalid)(x, y);
+        FALLTHROUGH;
         /*FALLTHRU*/
     case GLOC_INTERESTING:
         return (gather_locs_interesting(x, y, GLOC_DOOR)
@@ -816,7 +817,8 @@ getpos(coord *ccp, boolean force, const char *goal)
         mMoOdDxX[i] = gc.Cmd.spkeys[mMoOdDxX_def[i]];
     mMoOdDxX[SIZE(mMoOdDxX_def)] = '\0';
 
-    handle_tip(TIP_GETPOS);
+    if (handle_tip(TIP_GETPOS))
+        show_goal_msg = TRUE; /* tip has overwritten prompt in mesg window */
 
     if (!goal)
         goal = "desired location";
@@ -1033,7 +1035,11 @@ getpos(coord *ccp, boolean force, const char *goal)
                         || c == (int) gs.showsyms[sidx]
                         /* have '^' match webs and vibrating square or any
                            other trap that uses something other than '^' */
-                        || (c == '^' && is_cmap_trap(sidx)))
+                        || (c == '^' && is_cmap_trap(sidx))
+                        /* have room engraving character (default '`')
+                           match corridor engravings (default '#') too */
+                        || (c == gs.showsyms[S_engroom]
+                            && is_cmap_engraving(sidx)))
                         matching[sidx] = (char) ++k;
                 }
                 if (k) {
@@ -1054,7 +1060,7 @@ getpos(coord *ccp, boolean force, const char *goal)
                                     goto foundc;
                                 /* next, try glyph that's remembered here
                                    (might be trap or object) */
-                                if (gl.level.flags.hero_memory
+                                if (svl.level.flags.hero_memory
                                     /* !terrainmode: don't move to remembered
                                        trap or object if not currently shown */
                                     && !iflags.terrainmode) {
@@ -1064,7 +1070,7 @@ getpos(coord *ccp, boolean force, const char *goal)
                                         goto foundc;
                                 }
                                 /* last, try actual terrain here (shouldn't
-                                   we be using gl.lastseentyp[][] instead?) */
+                                   we be using svl.lastseentyp[][] instead?) */
                                 if (levl[tx][ty].seenv) {
                                     k = back_to_glyph(tx, ty);
                                     if (glyph_is_cmap(k)

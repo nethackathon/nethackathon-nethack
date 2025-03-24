@@ -1,4 +1,4 @@
-/* NetHack 3.7	were.c	$NHDT-Date: 1689448846 2023/07/15 19:20:46 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.34 $ */
+/* NetHack 3.7	were.c	$NHDT-Date: 1717570494 2024/06/05 06:54:54 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.36 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2011. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -16,6 +16,7 @@ were_change(struct monst *mon)
             && !rn2(night() ? (flags.moonphase == FULL_MOON ? 3 : 30)
                             : (flags.moonphase == FULL_MOON ? 10 : 50))) {
             new_were(mon); /* change into animal form */
+            gw.were_changes++;
             if (!Deaf && !canseemon(mon)) {
                 const char *howler;
 
@@ -39,9 +40,8 @@ were_change(struct monst *mon)
         }
     } else if (!rn2(30) || Protection_from_shape_changers) {
         new_were(mon); /* change back into human form */
+        gw.were_changes++;
     }
-    /* update innate intrinsics (mainly Drain_resistance) */
-    set_uasmon(); /* new_were() doesn't do this */
 }
 
 int
@@ -123,10 +123,17 @@ new_were(struct monst *mon)
         mon->mcanmove = 1;
     }
     /* regenerate by 1/4 of the lost hit points */
-    mon->mhp += (mon->mhpmax - mon->mhp) / 4;
+    healmon(mon, (mon->mhpmax - mon->mhp) / 4, 0);
     newsym(mon->mx, mon->my);
     mon_break_armor(mon, FALSE);
     possibly_unwield(mon, FALSE);
+
+    /* vision capability isn't changing so we don't call set_apparxy() to
+       update mon's idea of where hero is; peaceful check is redundant */
+    if (svc.context.mon_moving && !mon->mpeaceful
+        && onscary(mon->mux, mon->muy, mon)
+        && monnear(mon, mon->mux, mon->muy))
+        monflee(mon, rn1(9, 2), TRUE, TRUE); /* 2..10 turns */
 }
 
 /* were-creature (even you) summons a horde */
@@ -195,6 +202,7 @@ you_were(void)
         if (!paranoid_query(ParanoidWerechange, qbuf))
             return;
     }
+    gw.were_changes++;
     (void) polymon(u.ulycn);
 }
 

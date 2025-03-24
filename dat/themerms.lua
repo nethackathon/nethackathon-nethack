@@ -220,6 +220,19 @@ themeroom_fills = {
       end;
       locs:iterate(func);
    end,
+
+   -- Teleportation hub
+   function(rm)
+      local locs = selection.room():filter_mapchar(".");
+      for i = 1, 2 + nh.rn2(3) do
+         local pos = locs:rndcoord(1);
+         if (pos.x > 0) then
+            pos.x = pos.x + rm.region.x1 - 1;
+            pos.y = pos.y + rm.region.y1;
+            table.insert(postprocess, { handler = make_a_trap, data = { type = "teleport", seen = true, coord = pos, teledest = 1 } });
+         end
+      end
+   end,
 };
 
 themerooms = {
@@ -673,12 +686,12 @@ xx|.....|xx
      local itm = obj.new(escape_items[math.random(#escape_items)]);
      local itmcls = itm:class()
      local box
-     if itmcls[ "material" ] == 19 then                         -- GLASS==19
-         -- item is made of glass so explicitly force chest to be unlocked
+     if itmcls[ "material" ] == "glass" then
+         -- explicitly force chest to be unlocked
 	 box = des.object({ id = "chest", coord = chest_spots[1],
                             olocked = "no" });
      else
-         -- item isn't made of glass; accept random locked/unlocked state
+         -- accept random locked/unlocked state
 	 box = des.object({ id = "chest", coord = chest_spots[1] });
      end;
      box:addcontent(itm);
@@ -869,6 +882,17 @@ end
 function make_garden_walls(data)
    local sel = data.sel:grow();
    des.replace_terrain({ selection = sel, fromterrain="w", toterrain = "T" });
+end
+
+-- postprocess callback: make a trap
+function make_a_trap(data)
+   if (data.teledest == 1 and data.type == "teleport") then
+      local locs = selection.negate():filter_mapchar(".");
+      repeat
+         data.teledest = locs:rndcoord(1);
+      until (data.teledest.x ~= data.coord.x and data.teledest.y ~= data.coord.y);
+   end
+   des.trap(data);
 end
 
 -- called once after the whole level has been generated

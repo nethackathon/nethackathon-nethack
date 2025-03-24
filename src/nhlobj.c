@@ -72,7 +72,8 @@ l_obj_gc(lua_State *L)
 staticfn struct _lua_obj *
 l_obj_push(lua_State *L, struct obj *otmp)
 {
-    struct _lua_obj *lo = (struct _lua_obj *) lua_newuserdata(L, sizeof(struct _lua_obj));
+    struct _lua_obj *lo
+        = (struct _lua_obj *) lua_newuserdata(L, sizeof (struct _lua_obj));
     luaL_getmetatable(L, "obj");
     lua_setmetatable(L, -2);
 
@@ -218,7 +219,7 @@ l_obj_objects_to_table(lua_State *L)
     /* TODO: oc_bimanual, oc_bulky */
     nhl_add_table_entry_int(L, "tough", o->oc_tough);
     nhl_add_table_entry_int(L, "dir", o->oc_dir); /* TODO: convert to text */
-    nhl_add_table_entry_int(L, "material", o->oc_material); /* TODO: convert to text */
+    nhl_add_table_entry_str(L, "material", materialnm[o->oc_material]);
     /* TODO: oc_subtyp, oc_skill, oc_armcat */
     nhl_add_table_entry_int(L, "oprop", o->oc_oprop);
     nhl_add_table_entry_char(L, "class",
@@ -294,6 +295,7 @@ l_obj_to_table(lua_State *L)
     nhl_add_table_entry_int(L, "dknown", obj->dknown);
     nhl_add_table_entry_int(L, "bknown", obj->bknown);
     nhl_add_table_entry_int(L, "rknown", obj->rknown);
+    nhl_add_table_entry_int(L, "tknown", obj->tknown);
     if (obj->oclass == POTION_CLASS)
         nhl_add_table_entry_int(L, "odiluted", obj->odiluted);
     else
@@ -379,7 +381,7 @@ l_obj_at(lua_State *L)
         cvt_to_abscoord(&x, &y);
 
         lua_pop(L, 2);
-        (void) l_obj_push(L, gl.level.objects[x][y]);
+        (void) l_obj_push(L, svl.level.objects[x][y]);
         return 1;
     } else
         nhl_error(L, "l_obj_at: Wrong args");

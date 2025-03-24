@@ -1,4 +1,4 @@
-/* NetHack 3.7	steed.c	$NHDT-Date: 1702274036 2023/12/11 05:53:56 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.115 $ */
+/* NetHack 3.7	steed.c	$NHDT-Date: 1720128167 2024/07/04 21:22:47 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.121 $ */
 /* Copyright (c) Kevin Hugo, 1998-1999. */
 /* NetHack may be freely redistributed.  See license for details. */
 
@@ -131,6 +131,7 @@ use_saddle(struct obj *otmp)
         if (otmp->owornmask)
             remove_worn_item(otmp, FALSE);
         freeinv(otmp);
+        /* !can_saddle(mtmp) already eliminated above */
         put_saddle_on_mon(otmp, mtmp);
     } else
         pline("%s resists!", Monnam(mtmp));
@@ -140,8 +141,19 @@ use_saddle(struct obj *otmp)
 void
 put_saddle_on_mon(struct obj *saddle, struct monst *mtmp)
 {
-    if (!can_saddle(mtmp) || which_armor(mtmp, W_SADDLE))
+    if (!can_saddle(mtmp) || which_armor(mtmp, W_SADDLE)) {
+        if (saddle)
+            impossible("put_saddle_on_mon: saddle obj could get orphaned");
         return;
+    }
+    if (!saddle) {
+        if ((saddle = mksobj(SADDLE, TRUE, FALSE)) != 0) {
+            fully_identify_obj(saddle);
+            /* mpickobj can later override identification if out-of-view */
+        } else {
+            return;
+        }
+    }
     if (mpickobj(mtmp, saddle))
         panic("merged saddle?");
     mtmp->misc_worn_check |= W_SADDLE;
@@ -589,6 +601,7 @@ dismount_steed(
     switch (reason) {
     case DISMOUNT_THROWN:
         verb = "are thrown";
+        FALLTHROUGH;
         /*FALLTHRU*/
     case DISMOUNT_KNOCKED:
     case DISMOUNT_FELL:
@@ -869,12 +882,12 @@ stucksteed(boolean checkfeeding)
     if (steed) {
         /* check whether steed can move */
         if (helpless(steed)) {
-            pline("%s won't move!", upstart(y_monnam(steed)));
+            pline("%s won't move!", YMonnam(steed));
             return TRUE;
         }
         /* optionally check whether steed is in the midst of a meal */
         if (checkfeeding && steed->meating) {
-            pline("%s is still eating.", upstart(y_monnam(steed)));
+            pline("%s is still eating.", YMonnam(steed));
             return TRUE;
         }
     }
@@ -906,7 +919,7 @@ place_monster(struct monst *mon, coordxy x, coordxy y)
                    mon->mstate, buf);
         return;
     }
-    if ((othermon = gl.level.monsters[x][y]) != 0) {
+    if ((othermon = svl.level.monsters[x][y]) != 0) {
         describe_level(buf, 0);
         monnm = minimal_monnam(mon, FALSE);
         othnm = (mon != othermon) ? minimal_monnam(othermon, TRUE) : "itself";
@@ -914,7 +927,7 @@ place_monster(struct monst *mon, coordxy x, coordxy y)
                    monnm, othnm, x, y, othermon->mstate, mon->mstate, buf);
     }
     mon->mx = x, mon->my = y;
-    gl.level.monsters[x][y] = mon;
+    svl.level.monsters[x][y] = mon;
     mon->mstate = MON_FLOOR;
 }
 

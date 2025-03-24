@@ -1,4 +1,4 @@
-/* NetHack 3.7	artifact.c	$NHDT-Date: 1711734229 2024/03/29 17:43:49 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.230 $ */
+/* NetHack 3.7	artifact.c	$NHDT-Date: 1715889721 2024/05/16 20:02:01 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.236 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2013. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -14,7 +14,7 @@
  *        the contents, just the total size.
  */
 
-staticfn struct artifact *get_artifact(struct obj *) NONNULL; /* never returns null */
+staticfn struct artifact *get_artifact(struct obj *) NONNULL;
 
 /* #define get_artifact(o) \
     (((o) && ((o)->artifact > 0 && (o)->artifact < AFTER_LAST_ARTIFACT)) \
@@ -22,9 +22,11 @@ staticfn struct artifact *get_artifact(struct obj *) NONNULL; /* never returns n
                              : &artilist[ART_NONARTIFACT]) */
 
 staticfn boolean bane_applies(const struct artifact *, struct monst *)
-                      NONNULLARG12;
-staticfn int spec_applies(const struct artifact *, struct monst *) NONNULLARG12;
+                                                                 NONNULLARG12;
+staticfn int spec_applies(const struct artifact *, struct monst *)
+                                                                 NONNULLARG12;
 staticfn int invoke_ok(struct obj *);
+staticfn void nothing_special(struct obj *) NONNULLARG1;
 staticfn int arti_invoke(struct obj *);
 staticfn boolean Mb_hit(struct monst * magr, struct monst *mdef,
                       struct obj *, int *, int, boolean, char *);
@@ -33,6 +35,7 @@ staticfn uchar abil_to_adtyp(long *) NONNULLARG1;
 staticfn int glow_strength(int);
 staticfn boolean untouchable(struct obj *, boolean);
 staticfn int count_surround_traps(coordxy, coordxy);
+staticfn void dispose_of_orig_obj(struct obj *);
 
 /* The amount added to the victim's total hit points to insure that the
    victim will be killed even after damage bonus/penalty adjustments.
@@ -140,13 +143,18 @@ artiname(int artinum)
    If no alignment is given, then 'otmp' is converted
    into an artifact of matching type, or returned as-is if that's not
    possible.
-   For the 2nd case, caller should use ``obj = mk_artifact(obj, A_NONE);''
-   for the 1st, ``obj = mk_artifact((struct obj *) 0, some_alignment);''.
+   For the 2nd case, caller should use ``obj = mk_artifact(obj, A_NONE, 99);''
+   For the 1st, ``obj = mk_artifact((struct obj *) 0, some_alignment, ...);''.
+   The max_giftvalue is the value of the sacrifice, for an artifact obtained
+   by sacrificing, or 99 otherwise.
  */
 struct obj *
 mk_artifact(
-    struct obj *otmp,   /* existing object; ignored if alignment specified */
-    aligntyp alignment) /* target alignment, or A_NONE */
+    struct obj *otmp,    /* existing object; ignored and disposed of
+                          * if alignment specified */
+    aligntyp alignment,  /* target alignment, or A_NONE */
+    uchar max_giftvalue, /* cap on generated giftvalue */
+    boolean adjust_spe)  /* whether to add spe to situational artifacts */
 {
     const struct artifact *a;
     int m, n, altn;
@@ -154,6 +162,7 @@ mk_artifact(
     short o_typ = (by_align || !otmp) ? 0 : otmp->otyp;
     boolean unique = !by_align && otmp && objects[o_typ].oc_unique;
     short eligible[NROFARTIFACTS];
+    xint16 skill_compatibility;
 
     n = altn = 0;    /* no candidates found yet */
     eligible[0] = 0; /* lint suppression */
@@ -162,6 +171,8 @@ mk_artifact(
         if (artiexist[m].exists)
             continue;
         if ((a->spfx & SPFX_NOGEN) || unique)
+            continue;
+        if (a->gift_value > max_giftvalue && !Role_if(a->role))
             continue;
 
         if (!by_align) {
@@ -184,17 +195,33 @@ mk_artifact(
                 n = 1;
                 break; /* skip all other candidates */
             }
+
+            /* check if this is skill-compatible */
+            skill_compatibility = P_SKILLED;
+            if (objects[a->otyp].oc_class == WEAPON_CLASS) {
+                schar skill = objects[a->otyp].oc_skill;
+                if (skill < 0)
+                    skill_compatibility = P_MAX_SKILL(-skill);
+                else
+                    skill_compatibility = P_MAX_SKILL(skill);
+            }
+
             /* found something to consider for random selection */
-            if (a->alignment != A_NONE || u.ugifts > 0) {
+            if ((a->alignment != A_NONE || u.ugifts > 0 || !rn2(3)) &&
+                (!rn2(4) || skill_compatibility >= P_SKILLED ||
+                 (skill_compatibility >= P_BASIC && rn2(2)))) {
                 /* right alignment, or non-aligned with at least 1
-                   previous gift bestowed, makes this one viable */
+                   previous gift bestowed, makes this one viable;
+                   unaligned artifacts are possible even as the first
+                   gift, but less likely; if it's a bad weapon type
+                   for the role that also makes it less likely */
                 eligible[n++] = m;
             } else {
-                /* non-aligned with no previous gifts;
-                   if no candidates have been found yet, record
+                /* if no candidates have been found yet, record
                    this one as a[nother] fallback possibility in
                    case all aligned candidates have been used up
-                   (via wishing, naming, bones, random generation) */
+                   (via wishing, naming, bones, random generation)
+                   or failed the randomized compatibility checks */
                 if (!n)
                     eligible[altn++] = m;
                 /* [once a regular candidate is found, the list
@@ -213,23 +240,60 @@ mk_artifact(
         a = &artilist[m];
 
         /* make an appropriate object if necessary, then christen it */
-        if (by_align)
-            otmp = mksobj((int) a->otyp, TRUE, FALSE);
+        if (by_align) {
+            /* 'by_align' indicates that an alignment was passed as
+             * an argument, but also that the 'otmp' argument is not
+             * relevant */
+            struct obj *artiobj = mksobj((int) a->otyp, TRUE, FALSE);
 
-        if (otmp) {
-            /* prevent erosion from generating */
-            otmp->oeroded = otmp->oeroded2 = 0;
-            otmp = oname(otmp, a->name, ONAME_NO_FLAGS);
-            otmp->oartifact = m;
-            /* set existence and reason for creation bits */
-            artifact_origin(otmp, ONAME_RANDOM); /* 'random' is default */
+            /* nonnull value of 'otmp' is unexpected. Cope. */
+            if (otmp) /* just in case; avoid orphaning */
+                dispose_of_orig_obj(otmp);
+            otmp = artiobj;
+        }
+        /*
+         * otmp should be nonnull at this point:
+         * either the passed argument (if !by_align == A_NONE), or
+         * the result of mksobj() just above if by_align is an alignment. */
+        assert(otmp != 0);
+        /* prevent erosion from generating */
+        otmp->oeroded = otmp->oeroded2 = 0;
+        otmp = oname(otmp, a->name, ONAME_NO_FLAGS);
+        otmp->oartifact = m;  /* probably already set by this point, but */
+        /* set existence and reason for creation bits */
+        artifact_origin(otmp, ONAME_RANDOM); /* 'random' is default */
+        if (adjust_spe) {
+            int new_spe;
+
+            /* Adjust artiobj->spe by a->gen_spe. (This is a no-op for
+               non-weapons, which always have a gen_spe of 0, and for many
+               weapons, too.) The result is clamped into the "normal" range to
+               prevent an outside chance of +12 artifacts generating. */
+            new_spe = (int) otmp->spe + a->gen_spe;
+            if (new_spe >= -10 && new_spe < 10)
+                otmp->spe = new_spe;
         }
     } else {
         /* nothing appropriate could be found; return original object */
-        if (by_align)
-            otmp = 0; /* (there was no original object) */
+        if (by_align && otmp) {
+            /* (there shouldn't have been an original object). Deal with it.
+             * The callers that passed an alignment and a NULL otmp are
+             * prepared to get a potential NULL return value, so this is okay */
+            dispose_of_orig_obj(otmp);
+            otmp = 0;
+        } /* otherwise, otmp has not changed; just fallthrough to return it */
     }
     return otmp;
+}
+
+staticfn void
+dispose_of_orig_obj(struct obj *obj)
+{
+    if (!obj)
+        return;
+
+    obj_extract_self(obj);
+    obfree(obj, (struct obj *) 0);
 }
 
 /*
@@ -508,7 +572,7 @@ restrict_name(struct obj *otmp, const char *name)
     if (!objects[otyp].oc_name_known
         && (odesc = OBJ_DESCR(objects[otyp])) != 0) {
         obj_shuffle_range(otyp, &lo, &hi);
-        for (i = gb.bases[ocls]; i < NUM_OBJECTS; i++) {
+        for (i = svb.bases[ocls]; i < NUM_OBJECTS; i++) {
             if (objects[i].oc_class != ocls)
                 break;
             if (!objects[i].oc_name_known
@@ -627,7 +691,10 @@ protects(struct obj *otmp, boolean being_worn)
  * unworn/unwielded/dropped.  Pickup/drop only set/reset the W_ART mask.
  */
 void
-set_artifact_intrinsic(struct obj *otmp, boolean on, long wp_mask)
+set_artifact_intrinsic(
+    struct obj *otmp,
+    boolean on,
+    long wp_mask)
 {
     long *mask = 0;
     const struct artifact *art, *oart = get_artifact(otmp);
@@ -711,7 +778,7 @@ set_artifact_intrinsic(struct obj *otmp, boolean on, long wp_mask)
          * when restoring a game
          */
         (void) make_hallucinated((long) !on,
-                                 gp.program_state.restoring ? FALSE : TRUE,
+                                 program_state.restoring ? FALSE : TRUE,
                                  wp_mask);
     }
     if (spfx & SPFX_ESP) {
@@ -744,10 +811,10 @@ set_artifact_intrinsic(struct obj *otmp, boolean on, long wp_mask)
         if (spec_m2(otmp)) {
             if (on) {
                 EWarn_of_mon |= wp_mask;
-                gc.context.warntype.obj |= spec_m2(otmp);
+                svc.context.warntype.obj |= spec_m2(otmp);
             } else {
                 EWarn_of_mon &= ~wp_mask;
-                gc.context.warntype.obj &= ~spec_m2(otmp);
+                svc.context.warntype.obj &= ~spec_m2(otmp);
             }
             see_monsters();
         } else {
@@ -801,6 +868,13 @@ set_artifact_intrinsic(struct obj *otmp, boolean on, long wp_mask)
         if (oart->inv_prop <= LAST_PROP
             && (u.uprops[oart->inv_prop].extrinsic & W_ARTI))
             (void) arti_invoke(otmp);
+    }
+
+    if (wp_mask == W_WEP && is_art(otmp, ART_SUNSWORD)) {
+        if (on)
+            EBlnd_resist |= wp_mask;
+        else
+            EBlnd_resist &= ~wp_mask;
     }
 }
 
@@ -1598,9 +1672,7 @@ artifact_hit(
                     healup(drain, 0, FALSE, FALSE);
                 } else {
                     assert(magr != 0);
-                    magr->mhp += drain;
-                    if (magr->mhp > magr->mhpmax)
-                        magr->mhp = magr->mhpmax;
+                    healmon(magr, drain, 0);
                 }
             }
             return vis;
@@ -1626,9 +1698,7 @@ artifact_hit(
             }
             losexp("life drainage");
             if (magr && magr->mhp < magr->mhpmax) {
-                magr->mhp += (abs(oldhpmax - u.uhpmax) + 1) / 2;
-                if (magr->mhp > magr->mhpmax)
-                    magr->mhp = magr->mhpmax;
+                healmon(magr, (abs(oldhpmax - u.uhpmax) + 1) / 2, 0);
             }
             return TRUE;
         }
@@ -1674,6 +1744,13 @@ doinvoke(void)
     return arti_invoke(obj);
 }
 
+staticfn void
+nothing_special(struct obj *obj)
+{
+    if (carried(obj))
+        You_feel("a surge of power, but nothing seems to happen.");
+}
+
 staticfn int
 arti_invoke(struct obj *obj)
 {
@@ -1694,7 +1771,7 @@ arti_invoke(struct obj *obj)
 
     if (oart->inv_prop > LAST_PROP) {
         /* It's a special power, not "just" a property */
-        if (obj->age > gm.moves) {
+        if (obj->age > svm.moves) {
             /* the artifact is tired :-) */
             You_feel("that %s %s ignoring you.", the(xname(obj)),
                      otense(obj, "are"));
@@ -1702,7 +1779,7 @@ arti_invoke(struct obj *obj)
             obj->age += (long) d(3, 10);
             return ECMD_TIME;
         }
-        obj->age = gm.moves + rnz(100);
+        obj->age = svm.moves + rnz(100);
 
         switch (oart->inv_prop) {
         case TAMING: {
@@ -1730,8 +1807,10 @@ arti_invoke(struct obj *obj)
                              due to PermaBlind or eyeless polymorph;
                              vary the message in that situation */
                           && (HBlinded & ~TIMEOUT) != 0L) ? "slightly " : "");
-            else
-                goto nothing_special;
+            else {
+                nothing_special(obj);
+                return ECMD_TIME;
+            }
             if (healamt > 0) {
                 if (Upolyd)
                     u.mh += healamt;
@@ -1758,8 +1837,10 @@ arti_invoke(struct obj *obj)
                 u.uen += epboost;
                 disp.botl = TRUE;
                 You_feel("re-energized.");
-            } else
-                goto nothing_special;
+            } else {
+                nothing_special(obj);
+                return ECMD_TIME;
+            }
             break;
         }
         case UNTRAP: {
@@ -1796,16 +1877,16 @@ arti_invoke(struct obj *obj)
 
             any = cg.zeroany; /* set all bits to zero */
             start_menu(tmpwin, MENU_BEHAVE_STANDARD);
-            /* use index+1 (cant use 0) as identifier */
-            for (i = num_ok_dungeons = 0; i < gn.n_dgns; i++) {
-                if (!gd.dungeons[i].dunlev_ureached)
+            /* use index+1 (can't use 0) as identifier */
+            for (i = num_ok_dungeons = 0; i < svn.n_dgns; i++) {
+                if (!svd.dungeons[i].dunlev_ureached)
                     continue;
                 if (i == tutorial_dnum) /* can't portal into tutorial */
                     continue;
                 any.a_int = i + 1;
                 add_menu(tmpwin, &nul_glyphinfo, &any, 0, 0,
                          ATR_NONE, clr,
-                         gd.dungeons[i].dname, MENU_ITEMFLAGS_NONE);
+                         svd.dungeons[i].dname, MENU_ITEMFLAGS_NONE);
                 num_ok_dungeons++;
                 last_ok_dungeon = i;
             }
@@ -1818,7 +1899,8 @@ arti_invoke(struct obj *obj)
                 n = select_menu(tmpwin, PICK_ONE, &selected);
                 if (n <= 0) {
                     destroy_nhwindow(tmpwin);
-                    goto nothing_special;
+                    nothing_special(obj);
+                    return ECMD_TIME;
                 }
                 i = selected[0].item.a_int - 1;
                 free((genericptr_t) selected);
@@ -1833,10 +1915,10 @@ arti_invoke(struct obj *obj)
              * The closest level is either the entry or dunlev_ureached.
              */
             newlev.dnum = i;
-            if (gd.dungeons[i].depth_start >= depth(&u.uz))
-                newlev.dlevel = gd.dungeons[i].entry_lev;
+            if (svd.dungeons[i].depth_start >= depth(&u.uz))
+                newlev.dlevel = svd.dungeons[i].entry_lev;
             else
-                newlev.dlevel = gd.dungeons[i].dunlev_ureached;
+                newlev.dlevel = svd.dungeons[i].dunlev_ureached;
 
             if (u.uhave.amulet || In_endgame(&u.uz) || In_endgame(&newlev)
                 || newlev.dnum == u.uz.dnum || !next_to_u()) {
@@ -1856,8 +1938,10 @@ arti_invoke(struct obj *obj)
         case CREATE_AMMO: {
             struct obj *otmp = mksobj(ARROW, TRUE, FALSE);
 
-            if (!otmp)
-                goto nothing_special;
+            if (!otmp) {
+                nothing_special(obj);
+                return ECMD_TIME;
+            }
             otmp->blessed = obj->blessed;
             otmp->cursed = obj->cursed;
             otmp->bknown = obj->bknown;
@@ -1897,7 +1981,7 @@ arti_invoke(struct obj *obj)
                 if (mtmp->data->msound == MS_NEMESIS)
                     continue;
 
-                if (In_quest(&u.uz) && !gq.quest_status.killed_nemesis)
+                if (In_quest(&u.uz) && !svq.quest_status.killed_nemesis)
                     chance += 10;
                 if (is_dprince(mtmp->data))
                     chance += 2;
@@ -1938,11 +2022,14 @@ arti_invoke(struct obj *obj)
                 if (u.dx || u.dy) {
                     do_blinding_ray(obj);
                 } else if (u.dz) {
-                    /* up or down; light this map spot */
-                    levl[u.ux][u.uy].lit = 1;
-                    pline("%s", ((Blind || levl[u.ux][u.uy].waslit)
-                                 ? nothing_seems_to_happen
-                                 : "It is lit here now."));
+                    /* up or down => light this map spot; litroom() uses
+                       radius 0 for Sunsword, except on Rogue level where
+                       whole room gets lit and corridor spots remain unlit */
+                    litroom(TRUE, obj);
+                    pline("%s", ((!Blind && levl[u.ux][u.uy].lit
+                                  && !levl[u.ux][u.uy].waslit)
+                                 ? "It is lit here now."
+                                 : nothing_seems_to_happen));
                 } else { /* zapyourself() */
                     boolean vulnerable = (u.umonnum == PM_GREMLIN);
                     int damg = obj->blessed ? 15 : !obj->cursed ? 10 : 5;
@@ -1957,7 +2044,7 @@ arti_invoke(struct obj *obj)
             } else {
                 /* no direction picked */
                 pline("%s", Never_mind);
-                obj->age = gm.moves;
+                obj->age = svm.moves;
             }
             break;
         default:
@@ -1969,7 +2056,7 @@ arti_invoke(struct obj *obj)
              iprop = u.uprops[oart->inv_prop].intrinsic;
         boolean on = (eprop & W_ARTI) != 0; /* true if prop just set */
 
-        if (on && obj->age > gm.moves) {
+        if (on && obj->age > svm.moves) {
             /* the artifact is tired :-) */
             u.uprops[oart->inv_prop].extrinsic ^= W_ARTI;
             You_feel("that %s %s ignoring you.", the(xname(obj)),
@@ -1980,14 +2067,12 @@ arti_invoke(struct obj *obj)
         } else if (!on) {
             /* when turning off property, determine downtime */
             /* arbitrary for now until we can tune this -dlc */
-            obj->age = gm.moves + rnz(100);
+            obj->age = svm.moves + rnz(100);
         }
 
         if ((eprop & ~W_ARTI) || iprop) {
- nothing_special:
             /* you had the property from some other source too */
-            if (carried(obj))
-                You_feel("a surge of power, but nothing seems to happen.");
+            nothing_special(obj);
             return ECMD_TIME;
         }
         switch (oart->inv_prop) {
@@ -2005,8 +2090,10 @@ arti_invoke(struct obj *obj)
                 (void) float_down(I_SPECIAL | TIMEOUT, W_ARTI);
             break;
         case INVIS:
-            if (BInvis || Blind)
-                goto nothing_special;
+            if (BInvis || Blind) {
+                nothing_special(obj);
+                return ECMD_TIME;
+            }
             newsym(u.ux, u.uy);
             if (on)
                 Your("body takes on a %s transparency...",
@@ -2036,7 +2123,8 @@ finesse_ahriman(struct obj *obj)
 
     /* if we aren't levitating or this isn't an artifact which confers
        levitation via #invoke then freeinv() won't toggle levitation */
-    if (!Levitation || (oart = get_artifact(obj)) == &artilist[ART_NONARTIFACT]
+    if (!Levitation
+        || (oart = get_artifact(obj)) == &artilist[ART_NONARTIFACT]
         || oart->inv_prop != LEVITATION || !(ELevitation & W_ARTI))
         return FALSE;
 
@@ -2187,7 +2275,7 @@ what_gives(long *abil)
 
     for (obj = gi.invent; obj; obj = obj->nobj) {
         if (obj->oartifact
-            && (abil != &EWarn_of_mon || gc.context.warntype.obj)) {
+            && (abil != &EWarn_of_mon || svc.context.warntype.obj)) {
             const struct artifact *art = get_artifact(obj);
 
             if (art != &artilist[ART_NONARTIFACT]) {
@@ -2204,6 +2292,10 @@ what_gives(long *abil)
                     /* property conferred when wielded or worn */
                     if ((art->spfx & spfx) == spfx && obj->owornmask)
                         return obj;
+                }
+                if (obj == uwep && abil == &EBlnd_resist
+                    && (*abil & W_WEP) != 0L) {
+                    return obj; /* Sunsword */
                 }
             }
         } else {
@@ -2254,7 +2346,9 @@ glow_verb(int count, /* 0 means blind rather than no applicable creatures */
 
 /* use for warning "glow" for Sting, Orcrist, and Grimtooth */
 void
-Sting_effects(int orc_count) /* new count (warn_obj_cnt is old count); -1 is a flag value */
+Sting_effects(
+    int orc_count) /* new count (warn_obj_cnt is old count);
+                    * -1 is a flag value */
 {
     if (u_wield_art(ART_STING)
         || u_wield_art(ART_ORCRIST)
@@ -2498,8 +2592,7 @@ staticfn int
 count_surround_traps(coordxy x, coordxy y)
 {
     struct rm *levp;
-    struct obj *otmp;
-    struct trap *ttmp;
+    struct obj *o;
     coordxy dx, dy;
     int glyph, ret = 0;
 
@@ -2515,7 +2608,7 @@ count_surround_traps(coordxy x, coordxy y)
             glyph = glyph_at(dx, dy);
             if (glyph_is_trap(glyph))
                 continue;
-            if ((ttmp = t_at(dx, dy)) != 0) {
+            if (t_at(dx, dy)) {
                 ++ret;
                 continue;
             }
@@ -2524,8 +2617,8 @@ count_surround_traps(coordxy x, coordxy y)
                 ++ret;
                 continue;
             }
-            for (otmp = gl.level.objects[dx][dy]; otmp; otmp = otmp->nexthere)
-                if (Is_container(otmp) && otmp->otrapped) {
+            for (o = svl.level.objects[dx][dy]; o; o = o->nexthere)
+                if (Is_container(o) && o->otrapped) {
                     ++ret; /* we're counting locations, so just */
                     break; /* count the first one in a pile     */
                 }

@@ -1,4 +1,4 @@
-/* NetHack 3.7	worn.c	$NHDT-Date: 1715109581 2024/05/07 19:19:41 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.109 $ */
+/* NetHack 3.7	worn.c	$NHDT-Date: 1736530208 2025/01/10 09:30:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.116 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2013. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -7,7 +7,8 @@
 
 staticfn void m_lose_armor(struct monst *, struct obj *, boolean) NONNULLPTRS;
 staticfn void clear_bypass(struct obj *) NO_NNARGS;
-staticfn void m_dowear_type(struct monst *, long, boolean, boolean) NONNULLARG1;
+staticfn void m_dowear_type(struct monst *, long, boolean, boolean)
+                                                                  NONNULLARG1;
 staticfn int extra_pref(struct monst *, struct obj *) NONNULLARG1;
 
 static const struct worn {
@@ -161,7 +162,7 @@ setnotworn(struct obj *obj)
             *(wp->w_obj) = (struct obj *) 0;
             p = objects[obj->otyp].oc_oprop;
             u.uprops[p].extrinsic = u.uprops[p].extrinsic & ~wp->w_mask;
-            monstunseesu_prop(p); /* remove this extrinsic from seenres */ 
+            monstunseesu_prop(p); /* remove this extrinsic from seenres */
             obj->owornmask &= ~wp->w_mask;
             if (obj->oartifact)
                 set_artifact_intrinsic(obj, 0, wp->w_mask);
@@ -474,11 +475,13 @@ mon_adjust_speed(
             /* mimic the player's petrification countdown; "slowing down"
                even if fast movement rate retained via worn speed boots */
             if (flags.verbose)
-                pline("%s is slowing down.", Monnam(mon));
+                pline_mon(mon, "%s is slowing down.", Monnam(mon));
         } else if (adjust > 0 || mon->mspeed == MFAST)
-            pline("%s is suddenly moving %sfaster.", Monnam(mon), howmuch);
+            pline_mon(mon, "%s is suddenly moving %sfaster.",
+                      Monnam(mon), howmuch);
         else
-            pline("%s seems to be moving %sslower.", Monnam(mon), howmuch);
+            pline_mon(mon, "%s seems to be moving %sslower.",
+                      Monnam(mon), howmuch);
 
         /* might discover an object if we see the speed change happen */
         if (obj != 0)
@@ -550,12 +553,7 @@ update_mon_extrinsics(
         case JUMPING:
             break;
         default:
-            /* 1 through 8 correspond to MR_xxx mask values */
-            if (which >= 1 && which <= 8) {
-                /* FIRE,COLD,SLEEP,DISINT,SHOCK,POISON,ACID,STONE */
-                mask = (uchar) (1 << (which - 1));
-                mon->mextrinsics |= (unsigned short) mask;
-            }
+            mon->mextrinsics |= (unsigned short) res_to_mr(which);
             break;
         }
     } else { /* off */
@@ -592,7 +590,7 @@ update_mon_extrinsics(
              * only one pass but a worn alchemy smock will be an
              * alternate source for either of those two resistances.
              */
-            mask = (uchar) (1 << (which - 1));
+            mask = res_to_mr(which);
             for (otmp = mon->minvent; otmp; otmp = otmp->nobj) {
                 if (otmp == obj || !otmp->owornmask)
                     continue;
@@ -727,7 +725,7 @@ staticfn void
 m_dowear_type(
     struct monst *mon,
     long flag,               /* wornmask value */
-    boolean creation,
+    boolean creation,        /* no wear messages when mon is being created */
     boolean racialexception) /* small monsters that are allowed for player
                               * races (gnomes) can wear suits */
 {
@@ -851,14 +849,31 @@ m_dowear_type(
 
     if (!creation) {
         if (sawmon) {
-            char buf[BUFSZ];
+            char buf[BUFSZ], oldarm[BUFSZ], newarm[BUFSZ + sizeof "another "];
 
-            if (old)
-                Sprintf(buf, " removes %s and", distant_name(old, doname));
-            else
-                buf[0] = '\0';
-            pline("%s%s puts on %s.", Monnam(mon), buf,
-                  distant_name(best, doname));
+            /* "<Mon> [removes <oldarm> and ]puts on <newarm>."
+               uses accessory verbs for armor but we can live with that */
+            if (old) {
+                Strcpy(oldarm, distant_name(old, doname));
+                Snprintf(buf, sizeof buf, " removes %s and", oldarm);
+            } else {
+                buf[0] = oldarm[0] = '\0';
+            }
+            Strcpy(newarm, distant_name(best, doname));
+            /* a monster will swap an item of the same type as the one it
+               is replacing when the enchantment is better;
+               if newarm and oldarm have identical descriptions, substitute
+               "another <newarm>" for "a|an <newarm>" */
+            if (!strcmpi(newarm, oldarm)) {
+                /* size of newarm[] has been overallocated to guarantee
+                   enough room to insert "another " */
+                if (!strncmpi(newarm, "a ", 2))
+                    (void) strsubst(newarm, "a ", "another ");
+                else if (!strncmpi(newarm, "an ", 3))
+                    (void) strsubst(newarm, "an ", "another ");
+                newarm[BUFSZ - 1] = '\0';
+            }
+            pline_mon(mon, "%s%s puts on %s.", Monnam(mon), buf, newarm);
             if (autocurse)
                 pline("%s %s %s %s for a moment.", s_suffix(Monnam(mon)),
                       simpleonames(best), otense(best, "glow"),
@@ -976,7 +991,7 @@ clear_bypass(struct obj *objchn)
 
 /* all objects with their bypass bit set should now be reset to normal;
    this can be a relatively expensive operation so is only called if
-   gc.context.bypasses is set */
+   svc.context.bypasses is set */
 void
 clear_bypasses(void)
 {
@@ -985,14 +1000,14 @@ clear_bypasses(void)
     /*
      * 'Object' bypass is also used for one monster function:
      * polymorph control of long worms.  Activated via setting
-     * gc.context.bypasses even if no specific object has been
+     * svc.context.bypasses even if no specific object has been
      * bypassed.
      */
 
     clear_bypass(fobj);
     clear_bypass(gi.invent);
     clear_bypass(gm.migrating_objs);
-    clear_bypass(gl.level.buriedobjlist);
+    clear_bypass(svl.level.buriedobjlist);
     clear_bypass(gb.billobjs);
     clear_bypass(go.objs_deleted);
     for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
@@ -1023,14 +1038,14 @@ clear_bypasses(void)
     if (uchain)
         uchain->bypass = 0;
 
-    gc.context.bypasses = FALSE;
+    svc.context.bypasses = FALSE;
 }
 
 void
 bypass_obj(struct obj *obj)
 {
     obj->bypass = 1;
-    gc.context.bypasses = TRUE;
+    svc.context.bypasses = TRUE;
 }
 
 /* set or clear the bypass bit in a list of objects */
@@ -1040,7 +1055,7 @@ bypass_objlist(
     boolean on) /* TRUE => set, FALSE => clear */
 {
     if (on && objchain)
-        gc.context.bypasses = TRUE;
+        svc.context.bypasses = TRUE;
     while (objchain) {
         objchain->bypass = on ? 1 : 0;
         objchain = objchain->nobj;
@@ -1104,7 +1119,8 @@ mon_break_armor(struct monst *mon, boolean polyspot)
             } else {
                 Soundeffect(se_cracking_sound, 100);
                 if (vis)
-                    pline("%s breaks out of %s armor!", Monnam(mon), ppronoun);
+                    pline_mon(mon, "%s breaks out of %s armor!",
+                              Monnam(mon), ppronoun);
                 else
                     You_hear("a cracking sound.");
             }
@@ -1115,13 +1131,13 @@ mon_break_armor(struct monst *mon, boolean polyspot)
             && (otmp->otyp != MUMMY_WRAPPING || !WrappingAllowed(mdat))) {
             if (otmp->oartifact) {
                 if (vis)
-                    pline("%s %s falls off!", s_suffix(Monnam(mon)),
+                    pline_mon(mon, "%s %s falls off!", s_suffix(Monnam(mon)),
                           cloak_simple_name(otmp));
                 m_lose_armor(mon, otmp, polyspot);
             } else {
                 Soundeffect(se_ripping_sound, 100);
                 if (vis)
-                    pline("%s %s tears apart!", s_suffix(Monnam(mon)),
+                    pline_mon(mon, "%s %s tears apart!", s_suffix(Monnam(mon)),
                           cloak_simple_name(otmp));
                 else
                     You_hear("a ripping sound.");
@@ -1130,7 +1146,8 @@ mon_break_armor(struct monst *mon, boolean polyspot)
         }
         if ((otmp = which_armor(mon, W_ARMU)) != 0) {
             if (vis)
-                pline("%s shirt rips to shreds!", s_suffix(Monnam(mon)));
+                pline_mon(mon, "%s shirt rips to shreds!",
+                          s_suffix(Monnam(mon)));
             else
                 You_hear("a ripping sound.");
             m_useup(mon, otmp);
@@ -1142,8 +1159,8 @@ mon_break_armor(struct monst *mon, boolean polyspot)
         if ((otmp = which_armor(mon, W_ARM)) != 0) {
             Soundeffect(se_thud, 50);
             if (vis)
-                pline("%s armor falls around %s!", s_suffix(Monnam(mon)),
-                      pronoun);
+                pline_mon(mon, "%s armor falls around %s!",
+                          s_suffix(Monnam(mon)), pronoun);
             else
                 You_hear("a thud.");
             m_lose_armor(mon, otmp, polyspot);
@@ -1153,21 +1170,22 @@ mon_break_armor(struct monst *mon, boolean polyspot)
             && (otmp->otyp != MUMMY_WRAPPING || !WrappingAllowed(mdat))) {
             if (vis) {
                 if (is_whirly(mon->data))
-                    pline("%s %s falls, unsupported!", s_suffix(Monnam(mon)),
-                          cloak_simple_name(otmp));
+                    pline_mon(mon, "%s %s falls, unsupported!",
+                              s_suffix(Monnam(mon)), cloak_simple_name(otmp));
                 else
-                    pline("%s shrinks out of %s %s!", Monnam(mon), ppronoun,
-                          cloak_simple_name(otmp));
+                    pline_mon(mon, "%s shrinks out of %s %s!",
+                              Monnam(mon), ppronoun,
+                              cloak_simple_name(otmp));
             }
             m_lose_armor(mon, otmp, polyspot);
         }
         if ((otmp = which_armor(mon, W_ARMU)) != 0) {
             if (vis) {
                 if (passes_thru_clothes)
-                    pline("%s seeps right through %s shirt!", Monnam(mon),
-                          ppronoun);
+                    pline_mon(mon, "%s seeps right through %s shirt!",
+                              Monnam(mon), ppronoun);
                 else
-                    pline("%s becomes much too small for %s shirt!",
+                    pline_mon(mon, "%s becomes much too small for %s shirt!",
                           Monnam(mon), ppronoun);
             }
             m_lose_armor(mon, otmp, polyspot);
@@ -1177,15 +1195,16 @@ mon_break_armor(struct monst *mon, boolean polyspot)
         /* [caller needs to handle weapon checks] */
         if ((otmp = which_armor(mon, W_ARMG)) != 0) {
             if (vis)
-                pline("%s drops %s gloves%s!", Monnam(mon), ppronoun,
-                      MON_WEP(mon) ? " and weapon" : "");
+                pline_mon(mon, "%s drops %s gloves%s!",
+                          Monnam(mon), ppronoun,
+                          MON_WEP(mon) ? " and weapon" : "");
             m_lose_armor(mon, otmp, polyspot);
         }
         if ((otmp = which_armor(mon, W_ARMS)) != 0) {
             Soundeffect(se_clank, 50);
             if (vis)
-                pline("%s can no longer hold %s shield!", Monnam(mon),
-                      ppronoun);
+                pline_mon(mon, "%s can no longer hold %s shield!",
+                          Monnam(mon), ppronoun);
             else
                 You_hear("a clank.");
             m_lose_armor(mon, otmp, polyspot);
@@ -1196,8 +1215,8 @@ mon_break_armor(struct monst *mon, boolean polyspot)
             /* flimsy test for horns matches polyself handling */
             && (handless_or_tiny || !is_flimsy(otmp))) {
             if (vis)
-                pline("%s helmet falls to the %s!", s_suffix(Monnam(mon)),
-                      surface(mon->mx, mon->my));
+                pline_mon(mon, "%s helmet falls to the %s!",
+                          s_suffix(Monnam(mon)), surface(mon->mx, mon->my));
             else
                 You_hear("a clank.");
             m_lose_armor(mon, otmp, polyspot);
@@ -1207,9 +1226,11 @@ mon_break_armor(struct monst *mon, boolean polyspot)
         if ((otmp = which_armor(mon, W_ARMF)) != 0) {
             if (vis) {
                 if (is_whirly(mon->data))
-                    pline("%s boots fall away!", s_suffix(Monnam(mon)));
+                    pline_mon(mon, "%s boots fall away!",
+                              s_suffix(Monnam(mon)));
                 else
-                    pline("%s boots %s off %s feet!", s_suffix(Monnam(mon)),
+                    pline_mon(mon, "%s boots %s off %s feet!",
+                              s_suffix(Monnam(mon)),
                           verysmall(mdat) ? "slide" : "are pushed", ppronoun);
             }
             m_lose_armor(mon, otmp, polyspot);
@@ -1219,7 +1240,7 @@ mon_break_armor(struct monst *mon, boolean polyspot)
         if ((otmp = which_armor(mon, W_SADDLE)) != 0) {
             m_lose_armor(mon, otmp, polyspot);
             if (vis)
-                pline("%s saddle falls off.", s_suffix(Monnam(mon)));
+                pline_mon(mon, "%s saddle falls off.", s_suffix(Monnam(mon)));
         }
         if (mon == u.usteed)
             noride = TRUE;

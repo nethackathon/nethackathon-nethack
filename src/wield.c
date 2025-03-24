@@ -56,6 +56,7 @@ staticfn boolean cant_wield_corpse(struct obj *) NONNULLARG1;
 staticfn int ready_weapon(struct obj *) NO_NNARGS;
 staticfn int ready_ok(struct obj *) NO_NNARGS;
 staticfn int wield_ok(struct obj *) NO_NNARGS;
+staticfn void finish_splitting(struct obj *);
 
 /* used by will_weld() */
 /* probably should be renamed */
@@ -336,13 +337,20 @@ wield_ok(struct obj *obj)
     return GETOBJ_DOWNPLAY;
 }
 
+staticfn void
+finish_splitting(struct obj *obj)
+{
+    /* obj was split off from something; give it its own invlet */
+    freeinv(obj);
+    addinv_nomerge(obj);
+}
+
 /* the #wield command - wield a weapon */
 int
 dowield(void)
 {
     char qbuf[QBUFSZ];
     struct obj *wep, *oldwep;
-    boolean finish_splitting = FALSE;
     int result;
 
     /* May we attempt this? */
@@ -371,20 +379,20 @@ dowield(void)
         /* previously interrupted armor removal mustn't be resumed */
         reset_remarm();
         /* if player chose a partial stack but can't wield it, undo split */
-        if (wep->o_id && wep->o_id == gc.context.objsplit.child_oid)
+        if (wep->o_id && wep->o_id == svc.context.objsplit.child_oid)
             unsplitobj(wep);
         return ECMD_FAIL;
-    } else if (wep->o_id && wep->o_id == gc.context.objsplit.child_oid) {
+    } else if (wep->o_id && wep->o_id == svc.context.objsplit.child_oid) {
         /* if wep is the result of supplying a count to getobj()
            we don't want to split something already wielded; for
            any other item, we need to give it its own inventory slot */
-        if (uwep && uwep->o_id == gc.context.objsplit.parent_oid) {
+        if (uwep && uwep->o_id == svc.context.objsplit.parent_oid) {
             unsplitobj(wep);
             /* wep was merged back to uwep, already_wielded uses wep */
             wep = uwep;
             goto already_wielded;
         }
-        finish_splitting = TRUE;
+        finish_splitting(wep);
         goto wielding;
     }
 
@@ -405,7 +413,7 @@ dowield(void)
             case 'y':
                 /* leave N-1 quivered, split off 1 to wield */
                 wep = splitobj(uquiver, 1L);
-                finish_splitting = TRUE;
+                finish_splitting(wep);
                 goto wielding;
             default:
                 break;
@@ -433,12 +441,6 @@ dowield(void)
     }
 
  wielding:
-    if (finish_splitting) {
-        /* wep was split off from something; give it its own invlet */
-        freeinv(wep);
-        addinv_nomerge(wep);
-    }
-
     /* Set your new primary weapon */
     oldwep = uwep;
     result = ready_weapon(wep);
@@ -507,8 +509,7 @@ doquiver_core(const char *verb) /* "ready" or "fire" */
     char qbuf[QBUFSZ];
     struct obj *newquiver;
     int res;
-    boolean finish_splitting = FALSE,
-            was_uwep = FALSE, was_twoweap = u.twoweap;
+    boolean was_uwep = FALSE, was_twoweap = u.twoweap;
 
     /* Since the quiver isn't in your hands, don't check cantwield(),
        will_weld(), touch_petrifies(), etc. */
@@ -538,11 +539,11 @@ doquiver_core(const char *verb) /* "ready" or "fire" */
             You("already have no ammunition readied!");
         }
         return ECMD_OK;
-    } else if (newquiver->o_id == gc.context.objsplit.child_oid) {
+    } else if (newquiver->o_id == svc.context.objsplit.child_oid) {
         /* if newquiver is the result of supplying a count to getobj()
            we don't want to split something already in the quiver;
            for any other item, we need to give it its own inventory slot */
-        if (uquiver && uquiver->o_id == gc.context.objsplit.parent_oid) {
+        if (uquiver && uquiver->o_id == svc.context.objsplit.parent_oid) {
             unsplitobj(newquiver);
             goto already_quivered;
         } else if (newquiver->oclass == COIN_CLASS) {
@@ -551,7 +552,7 @@ doquiver_core(const char *verb) /* "ready" or "fire" */
             unsplitobj(newquiver);
             return ECMD_OK;
         }
-        finish_splitting = TRUE;
+        finish_splitting(newquiver);
     } else if (newquiver == uquiver) {
  already_quivered:
         pline("That ammunition is already readied!");
@@ -578,7 +579,7 @@ doquiver_core(const char *verb) /* "ready" or "fire" */
             case 'y':
                 /* leave 1 wielded, split rest off and put into quiver */
                 newquiver = splitobj(uwep, uwep->quan - 1L);
-                finish_splitting = TRUE;
+                finish_splitting(newquiver);
                 goto quivering;
             default:
                 break;
@@ -616,7 +617,7 @@ doquiver_core(const char *verb) /* "ready" or "fire" */
             case 'y':
                 /* leave 1 alt-wielded, split rest off and put into quiver */
                 newquiver = splitobj(uswapwep, uswapwep->quan - 1L);
-                finish_splitting = TRUE;
+                finish_splitting(newquiver);
                 goto quivering;
             default:
                 break;
@@ -644,11 +645,6 @@ doquiver_core(const char *verb) /* "ready" or "fire" */
     }
 
  quivering:
-    if (finish_splitting) {
-        freeinv(newquiver);
-        addinv_nomerge(newquiver);
-    }
-
     if (!strcmp(verb, "ready")) {
         /* place item in quiver before printing so that inventory feedback
            includes "(at the ready)" */

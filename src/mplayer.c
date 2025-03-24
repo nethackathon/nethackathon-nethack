@@ -69,7 +69,7 @@ dev_name(void)
 }
 
 staticfn void
-get_mplname(struct monst* mtmp, char *nam)
+get_mplname(struct monst *mtmp, char *nam)
 {
     boolean fmlkind = is_female(mtmp->data);
     const char *devnam;
@@ -261,8 +261,9 @@ mk_mplayer(struct permonst *ptr, coordxy x, coordxy y, boolean special)
                 otmp->oerodeproof = 1;
             else if (!rn2(2))
                 otmp->greased = 1;
+            /* mk_artifact() with otmp and A_NONE will never return NULL */
             if (special && rn2(2))
-                otmp = mk_artifact(otmp, A_NONE);
+                otmp = mk_artifact(otmp, A_NONE, 99, FALSE);
             /* usually increase stack size if stackable weapon */
             if (objects[otmp->otyp].oc_merge && !otmp->oartifact
                 && monmightthrowwep(otmp))

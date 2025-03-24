@@ -1,4 +1,4 @@
-/* NetHack 3.7	winprocs.h	$NHDT-Date: 1683748057 2023/05/10 19:47:37 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.74 $ */
+/* NetHack 3.7	winprocs.h	$NHDT-Date: 1736530208 2025/01/10 09:30:08 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.83 $ */
 /* Copyright (c) David Cohrs, 1992                                */
 /* NetHack may be freely redistributed.  See license for details. */
 
@@ -10,13 +10,13 @@
 #include "color.h"
 #endif
 
-enum wp_ids { wp_tty = 1, wp_X11, wp_Qt, wp_mswin, wp_curses, 
+enum wp_ids { wp_tty = 1, wp_X11, wp_Qt, wp_mswin, wp_curses,
               wp_chainin, wp_chainout, wp_safestartup, wp_shim,
               wp_hup, wp_guistubs, wp_ttystubs,
 #ifdef OUTDATED_STUFF
               wp_mac, wp_Gem, wp_Gnome, wp_amii, wp_amiv,
 #endif
-	      wp_trace	// XXX do we need this?  should chainin/out get an id? TBD
+              wp_trace	// XXX do we need this?  should chainin/out get an id? TBD
 };
 
 /* NB: this MUST match chain_procs below */
@@ -80,10 +80,6 @@ struct window_procs {
     char *(*win_get_color_string)(void);
 #endif
 
-    /* other defs that really should go away (they're tty specific) */
-    void (*win_start_screen)(void);
-    void (*win_end_screen)(void);
-
     void (*win_outrip)(winid, int, time_t);
     void (*win_preference_update)(const char *);
     char *(*win_getmsghistory)(boolean);
@@ -128,10 +124,9 @@ extern
 #define display_file (*windowprocs.win_display_file)
 #define start_menu (*windowprocs.win_start_menu)
 #define end_menu (*windowprocs.win_end_menu)
-/* 3.7: There are real add_menu() and select_menu
- *      in the core now.
+/* 3.7: There are real add_menu() and select_menu in the core now.
  *      add_menu does some common activities, such as menu_colors.
- *      select_menu does some before and after activities. 
+ *      select_menu does some before and after activities.
  *      add_menu() and select_menu() are in windows.c
  */
 /* #define add_menu (*windowprocs.win_add_menu) */
@@ -177,10 +172,6 @@ extern
  */
 /* #define yn_function (*windowprocs.win_yn_function) */
 
-/* other defs that really should go away (they're tty specific) */
-#define start_screen (*windowprocs.win_start_screen)
-#define end_screen (*windowprocs.win_end_screen)
-
 #define outrip (*windowprocs.win_outrip)
 #define preference_update (*windowprocs.win_preference_update)
 #define getmsghistory (*windowprocs.win_getmsghistory)
@@ -193,10 +184,10 @@ extern
 #define ctrl_nhwindow (*windowprocs.win_ctrl_nhwindow)
 
 /*
- * 
+ *
  */
 #define WPID(name) #name, wp_##name
-#define WPIDMINUS(name) "-" #name, wp_##name 
+#define WPIDMINUS(name) "-" #name, wp_##name
 
 /*
  * WINCAP
@@ -404,10 +395,6 @@ struct chain_procs {
     char *(*win_get_color_string)(CARGS);
 #endif
 
-    /* other defs that really should go away (they're tty specific) */
-    void (*win_start_screen)(CARGS);
-    void (*win_end_screen)(CARGS);
-
     void (*win_outrip)(CARGS, winid, int, time_t);
     void (*win_preference_update)(CARGS, const char *);
     char *(*win_getmsghistory)(CARGS, boolean);
@@ -420,7 +407,8 @@ struct chain_procs {
                               unsigned long *);
     boolean (*win_can_suspend)(CARGS);
     void (*win_update_inventory)(CARGS, int);
-    win_request_info *(*win_ctrl_nhwindow)(CARGS, winid, int, win_request_info *);
+    win_request_info *(*win_ctrl_nhwindow)(CARGS, winid, int,
+                                           win_request_info *);
 };
 #endif /* WINCHAIN */
 
@@ -480,8 +468,6 @@ extern short safe_set_font_name(winid, char *);
 #endif
 extern char *safe_get_color_string(void);
 #endif
-extern void safe_start_screen(void);
-extern void safe_end_screen(void);
 extern void safe_outrip(winid, int, time_t);
 extern void safe_preference_update(const char *);
 extern char *safe_getmsghistory(boolean);

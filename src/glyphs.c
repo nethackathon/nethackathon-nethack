@@ -1,4 +1,4 @@
-/* NetHack 3.7	glyphs.c	*/
+/* NetHack 3.7	glyphs.c	TODO: add NHDT branch/date/revision tags */
 /* Copyright (c) Michael Allison, 2021. */
 /* NetHack may be freely redistributed.  See license for details. */
 
@@ -50,7 +50,9 @@ staticfn void shuffle_customizations(void);
 /* staticfn void purge_custom_entries(enum graphics_sets which_set); */
 
 staticfn void
-to_custom_symset_entry_callback(int glyph, struct find_struct *findwhat)
+to_custom_symset_entry_callback(
+    int glyph,
+    struct find_struct *findwhat)
 {
     int idx = gs.symset_which_set;
 #ifdef ENHANCED_SYMBOLS
@@ -82,7 +84,8 @@ to_custom_symset_entry_callback(int glyph, struct find_struct *findwhat)
             static int glyphnag = 0;
 
             if (!glyphnag++)
-                config_error_add("Unimplemented customization feature, ignoring for now");
+                config_error_add("Unimplemented customization feature,"
+                                 " ignoring for now");
         }
     }
 #endif
@@ -94,7 +97,8 @@ to_custom_symset_entry_callback(int glyph, struct find_struct *findwhat)
             static int colornag = 0;
 
             if (!colornag++)
-                config_error_add("Unimplemented customization feature, ignoring for now");
+                config_error_add("Unimplemented customization feature,"
+                                 " ignoring for now");
         }
     }
 }
@@ -105,7 +109,9 @@ to_custom_symset_entry_callback(int glyph, struct find_struct *findwhat)
  *               0 = failure
  */
 int
-glyphrep_to_custom_map_entries(const char *op, int *glyphptr)
+glyphrep_to_custom_map_entries(
+    const char *op,
+    int *glyphptr)
 {
     to_custom_symbol_find = zero_find;
     char buf[BUFSZ], *c_glyphid, *c_unicode, *c_colorval, *cp;
@@ -115,6 +121,7 @@ glyphrep_to_custom_map_entries(const char *op, int *glyphptr)
 
     if (!glyphid_cache)
         reslt = 1; /* for debugger use only; no cache available */
+    nhUse(reslt);
 
     Snprintf(buf, sizeof buf, "%s", op);
     c_unicode = c_colorval = (char *) 0;
@@ -189,8 +196,44 @@ fix_glyphname(char *str)
     return str;
 }
 
+int
+glyph_to_cmap(int glyph)
+{
+    if (glyph == GLYPH_CMAP_STONE_OFF)
+        return S_stone;
+    else if (glyph_is_cmap_main(glyph))
+        return (glyph - GLYPH_CMAP_MAIN_OFF) + S_vwall;
+    else if (glyph_is_cmap_mines(glyph))
+        return (glyph - GLYPH_CMAP_MINES_OFF) + S_vwall;
+    else if (glyph_is_cmap_gehennom(glyph))
+        return (glyph - GLYPH_CMAP_GEH_OFF) + S_vwall;
+    else if (glyph_is_cmap_knox(glyph))
+        return (glyph - GLYPH_CMAP_KNOX_OFF) + S_vwall;
+    else if (glyph_is_cmap_sokoban(glyph))
+        return (glyph - GLYPH_CMAP_SOKO_OFF) + S_vwall;
+    else if (glyph_is_cmap_a(glyph))
+        return (glyph - GLYPH_CMAP_A_OFF) + S_ndoor;
+    else if (glyph_is_cmap_altar(glyph))
+        return S_altar;
+    else if (glyph_is_cmap_b(glyph))
+        return (glyph - GLYPH_CMAP_B_OFF) + S_grave;
+    else if (glyph_is_cmap_c(glyph))
+        return (glyph - GLYPH_CMAP_C_OFF) + S_digbeam;
+    else if (glyph_is_cmap_zap(glyph))
+        return ((glyph - GLYPH_ZAP_OFF) % 4) + S_vbeam;
+    else if (glyph_is_swallow(glyph))
+        return glyph_to_swallow(glyph) + S_sw_tl;
+    else if (glyph_is_explosion(glyph))
+        return glyph_to_explosion(glyph) + S_expl_tl;
+    else
+        return MAXPCHARS;    /* MAXPCHARS is legal array index because
+                              * of trailing fencepost entry */
+}
+
 staticfn int
-glyph_find_core(const char *id, struct find_struct *findwhat)
+glyph_find_core(
+    const char *id,
+    struct find_struct *findwhat)
 {
     int glyph;
     boolean do_callback, end_find = FALSE;
@@ -208,7 +251,8 @@ glyph_find_core(const char *id, struct find_struct *findwhat)
                     break;
                 case find_pm:
                     if (glyph_is_monster(glyph)
-                        && monsym(&mons[glyph_to_mon(glyph)]) == findwhat->val)
+                        && monsym(&mons[glyph_to_mon(glyph)])
+                           == findwhat->val)
                         do_callback = TRUE;
                     break;
                 case find_oc:
@@ -427,6 +471,7 @@ glyphrep(const char *op)
 
     if (!glyphid_cache)
         reslt = 1;      /* for debugger use only; no cache available */
+    nhUse(reslt);
     reslt = glyphrep_to_custom_map_entries(op, &glyph);
     if (reslt)
         return 1;
@@ -455,7 +500,7 @@ add_custom_nhcolor_entry(
         gdc->details_end = 0;
     }
     details = find_matching_customization(customization_name,
-                                            custom_nhcolor, which_set);
+                                          custom_nhcolor, which_set);
     if (details) {
         while (details) {
             if (details->content.ccolor.glyphidx == glyphidx) {
@@ -466,8 +511,7 @@ add_custom_nhcolor_entry(
         }
     }
     /* create new details entry */
-    newdetails = (struct customization_detail *) alloc(
-                                        sizeof (struct customization_detail));
+    newdetails = (struct customization_detail *) alloc(sizeof *newdetails);
     newdetails->content.urep.glyphidx = glyphidx;
     newdetails->content.ccolor.nhcolor = nhcolor;
     newdetails->next = (struct customization_detail *) 0;
@@ -483,8 +527,8 @@ add_custom_nhcolor_entry(
 
 void
 apply_customizations(
-        enum graphics_sets which_set,
-        enum do_customizations docustomize)
+    enum graphics_sets which_set,
+    enum do_customizations docustomize)
 {
     glyph_map *gmap;
     struct customization_detail *details;
@@ -517,7 +561,7 @@ apply_customizations(
                     if (sc->custtype == custom_nhcolor) {
                         gmap = &glyphmap[details->content.ccolor.glyphidx];
                         (void) set_map_customcolor(gmap,
-                                               details->content.ccolor.nhcolor);
+                                             details->content.ccolor.nhcolor);
                     }
                 }
                 details = details->next;
@@ -633,12 +677,14 @@ shuffle_customizations(void)
                 tmp_customcolor[i] = other_customcolor;
                 tmp_color256idx[i] = other_color256idx;
 #ifdef ENHANCED_SYMBOLS
-                tmp_u[i] = (struct unicode_representation *)
-                           alloc(sizeof *tmp_u[i]);
-                *tmp_u[i] = *other;
-                if (other->utf8str != NULL) {
-                    tmp_u[i]->utf8str = (uint8 *)
-                                        dupstr((const char *) other->utf8str);
+                if (other) {
+                    tmp_u[i] = (struct unicode_representation *) alloc(
+                        sizeof *tmp_u[i]);
+                    *tmp_u[i] = *other;
+                    if (other->utf8str != NULL) {
+                        tmp_u[i]->utf8str =
+                            (uint8 *) dupstr((const char *) other->utf8str);
+                    }
                 }
 #endif
             } else {
@@ -683,7 +729,8 @@ find_matching_customization(
     enum customization_types custtype,
     enum graphics_sets which_set)
 {
-    struct symset_customization *gdc = &gs.sym_customizations[which_set][custtype];
+    struct symset_customization *gdc
+        = &gs.sym_customizations[which_set][custtype];
 
     if ((gdc->custtype == custtype) && gdc->customization_name
         && (strcmp(customization_name, gdc->customization_name) == 0))
@@ -764,7 +811,9 @@ wizcustom_glyphids(winid win)
  }
 
 staticfn int
-parse_id(const char *id, struct find_struct *findwhat)
+parse_id(
+    const char *id,
+    struct find_struct *findwhat)
 {
     FILE *fp = (FILE *) 0;
     int i = 0, j, mnum, glyph,
@@ -861,30 +910,26 @@ parse_id(const char *id, struct find_struct *findwhat)
                 } else if (glyph_is_body(glyph)) {
                     /* buf2 will hold the distinguishing prefix */
                     /* buf3 will hold the base name */
-                    buf2 = ""; /* superfluous */
+                    buf2 = glyph_is_body_piletop(glyph)
+                           ? "piletop_body_"
+                           : "body_";
                     buf3 = monsdump[glyph_to_body_corpsenm(glyph)].nm;
-                    if (glyph_is_body_piletop(glyph)) {
-                        buf2 = "piletop_body_";
-                    } else {
-                        buf2 = "body_";
-                    }
                     Strcpy(buf[0], "G_");
                     Strcat(buf[0], buf2);
                     Strcat(buf[0], buf3);
                 } else if (glyph_is_statue(glyph)) {
                     /* buf2 will hold the distinguishing prefix */
                     /* buf3 will hold the base name */
-                    buf2 = "";
+                    buf2 = glyph_is_fem_statue_piletop(glyph)
+                           ? "piletop_statue_of_female_"
+                           : glyph_is_fem_statue(glyph)
+                             ? "statue_of_female_"
+                             : glyph_is_male_statue_piletop(glyph)
+                               ? "piletop_statue_of_male_"
+                               : glyph_is_male_statue(glyph)
+                                 ? "statue_of_male_"
+                                 : ""; /* shouldn't happen */
                     buf3 = monsdump[glyph_to_statue_corpsenm(glyph)].nm;
-                    if (glyph_is_fem_statue_piletop(glyph)) {
-                        buf2 = "piletop_statue_of_female_";
-                    } else if (glyph_is_fem_statue(glyph)) {
-                        buf2 = "statue_of_female_";
-                    } else if (glyph_is_male_statue_piletop(glyph)) {
-                        buf2 = "piletop_statue_of_male_";
-                    } else if (glyph_is_male_statue(glyph)) {
-                        buf2 = "statue_of_male_";
-                    }
                     Strcpy(buf[0], "G_");
                     Strcat(buf[0], buf2);
                     Strcat(buf[0], buf3);
@@ -892,8 +937,6 @@ parse_id(const char *id, struct find_struct *findwhat)
                     i = glyph_to_obj(glyph);
                     /* buf2 will hold the distinguishing prefix */
                     /* buf3 will hold the base name */
-                    buf2 = "";
-                    buf3 = "";
                     if (((i > SCR_STINKING_CLOUD) && (i < SCR_MAIL))
                         || ((i > WAN_LIGHTNING) && (i < GOLD_PIECE)))
                         skip_this_one = TRUE;
@@ -913,6 +956,8 @@ parse_id(const char *id, struct find_struct *findwhat)
                             buf2 = "ring of ";
                         else if (i == LAND_MINE)
                             buf2 = "unset ";
+                        else
+                            buf2 = "";
                         buf3 = (i == SCR_BLANK_PAPER) ? "blank scroll"
                                : (i == SPE_BLANK_PAPER) ? "blank spellbook"
                                  : (i == SLIME_MOLD) ? "slime mold"
@@ -1002,7 +1047,6 @@ parse_id(const char *id, struct find_struct *findwhat)
                         j = glyph - GLYPH_SWALLOW_OFF;
                         cmap = glyph_to_swallow(glyph);
                         mnum = j / ((S_sw_br - S_sw_tl) + 1);
-                        i = cmap - S_sw_tl;
                         Strcpy(buf[3], "swallow ");
                         Strcat(buf[3], monsdump[mnum].nm);
                         Strcat(buf[3], " ");
@@ -1022,8 +1066,7 @@ parse_id(const char *id, struct find_struct *findwhat)
 
                         j = glyph - GLYPH_EXPLODE_OFF;
                         expl = j / ((S_expl_br - S_expl_tl) + 1);
-                        cmap = (j % ((S_expl_br - S_expl_tl) + 1))
-                               + S_expl_tl;
+                        cmap = glyph_to_explosion(glyph) + S_expl_tl;
                         i = cmap - S_expl_tl;
                         Snprintf(buf[2], sizeof buf[2], "%s ",
                                  expl_type_texts[expl]);

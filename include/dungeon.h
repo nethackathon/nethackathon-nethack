@@ -39,7 +39,8 @@ enum level_region_types {
     LR_BRANCH,
     LR_TELE,
     LR_UPTELE,
-    LR_DOWNTELE
+    LR_DOWNTELE,
+    LR_MONGEN,
 };
 
 typedef struct dest_area { /* non-stairway level change identifier */
@@ -215,7 +216,7 @@ typedef struct mapseen {
         Bitfield(shoptype, 5);
     } feat;
     struct mapseen_flags {
-        Bitfield(unreachable, 1); /* can't get back to this level */
+        Bitfield(notreachable, 1); /* can't get back to this level */
         Bitfield(forgot, 1);      /* player has forgotten about this level */
         Bitfield(knownbones, 1);  /* player aware of bones */
         Bitfield(oracle, 1);
@@ -247,7 +248,7 @@ typedef struct mapseen {
     struct mapseen_rooms {
         Bitfield(seen, 1);
         Bitfield(untended, 1);         /* flag for shop without shk */
-    } msrooms[(MAXNROFROOMS + 1) * 2]; /* same size as gr.rooms[] */
+    } msrooms[(MAXNROFROOMS + 1) * 2]; /* same size as svr.rooms[] */
     /* dead heroes; might not have graves or ghosts */
     struct cemetery *final_resting_place; /* same as level.bonesinfo */
 } mapseen;

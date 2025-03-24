@@ -1,4 +1,4 @@
-/* NetHack 3.7	lock.c	$NHDT-Date: 1713657045 2024/04/20 23:50:45 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.136 $ */
+/* NetHack 3.7	lock.c	$NHDT-Date: 1741793439 2025/03/12 07:30:39 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.145 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2011. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -29,7 +29,8 @@ picking_lock(coordxy *x, coordxy *y)
 boolean
 picking_at(coordxy x, coordxy y)
 {
-    return (boolean) (go.occupation == picklock && gx.xlock.door == &levl[x][y]);
+    return (boolean) (go.occupation == picklock
+                      && gx.xlock.door == &levl[x][y]);
 }
 
 /* produce an occupation string appropriate for the current activity */
@@ -104,10 +105,12 @@ picklock(void)
                        : (gx.xlock.door->doormask & D_TRAPPED) != 0)
         && gx.xlock.magic_key) {
         gx.xlock.chance += 20; /* less effort needed next time */
-        /* unfortunately we don't have a 'tknown' flag to record
-           "known to be trapped" so declining to disarm and then
-           retrying lock manipulation will find it all over again */
-        if (y_n("You find a trap!  Do you want to try to disarm it?") == 'y') {
+        if (!gx.xlock.door) {
+            if (!gx.xlock.box->tknown)
+                You("find a trap!");
+            gx.xlock.box->tknown = 1;
+        }
+        if (y_n("Do you want to try to disarm it?") == 'y') {
             const char *what;
             boolean alreadyunlocked;
 
@@ -118,6 +121,7 @@ picklock(void)
                 alreadyunlocked = !(gx.xlock.door->doormask & D_LOCKED);
             } else {
                 gx.xlock.box->otrapped = 0;
+                gx.xlock.box->tknown = 0;
                 what = (gx.xlock.box->otyp == CHEST) ? "chest" : "box";
                 alreadyunlocked = !gx.xlock.box->olocked;
             }
@@ -182,7 +186,8 @@ breakchestlock(struct obj *box, boolean destroyit)
             if (!rn2(3) || otmp->oclass == POTION_CLASS) {
                 chest_shatter_msg(otmp);
                 if (costly)
-                    loss += stolen_value(otmp, u.ux, u.uy, peaceful_shk, TRUE);
+                    loss += stolen_value(otmp, u.ux, u.uy, peaceful_shk,
+                                         TRUE);
                 if (otmp->quan == 1L) {
                     obfree(otmp, (struct obj *) 0);
                     continue;
@@ -192,7 +197,7 @@ breakchestlock(struct obj *box, boolean destroyit)
                 useup(otmp);
             }
             if (box->otyp == ICE_BOX && otmp->otyp == CORPSE) {
-                otmp->age = gm.moves - otmp->age; /* actual age */
+                otmp->age = svm.moves - otmp->age; /* actual age */
                 start_corpse_timeout(otmp);
             }
             place_object(otmp, u.ux, u.uy);
@@ -441,7 +446,7 @@ pick_lock(
 
         count = 0;
         c = 'n'; /* in case there are no boxes here */
-        for (otmp = gl.level.objects[cc.x][cc.y]; otmp;
+        for (otmp = svl.level.objects[cc.x][cc.y]; otmp;
              otmp = otmp->nexthere) {
             /* autounlock on boxes: only the one that was just discovered to
                be locked; don't include any other boxes which might be here */
@@ -465,7 +470,8 @@ pick_lock(
 
                 if (autounlock && (flags.autounlock & AUTOUNLOCK_UNTRAP) != 0
                     && could_untrap(FALSE, TRUE)
-                    && (c = ynq(safe_qbuf(qbuf, "Check ", " for a trap?",
+                    && (c = otmp->tknown ? (otmp->otrapped ? 'y' : 'n')
+                            : ynq(safe_qbuf(qbuf, "Check ", " for a trap?",
                                           otmp, yname, ysimple_name, "this")))
                        != 'n') {
                     if (c == 'q')
@@ -506,7 +512,8 @@ pick_lock(
                     You_cant("do that with %s.",
                              an(simple_typename(picktyp)));
                     return PICKLOCK_LEARNED_SOMETHING;
-                } else if (autounlock && !touch_artifact(pick, &gy.youmonst)) {
+                } else if (autounlock
+                           && !touch_artifact(pick, &gy.youmonst)) {
                     /* note: for !autounlock, apply already did touch check */
                     return PICKLOCK_DID_SOMETHING;
                 }
@@ -575,7 +582,7 @@ pick_lock(
             /* this is probably only relevant when blind */
             feel_location(cc.x, cc.y);
             if (door->glyph != oldglyph
-                || gl.lastseentyp[cc.x][cc.y] != oldlastseentyp)
+                || svl.lastseentyp[cc.x][cc.y] != oldlastseentyp)
                 res = PICKLOCK_LEARNED_SOMETHING;
 
             if (is_drawbridge_wall(cc.x, cc.y) >= 0)
@@ -639,7 +646,7 @@ pick_lock(
             gx.xlock.box = 0;
         }
     }
-    gc.context.move = 0;
+    svc.context.move = 0;
     gx.xlock.chance = ch;
     gx.xlock.picktyp = picktyp;
     gx.xlock.magic_key = is_magic_key(&gy.youmonst, pick);
@@ -688,7 +695,7 @@ doforce(void)
                  !uwep ? "when not wielding a"
                  : (uwep->oclass != WEAPON_CLASS && !is_weptool(uwep))
                    ? (use_plural ? "without proper" : "without a proper")
-                   : (use_plural ? "with that" : "with those"),
+                   : (use_plural ? "with those" : "with that"),
                  use_plural ? "s" : "");
         return ECMD_OK;
     }
@@ -706,7 +713,7 @@ doforce(void)
 
     /* A lock is made only for the honest man, the thief will break it. */
     gx.xlock.box = (struct obj *) 0;
-    for (otmp = gl.level.objects[u.ux][u.uy]; otmp; otmp = otmp->nexthere)
+    for (otmp = svl.level.objects[u.ux][u.uy]; otmp; otmp = otmp->nexthere)
         if (Is_box(otmp)) {
             if (otmp->obroken || !otmp->olocked) {
                 /* force doname() to omit known "broken" or "unlocked"
@@ -827,7 +834,7 @@ doopen_indir(coordxy x, coordxy y)
 
         newsym(cc.x, cc.y);
         if (door->glyph != oldglyph
-            || gl.lastseentyp[cc.x][cc.y] != oldlastseentyp)
+            || svl.lastseentyp[cc.x][cc.y] != oldlastseentyp)
             res = ECMD_TIME; /* learned something */
     }
 
@@ -874,12 +881,15 @@ doopen_indir(coordxy x, coordxy y)
                 && (unlocktool = autokey(TRUE)) != 0) {
                 res = pick_lock(unlocktool, cc.x, cc.y,
                                 (struct obj *) 0) ? ECMD_TIME : ECMD_OK;
-            } else if (!u.usteed
-                       && (flags.autounlock & AUTOUNLOCK_KICK) != 0
+            } else if ((flags.autounlock & AUTOUNLOCK_KICK) != 0
+                       && !u.usteed /* kicking is different when mounted */
                        && ynq("Kick it?") == 'y') {
                 cmdq_add_ec(CQ_CANNED, dokick);
-                cmdq_add_dir(CQ_CANNED, sgn(cc.x - u.ux), sgn(cc.y - u.uy), 0);
-                res = ECMD_TIME;
+                cmdq_add_dir(CQ_CANNED,
+                             sgn(cc.x - u.ux), sgn(cc.y - u.uy), 0);
+                /* this was 'ECMD_TIME', but time shouldn't elapse until
+                   the canned kick takes place */
+                res = ECMD_OK;
             }
         }
         return res;
@@ -902,7 +912,7 @@ doopen_indir(coordxy x, coordxy y)
         } else
             door->doormask = D_ISOPEN;
         feel_newsym(cc.x, cc.y); /* the hero knows she opened it */
-        unblock_point(cc.x, cc.y); /* vision: new see through there */
+        recalc_block_point(cc.x, cc.y); /* vision: new see through there */
     } else {
         exercise(A_STR, TRUE);
         set_msg_xy(cc.x, cc.y);
@@ -989,7 +999,8 @@ doclose(void)
         schar oldlastseentyp = update_mapseen_for(x, y);
 
         feel_location(x, y);
-        if (door->glyph != oldglyph || gl.lastseentyp[x][y] != oldlastseentyp)
+        if (door->glyph != oldglyph
+            || svl.lastseentyp[x][y] != oldlastseentyp)
             res = ECMD_TIME; /* learned something */
     }
 
@@ -1222,7 +1233,7 @@ doorlock(struct obj *otmp, coordxy x, coordxy y)
             }
             sawit = cansee(x, y);
             door->doormask = D_BROKEN;
-            unblock_point(x, y);
+            recalc_block_point(x, y);
             seeit = cansee(x, y);
             newsym(x, y);
             if (flags.verbose) {

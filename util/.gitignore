@@ -11,6 +11,7 @@ lev_comp
 dlb
 dlb_main
 recover
+stripbs
 tilemap
 tileedit
 tile2x11
@@ -23,6 +24,7 @@ tile2img.ttp
 xpm2ppm.ttp
 nethack.tags
 readtags
+lua-*.dll
 # dev tool for analyzing data collected by nethack's #define MONITOR_HEAP
 heaputil
 heaputil.c

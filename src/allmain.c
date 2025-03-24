@@ -1,4 +1,4 @@
-/* NetHack 3.7	allmain.c	$NHDT-Date: 1704225560 2024/01/02 19:59:20 $  $NHDT-Branch: keni-luabits2 $:$NHDT-Revision: 1.238 $ */
+/* NetHack 3.7	allmain.c	$NHDT-Date: 1726894914 2024/09/21 05:01:54 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.261 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2012. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -6,7 +6,6 @@
 /* various code that was replicated in *main.c */
 
 #include "hack.h"
-#include <ctype.h>
 
 #ifndef NO_SIGNAL
 #include <signal.h>
@@ -75,15 +74,15 @@ moveloop_preamble(boolean resuming)
     }
 
     if (!resuming) { /* new game */
-        gp.program_state.beyond_savefile_load = 1; /* for TTY_PERM_INVENT */
-        gc.context.rndencode = rnd(9000);
+        program_state.beyond_savefile_load = 1; /* for TTY_PERM_INVENT */
+        svc.context.rndencode = rnd(9000);
         set_wear((struct obj *) 0); /* for side-effects of starting gear */
         reset_justpicked(gi.invent);
         (void) pickup(1);      /* autopickup at initial location */
         /* only matters if someday a character is able to start with
            clairvoyance (wizard with cornuthaum perhaps?); without this,
            first "random" occurrence would always kick in on turn 1 */
-        gc.context.seer_turn = (long) rnd(30);
+        svc.context.seer_turn = (long) rnd(30);
         /* give hero initial movement points; new game only--for restore,
            pending movement points were included in the save file */
         u.umovement = NORMAL_SPEED;
@@ -102,14 +101,13 @@ moveloop_preamble(boolean resuming)
     }
 
     u.uz0.dlevel = u.uz.dlevel;
-    gc.context.move = 0;
-
-    gp.program_state.in_moveloop = 1;
+    svc.context.move = 0;
 
 #ifdef WHEREIS_FILE
     touch_whereis();
 #endif
 
+    program_state.in_moveloop = 1;
     /* for perm_invent preset at startup, display persistent inventory after
        invent is fully populated and the in_moveloop flag has been set */
     if (iflags.perm_invent)
@@ -175,7 +173,7 @@ moveloop_core(void)
     boolean monscanmove = FALSE;
 
 #ifdef SAFERHANGUP
-    if (gp.program_state.done_hup)
+    if (program_state.done_hup)
         end_of_input();
 #endif
     get_nh_event();
@@ -185,32 +183,33 @@ moveloop_core(void)
 
     dobjsfree();
 
-    if (gc.context.bypasses)
+    if (svc.context.bypasses)
         clear_bypasses();
 
     if (iflags.sanity_check || iflags.debug_fuzzer)
         sanity_check();
 
-    if (gc.context.move) {
+    if (svc.context.move) {
         /* actual time passed */
         u.umovement -= NORMAL_SPEED;
 
         do { /* hero can't move this turn loop */
             mvl_wtcap = encumber_msg();
 
-            gc.context.mon_moving = TRUE;
+            svc.context.mon_moving = TRUE;
             do {
                 monscanmove = movemon();
                 if (u.umovement >= NORMAL_SPEED)
                     break; /* it's now your turn */
             } while (monscanmove);
-            gc.context.mon_moving = FALSE;
+            svc.context.mon_moving = FALSE;
 
             if (!monscanmove && u.umovement < NORMAL_SPEED) {
                 /* both hero and monsters are out of steam this round */
                 struct monst *mtmp;
 
                 /* set up for a new turn */
+                gw.were_changes = 0L;
                 mcalcdistress(); /* adjust monsters' trap, blind, etc */
 
                 /* reallocate movement rations to monsters; don't need
@@ -231,7 +230,7 @@ moveloop_core(void)
                 u_calc_moveamt(mvl_wtcap);
                 settrack();
 
-                gm.moves++;
+                svm.moves++;
                 /*
                  * Never allow 'moves' to grow big enough to wrap.
                  * We don't care what the maximum possible 'long int'
@@ -240,16 +239,16 @@ moveloop_core(void)
                  * When imposing the limit, use a mystic decimal value
                  * instead of a magic binary one such as 0x7fffffffL.
                  */
-                if (gm.moves >= 1000000000L) {
+                if (svm.moves >= 1000000000L) {
                     display_nhwindow(WIN_MESSAGE, TRUE);
                     urgent_pline("The dungeon capitulates.");
                     done(ESCAPED);
                 }
                 /* 'moves' is misnamed; it represents turns; hero_seq is
                    a value that is distinct every time the hero moves */
-                gh.hero_seq = gm.moves << 3;
+                gh.hero_seq = svm.moves << 3;
 
-                if (flags.time && !gc.context.run)
+                if (flags.time && !svc.context.run)
                     disp.time_botl = TRUE; /* 'moves' just changed */
 
                 /********************************/
@@ -267,8 +266,8 @@ moveloop_core(void)
                     u.ublesscnt--;
 
 #ifdef EXTRAINFO_FN
-                if ((prev_dgl_extrainfo == 0) || (prev_dgl_extrainfo < (gm.moves + 250))) {
-                    prev_dgl_extrainfo = gm.moves;
+                if ((prev_dgl_extrainfo == 0) || (prev_dgl_extrainfo < (svm.moves + 250))) {
+                    prev_dgl_extrainfo = svm.moves;
                     mk_dgl_extrainfo();
                 }
 #endif
@@ -293,8 +292,8 @@ moveloop_core(void)
 
                 /* moving around while encumbered is hard work */
                 if (mvl_wtcap > MOD_ENCUMBER && u.umoved) {
-                    if (!(mvl_wtcap < EXT_ENCUMBER ? gm.moves % 30
-                          : gm.moves % 10)) {
+                    if (!(mvl_wtcap < EXT_ENCUMBER ? svm.moves % 30
+                          : svm.moves % 10)) {
                         overexert_hp();
                     }
                 }
@@ -336,10 +335,15 @@ moveloop_core(void)
                     }
                 }
 
-                if (!gl.level.flags.noautosearch && Searching && gm.multi >= 0)
+                if (Searching && !svl.level.flags.noautosearch
+                    && gm.multi >= 0)
                     (void) dosearch0(1);
                 if (Warning)
                     warnreveal();
+                if (gw.were_changes) {
+                    /* update innate intrinsics (mainly Drain_resistance) */
+                    set_uasmon();
+                }
                 mkot_trap_warn();
                 dosounds();
                 do_storms();
@@ -365,7 +369,7 @@ moveloop_core(void)
                 /* vision will be updated as bubbles move */
                 if (Is_waterlevel(&u.uz) || Is_airlevel(&u.uz))
                     movebubbles();
-                else if (gl.level.flags.fumaroles)
+                else if (svl.level.flags.fumaroles)
                     fumaroles();
 
                 /* when immobile, count is in turns */
@@ -398,13 +402,13 @@ moveloop_core(void)
         if (iflags.hilite_delta)
             status_eval_next_unhilite();
 #endif
-        if (gm.moves >= gc.context.seer_turn) {
+        if (svm.moves >= svc.context.seer_turn) {
             if ((u.uhave.amulet || Clairvoyant) && !In_endgame(&u.uz)
                 && !BClairvoyant)
                 do_vicinity_map((struct obj *) 0);
             /* we maintain this counter even when clairvoyance isn't
                taking place; on average, go again 30 turns from now */
-            gc.context.seer_turn = gm.moves + (long) rn1(31, 15); /*15..45*/
+            svc.context.seer_turn = svm.moves + (long) rn1(31, 15); /*15..45*/
             /* [it used to be that on every 15th turn, there was a 50%
                chance of farsight, so it could happen as often as every
                15 turns or theoretically never happen at all; but when
@@ -425,6 +429,7 @@ moveloop_core(void)
         else if (u.uburied)
             under_ground(0);
 
+        see_nearby_monsters();
     } /* actual time passed */
 
     /****************************************/
@@ -433,7 +438,7 @@ moveloop_core(void)
 
     clear_splitobjs();
     find_ac();
-    if (!gc.context.mv || Blind) {
+    if (!svc.context.mv || Blind) {
         /* redo monsters if hallu or wearing a helm of telepathy */
         if (Hallucination) { /* update screen randomly */
             see_monsters();
@@ -441,11 +446,14 @@ moveloop_core(void)
             see_traps();
             if (u.uswallow)
                 swallowed(0);
-        } else if (Unblind_telepat) {
+        } else if (Unblind_telepat || Warning || Warn_of_mon
+                   /* this is needed for the case where you saw a monster
+                      due to being next to it while it's in a gas cloud
+                      and then you moved away; it should no longer be seen
+                      when that happens, even if it hasn't moved */
+                   || any_visible_region()) { /* TODO: optimize this */
             see_monsters();
-        } else if (Warning || Warn_of_mon)
-            see_monsters();
-
+        }
         if (gv.vision_full_recalc)
             vision_recalc(0); /* vision! */
     }
@@ -459,7 +467,7 @@ moveloop_core(void)
 
     m_everyturn_effect(&gy.youmonst);
 
-    gc.context.move = 1;
+    svc.context.move = 1;
 
     if (gm.multi >= 0 && go.occupation) {
 #if defined(MICRO) || defined(WIN32CON)
@@ -501,10 +509,10 @@ moveloop_core(void)
         runmode_delay_output();
         if (!gm.multi) {
             /* lookaround may clear multi */
-            gc.context.move = 0;
+            svc.context.move = 0;
             return;
         }
-        if (gc.context.mv) {
+        if (svc.context.mv) {
             if (gm.multi < COLNO && !--gm.multi)
                 end_running(TRUE);
             domove();
@@ -525,10 +533,10 @@ moveloop_core(void)
     if (gv.vision_full_recalc)
         vision_recalc(0); /* vision! */
     /* when running in non-tport mode, this gets done through domove() */
-    if ((!gc.context.run || flags.runmode == RUN_TPORT)
-        && (gm.multi && (!gc.context.travel ? !(gm.multi % 7)
-                        : !(gm.moves % 7L)))) {
-        if (flags.time && gc.context.run)
+    if ((!svc.context.run || flags.runmode == RUN_TPORT)
+        && (gm.multi && (!svc.context.travel ? !(gm.multi % 7)
+                        : !(svm.moves % 7L)))) {
+        if (flags.time && svc.context.run)
             disp.botl = TRUE;
         /* [should this be flush_screen() instead?] */
         display_nhwindow(WIN_MAP, FALSE);
@@ -582,7 +590,7 @@ regen_pw(int wtcap)
 {
     if (u.uen < u.uenmax
         && ((wtcap < MOD_ENCUMBER
-             && (!(gm.moves % ((MAXULEV + 8 - u.ulevel)
+             && (!(svm.moves % ((MAXULEV + 8 - u.ulevel)
                               * (Role_if(PM_WIZARD) ? 3 : 4)
                               / 6)))) || Energy_regeneration)) {
         int upper = (int) (ACURR(A_WIS) + ACURR(A_INT)) / 15 + 1;
@@ -615,10 +623,10 @@ regen_hp(int wtcap)
             /* eel out of water loses hp, similar to monster eels;
                as hp gets lower, rate of further loss slows down */
             if (u.mh > 1 && !Regeneration && rn2(u.mh) > rn2(8)
-                && (!Half_physical_damage || !(gm.moves % 2L)))
+                && (!Half_physical_damage || !(svm.moves % 2L)))
                 heal = -1;
         } else if (u.mh < u.mhmax) {
-            if (U_CAN_REGEN() || (encumbrance_ok && !(gm.moves % 20L)))
+            if (U_CAN_REGEN() || (encumbrance_ok && !(svm.moves % 20L)))
                 heal = 1;
         }
         if (heal) {
@@ -734,6 +742,10 @@ init_sound_disp_gamewindows(void)
     display_nhwindow(WIN_MESSAGE, FALSE);
     clear_glyph_buffer();
     display_nhwindow(WIN_MAP, FALSE);
+#ifdef TTY_PERM_INVENT
+    if (iflags.perm_invent_pending)
+        check_perm_invent_again();
+#endif
  }
 
 void
@@ -744,14 +756,14 @@ newgame(void)
     /* make sure welcome messages are given before noticing monsters */
     notice_mon_off();
     disp.botlx = TRUE;
-    gc.context.ident = 1;
-    gc.context.warnlevel = 1;
-    gc.context.next_attrib_check = 600L; /* arbitrary first setting */
-    gc.context.tribute.enabled = TRUE;   /* turn on 3.6 tributes    */
-    gc.context.tribute.tributesz = sizeof(struct tribute_info);
+    svc.context.ident = 2;  /* id 1 is reserved for gy.youmonst */
+    svc.context.warnlevel = 1;
+    svc.context.next_attrib_check = 600L; /* arbitrary first setting */
+    svc.context.tribute.enabled = TRUE;   /* turn on 3.6 tributes    */
+    svc.context.tribute.tributesz = sizeof(struct tribute_info);
 
     for (i = LOW_PM; i < NUMMONS; i++)
-        gm.mvitals[i].mvflags = mons[i].geno & G_NOCORPSE;
+        svm.mvitals[i].mvflags = mons[i].geno & G_NOCORPSE;
 
     init_objects(); /* must be before u_init() */
 
@@ -766,7 +778,7 @@ newgame(void)
                        * any artifacts */
     u_init();
 
-    l_nhcore_init();  /* create a Lua state that lasts until the end of the game */
+    l_nhcore_init();  /* create a Lua state that lasts until end of game */
     reset_glyphmap(gm_newgame);
 #ifndef NO_SIGNAL
     (void) signal(SIGINT, (SIG_RET_TYPE) done1);
@@ -791,7 +803,7 @@ newgame(void)
 
     if (flags.legacy) {
         flush_screen(1);
-        com_pager("legacy");
+        com_pager(u.uroleplay.pauper ? "pauper_legacy" : "legacy");
     }
 
     urealtime.realtime = 0L;
@@ -799,7 +811,7 @@ newgame(void)
 #ifdef INSURANCE
     save_currentstate();
 #endif
-    gp.program_state.something_worth_saving++; /* useful data now exists */
+    program_state.something_worth_saving++; /* useful data now exists */
 
     /* Success! */
     welcome(TRUE);
@@ -811,7 +823,7 @@ newgame(void)
     return;
 }
 
-/* show "welcome [back] to nethack" message at program startup */
+/* show "welcome [back] to NetHack" message at program startup */
 void
 welcome(boolean new_game) /* false => restoring an old game */
 {
@@ -843,20 +855,21 @@ welcome(boolean new_game) /* false => restoring an old game */
         Sprintf(eos(buf), " %s", align_str(u.ualignbase[A_ORIGINAL]));
     if (!gu.urole.name.f
         && (new_game
-                ? (gu.urole.allow & ROLE_GENDMASK) == (ROLE_MALE | ROLE_FEMALE)
-                : currentgend != flags.initgend))
+            ? (gu.urole.allow & ROLE_GENDMASK) == (ROLE_MALE | ROLE_FEMALE)
+            : currentgend != flags.initgend))
         Sprintf(eos(buf), " %s", genders[currentgend].adj);
     Sprintf(eos(buf), " %s %s", gu.urace.adj,
-            (currentgend && gu.urole.name.f) ? gu.urole.name.f : gu.urole.name.m);
+            (currentgend && gu.urole.name.f) ? gu.urole.name.f
+                                             : gu.urole.name.m);
 
     pline(new_game ? "%s %s, welcome to NetHack!  You are a%s."
                    : "%s %s, the%s, welcome back to NetHack!",
-          Hello((struct monst *) 0), gp.plname, buf);
+          Hello((struct monst *) 0), svp.plname, buf);
 
     if (new_game) {
         /* guarantee that 'major' event category is never empty */
         livelog_printf(LL_ACHIEVE, "%s the%s entered the dungeon",
-                       gp.plname, buf);
+                       svp.plname, buf);
     } else {
         /* if restoring in Gehennom, give same hot/smoky message as when
            first entering it */
@@ -913,7 +926,7 @@ do_positionbar(void)
 staticfn void
 interrupt_multi(const char *msg)
 {
-    if (gm.multi > 0 && !gc.context.travel && !gc.context.run) {
+    if (gm.multi > 0 && !svc.context.travel && !svc.context.run) {
         nomul(0);
         if (flags.verbose && msg)
             Norep("%s", msg);
@@ -941,6 +954,7 @@ static const struct early_opt earlyopts[] = {
     { ARG_DUMPENUMS, "dumpenums", 9, FALSE },
 #endif
     { ARG_DUMPGLYPHIDS, "dumpglyphids", 12, FALSE },
+    { ARG_DUMPMONGEN, "dumpmongen", 10, FALSE },
 #ifdef WIN32
     { ARG_WINDOWS, "windows", 4, TRUE },
 #endif
@@ -970,7 +984,7 @@ argcheck(int argc, char *argv[], enum earlyarg e_arg)
     for (idx = 0; idx < SIZE(earlyopts); idx++) {
         if (earlyopts[idx].e == e_arg){
             break;
-	}
+        }
     }
     if (idx >= SIZE(earlyopts) || argc < 1)
         return 0;
@@ -1042,6 +1056,9 @@ argcheck(int argc, char *argv[], enum earlyarg e_arg)
         case ARG_DUMPGLYPHIDS:
             dump_glyphids();
             return 2;
+        case ARG_DUMPMONGEN:
+            dump_mongen();
+            return 2;
 #ifdef CRASHREPORT
         case ARG_BIDSHOW:
             crashreport_bidshow();
@@ -1053,6 +1070,7 @@ argcheck(int argc, char *argv[], enum earlyarg e_arg)
                 extended_opt++;
                 return windows_early_options(extended_opt);
             }
+        FALLTHROUGH;
         /*FALLTHRU*/
 #endif
         default:
@@ -1142,6 +1160,7 @@ timet_delta(time_t etim, time_t stim) /* end and start times */
 /* monsdump[] and objdump[] are also used in utf8map.c */
 
 #define DUMP_ENUMS
+#define UNPREFIXED_COUNT (5)
 struct enum_dump monsdump[] = {
 #include "monsters.h"
     { NUMMONS, "NUMMONS" },
@@ -1222,12 +1241,6 @@ dump_enums(void)
         arti_enum,
         NUM_ENUM_DUMPS
     };
-    static const char *const titles[NUM_ENUM_DUMPS] = {
-        "monnums", "objects_nums" , "misc_object_nums",
-        "cmap_symbols", "mon_syms", "mon_defchars",
-        "objclass_defchars", "objclass_classes",
-        "objclass_syms", "artifacts_nums",
-    };
 
 #define dump_om(om) { om, #om }
     static const struct enum_dump omdump[] = {
@@ -1248,6 +1261,7 @@ dump_enums(void)
         dump_om(MAX_GLYPH),
     };
 #undef dump_om
+
     static const struct enum_dump *const ed[NUM_ENUM_DUMPS] = {
         monsdump, objdump, omdump,
         defsym_cmap_dump, defsym_mon_syms_dump,
@@ -1257,32 +1271,37 @@ dump_enums(void)
         objclass_syms_dump,
         arti_enum_dump,
     };
-    static const char *const pfx[NUM_ENUM_DUMPS] = { "PM_", "", "",
-                                                     "", "", "", "",
-                                                     "", "", "" };
-    /* 0 = dump numerically only, 1 = add 'char' comment */
-    static const int dumpflgs[NUM_ENUM_DUMPS] = { 0, 0, 0, 0, 0, 1, 1, 0, 0, 0 };
-    static int szd[NUM_ENUM_DUMPS] = { SIZE(monsdump), SIZE(objdump),
-                                       SIZE(omdump), SIZE(defsym_cmap_dump),
-                                       SIZE(defsym_mon_syms_dump),
-                                       SIZE(defsym_mon_defchars_dump),
-                                       SIZE(objclass_defchars_dump),
-                                       SIZE(objclass_classes_dump),
-                                       SIZE(objclass_syms_dump),
-                                       SIZE(arti_enum_dump),
+
+    static const struct de_params {
+        const char *const title;
+        const char *const pfx;
+        int unprefixed_count;
+        int dumpflgs;  /* 0 = dump numerically only, 1 = add 'char' comment */
+        int szd;
+    } edmp[NUM_ENUM_DUMPS] = {
+        { "monnums", "PM_", UNPREFIXED_COUNT, 0, SIZE(monsdump) },
+        { "objects_nums", "", 1, 0, SIZE(objdump) },
+        { "misc_object_nums", "", 1, 0, SIZE(omdump) },
+        { "cmap_symbols", "", 1, 0, SIZE(defsym_cmap_dump) },
+        { "mon_syms", "", 1, 0, SIZE(defsym_mon_syms_dump) },
+        { "mon_defchars", "", 1, 1, SIZE(defsym_mon_defchars_dump) },
+        { "objclass_defchars", "", 1, 1, SIZE(objclass_defchars_dump) },
+        { "objclass_classes", "", 1, 0, SIZE(objclass_classes_dump) },
+        { "objclass_syms", "", 1, 0, SIZE(objclass_syms_dump) },
+        { "artifacts_nums", "", 1, 0, SIZE(arti_enum_dump) },
     };
+
     const char *nmprefix;
     int i, j, nmwidth;
     char comment[BUFSZ];
 
     for (i = 0; i < NUM_ENUM_DUMPS; ++ i) {
-        raw_printf("enum %s = {", titles[i]);
-        for (j = 0; j < szd[i]; ++j) {
-            int unprefixed_count = (i == monsters_enum) ? 4 : 1;
-            nmprefix = (j >= szd[i] - unprefixed_count)
-                           ? "" : pfx[i]; /* "" or "PM_" */
+        raw_printf("enum %s = {", edmp[i].title);
+        for (j = 0; j < edmp[i].szd; ++j) {
+            nmprefix = (j >= edmp[i].szd - edmp[i].unprefixed_count)
+                           ? "" : edmp[i].pfx; /* "" or "PM_" */
             nmwidth = 27 - (int) strlen(nmprefix); /* 27 or 24 */
-            if (dumpflgs[i] > 0) {
+            if (edmp[i].dumpflgs > 0) {
                 Snprintf(comment, sizeof comment,
                          "    /* '%c' */",
                          (ed[i][j].val >= 32 && ed[i][j].val <= 126)
@@ -1300,6 +1319,7 @@ dump_enums(void)
     }
     raw_print("");
 }
+#undef UNPREFIXED_COUNT
 #endif /* NODUMPENUMS */
 
 void

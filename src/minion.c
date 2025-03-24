@@ -21,6 +21,7 @@ newemin(struct monst *mtmp)
     if (!EMIN(mtmp)) {
         EMIN(mtmp) = (struct emin *) alloc(sizeof(struct emin));
         (void) memset((genericptr_t) EMIN(mtmp), 0, sizeof(struct emin));
+        EMIN(mtmp)->parentmid = mtmp->m_id;
     }
 }
 
@@ -133,7 +134,7 @@ msummon(struct monst *mon)
      * If this daemon is unique and being re-summoned (the only way we
      * could get this far with an extinct dtype), try another.
      */
-    if ((gm.mvitals[dtype].mvflags & G_GONE) != 0) {
+    if ((svm.mvitals[dtype].mvflags & G_GONE) != 0) {
         dtype = ndemon(atyp);
         if (dtype == NON_PM)
             return 0;
@@ -388,7 +389,7 @@ dprince(aligntyp atyp)
 
     for (tryct = !In_endgame(&u.uz) ? 20 : 0; tryct > 0; --tryct) {
         pm = rn1(PM_DEMOGORGON + 1 - PM_ORCUS, PM_ORCUS);
-        if (!(gm.mvitals[pm].mvflags & G_GONE)
+        if (!(svm.mvitals[pm].mvflags & G_GONE)
             && (atyp == A_NONE || sgn(mons[pm].maligntyp) == sgn(atyp)))
             return pm;
     }
@@ -402,7 +403,7 @@ dlord(aligntyp atyp)
 
     for (tryct = !In_endgame(&u.uz) ? 20 : 0; tryct > 0; --tryct) {
         pm = rn1(PM_YEENOGHU + 1 - PM_JUIBLEX, PM_JUIBLEX);
-        if (!(gm.mvitals[pm].mvflags & G_GONE)
+        if (!(svm.mvitals[pm].mvflags & G_GONE)
             && (atyp == A_NONE || sgn(mons[pm].maligntyp) == sgn(atyp)))
             return pm;
     }
@@ -413,7 +414,7 @@ dlord(aligntyp atyp)
 int
 llord(void)
 {
-    if (!(gm.mvitals[PM_ARCHON].mvflags & G_GONE))
+    if (!(svm.mvitals[PM_ARCHON].mvflags & G_GONE))
         return PM_ARCHON;
 
     return lminion(); /* approximate */
@@ -459,7 +460,8 @@ ndemon(aligntyp atyp) /* A_NONE is used for 'any alignment' */
 
 /* guardian angel has been affected by conflict so is abandoning hero */
 void
-lose_guardian_angel(struct monst *mon) /* if null, angel hasn't been created yet */
+lose_guardian_angel(
+    struct monst *mon) /* if Null, angel hasn't been created yet */
 {
     coord mm;
     int i;
@@ -527,10 +529,6 @@ gain_guardian_angel(void)
              * the final level of the game. The angel will still appear, but
              * won't be tamed. */
             if (u.uconduct.pets) {
-                /* guardian angel -- the one case mtame doesn't
-                 * imply an edog structure, so we don't want to
-                 * call tamedog().
-                 */
                 mtmp->mtame = 10;
                 u.uconduct.pets++;
             }

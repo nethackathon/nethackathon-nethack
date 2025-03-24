@@ -69,7 +69,7 @@ curses_create_window(int wid, int width, int height, orient orientation)
 
     if ((orientation == UP) || (orientation == DOWN) ||
         (orientation == LEFT) || (orientation == RIGHT)) {
-        if (gi.invent || (gm.moves > 1)) {
+        if (svm.moves > 0) {
             map_border = curses_window_has_border(MAP_WIN);
             curses_get_window_xy(MAP_WIN, &mapx, &mapy);
             curses_get_window_size(MAP_WIN, &maph, &mapw);
@@ -98,13 +98,14 @@ curses_create_window(int wid, int width, int height, orient orientation)
     switch (orientation) {
     default:
         impossible("curses_create_window: Bad orientation");
+        FALLTHROUGH;
         /*FALLTHRU*/
     case CENTER:
         startx = (term_cols / 2) - (width / 2);
         starty = (term_rows / 2) - (height / 2);
         break;
     case UP:
-        if (gi.invent || (gm.moves > 1)) {
+        if (svm.moves > 0) {
             startx = (mapw / 2) - (width / 2) + mapx + mapb_offset;
         } else {
             startx = 0;
@@ -113,7 +114,7 @@ curses_create_window(int wid, int width, int height, orient orientation)
         starty = mapy + mapb_offset;
         break;
     case DOWN:
-        if (gi.invent || (gm.moves > 1)) {
+        if (svm.moves > 0) {
             startx = (mapw / 2) - (width / 2) + mapx + mapb_offset;
         } else {
             startx = 0;
@@ -129,7 +130,7 @@ curses_create_window(int wid, int width, int height, orient orientation)
         starty = term_rows - height;
         break;
     case RIGHT:
-        if (gi.invent || (gm.moves > 1)) {
+        if (svm.moves > 0) {
             startx = (mapw + mapx + (mapb_offset * 2)) - width;
         } else {
             startx = term_cols - width;
@@ -199,10 +200,32 @@ curses_set_wid_colors(int wid, WINDOW *win)
 void
 curses_destroy_win(WINDOW *win)
 {
+    int mapwidth = 0, winwidth, dummyht;
+
+    /*
+     * In case map is narrower than the space alloted for it, if we
+     * are destroying a popup window and it is wider than the map,
+     * erase the popup first.  It probably has overwritten some of
+     * the next-to-map empty space.  If we don't clear that now, the
+     * base window will remember it and redisplay it during refreshes.
+     *
+     * Note: since we almost never destroy non-popups, we don't really
+     * need to determine whether 'win' is one.  Overhead for unnecessary
+     * erasure is negligible.
+     */
+    getmaxyx(win, dummyht, winwidth); /* macro, assigns to its args */
+    if (mapwin)
+        getmaxyx(mapwin, dummyht, mapwidth);
+    if (winwidth > mapwidth) {
+        werase(win);
+        wnoutrefresh(win);
+    }
+
     delwin(win);
     if (win == activemenu)
         activemenu = NULL;
     curses_refresh_nethack_windows();
+    nhUse(dummyht);
 }
 
 
@@ -222,7 +245,7 @@ curses_refresh_nethack_windows(void)
         return;
     }
 
-    if ((gm.moves <= 1) && !gi.invent) {
+    if (svm.moves == 0) {
         /* Main windows not yet displayed; refresh base window instead */
         touchwin(stdscr);
         refresh();
@@ -329,8 +352,9 @@ curses_parse_wid_colors(int wid, char *fg, char *bg)
 /* Add curses window pointer and window info to list for given NetHack winid */
 
 void
-curses_add_nhwin(winid wid, int height, int width, int y, int x,
-                 orient orientation, boolean border)
+curses_add_nhwin(
+    winid wid, int height, int width, int y, int x,
+    orient orientation, boolean border)
 {
     WINDOW *win;
     int real_width = width;
@@ -484,20 +508,27 @@ curs_destroy_all_wins(void)
 {
     curses_count_window((char *) 0); /* clean up orphan */
 
+#if 0   /* this works but confuses the static analyzer (from llvm-19,
+         * which reports "warning: Use of memory after it is freed") */
     while (nhwids)
         curses_del_wid(nhwids->nhwid);
+#else
+    while (nhwids) {
+        nethack_wid *tmpptr = nhwids;
+
+        curses_del_wid(tmpptr->nhwid);
+    }
+#endif
 }
 
 /* Print a single character in the given window at the given coordinates */
 
 void
-#ifdef ENHANCED_SYMBOLS
 curses_putch(winid wid, int x, int y, int ch,
+#ifdef ENHANCED_SYMBOLS
              struct unicode_representation *unicode_representation,
-             int color, int framecolor, int attr)
-#else
-curses_putch(winid wid, int x, int y, int ch, int color, int framecolor, int attr)
 #endif
+             int color, int framecolor, int attr)
 {
     static boolean map_initted = FALSE;
     int sx, sy, ex, ey;

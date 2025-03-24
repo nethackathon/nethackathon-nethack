@@ -11,7 +11,6 @@
 #include "cursmisc.h"
 #include "cursdial.h"
 #include "func_tab.h"
-#include <ctype.h>
 
 #if defined(FILENAME_CMP) && !defined(strcasecmp)
 #define strcasecmp FILENAME_CMP
@@ -227,7 +226,7 @@ curses_character_input_dialog(
        re-activate them now that input is being requested */
     curses_got_input();
 
-    if (gi.invent || (gm.moves > 1)) {
+    if (svm.moves > 0) {
         curses_get_window_size(MAP_WIN, &map_height, &map_width);
     } else {
         map_height = term_rows;
@@ -450,7 +449,6 @@ curses_ext_cmd(void)
         letter = pgetchar(); /* pgetchar(cmd.c) implements do-again */
         curs_set(0);
         prompt_width = (int) strlen(cur_choice);
-        matches = 0;
 
         if (letter == '\033' || letter == ERR) {
             ret = -1;
@@ -668,7 +666,7 @@ curs_pad_menu(
     boolean do_pad UNUSED)
 {
     nhmenu_item *menu_item_ptr;
-    int numpages = current_menu->num_pages;
+    int numpages;
 
     /* caller has already called menu_win_size() */
     menu_determine_pages(current_menu); /* sets 'menu->num_pages' */
@@ -789,7 +787,7 @@ curses_display_nhmenu(
     menu_determine_pages(current_menu);
 
     /* Display pre and post-game menus centered */
-    if ((gm.moves <= 1 && !gi.invent) || gp.program_state.gameover) {
+    if (svm.moves == 0 || program_state.gameover) {
         win = curses_create_window(wid, current_menu->width,
                                    current_menu->height, CENTER);
     } else { /* Display during-game menus on the right out of the way */
@@ -943,7 +941,7 @@ menu_is_multipage(nhmenu *menu, int width, int height)
     int curline = 0, accel_per_page = 0;
     nhmenu_item *menu_item_ptr = menu->entries;
 
-    if (*menu->prompt) {
+    if (menu->prompt && *menu->prompt) {
         curline += curses_num_lines(menu->prompt, width) + 1;
     }
 
@@ -979,13 +977,12 @@ menu_determine_pages(nhmenu *menu)
     int tmpline, num_lines, accel_per_page;
     int curline = 0;
     int page_num = 1;
-    nhmenu_item *menu_item_ptr = menu->entries;
+    nhmenu_item *menu_item_ptr;
     int width = menu->width;
     int height = menu->height;
     int page_end = height;
 
-
-    if (*menu->prompt) {
+    if (menu->prompt && *menu->prompt) {
         curline += curses_num_lines(menu->prompt, width) + 1;
     }
     tmpline = curline;
@@ -1033,7 +1030,8 @@ menu_win_size(nhmenu *menu)
     int maxheaderwidth = menu->prompt ? (int) strlen(menu->prompt) : 0;
     nhmenu_item *menu_item_ptr, *last_item_ptr = NULL;
 
-    if (gp.program_state.gameover) {
+#if 0   /* maxwidth is set below, so the value calculated here isn't used */
+    if (program_state.gameover) {
         /* for final inventory disclosure, use full width */
         maxwidth = term_cols - 2; /* +2: borders assumed */
     } else {
@@ -1047,6 +1045,7 @@ menu_win_size(nhmenu *menu)
         if ((term_cols / 2) > maxwidth)
             maxwidth = (term_cols / 2); /* Half the screen */
     }
+#endif
     maxheight = menu_max_height();
 
     /* First, determine the width of the longest menu entry */
@@ -1444,6 +1443,9 @@ curs_nonselect_menu_action(
     case MENU_SEARCH: {
         char search_key[BUFSZ];
 
+        if (how == PICK_NONE)
+            break;
+
         search_key[0] = '\0';
         curses_line_input_dialog("Search for:", search_key, BUFSZ);
 
@@ -1473,8 +1475,6 @@ curs_nonselect_menu_action(
             }
             menu_item_ptr = menu_item_ptr->next_item;
         }
-
-        menu_item_ptr = menu->entries;
         break;
     } /* case MENU_SEARCH */
     default:
@@ -1498,7 +1498,7 @@ menu_get_selections(WINDOW *win, nhmenu *menu, int how)
     int num_selected = 0;
     boolean dismiss = FALSE;
     char selectors[256], groupaccels[256];
-    nhmenu_item *menu_item_ptr = menu->entries;
+    nhmenu_item *menu_item_ptr;
 
     activemenu = win;
     menu_display_page(win, menu, curpage, selectors, groupaccels);
@@ -1553,9 +1553,11 @@ menu_get_selections(WINDOW *win, nhmenu *menu, int how)
                     break;
                 }
             }
+            FALLTHROUGH;
             /*FALLTHRU*/
         default:
-            if (isdigit(curletter) && !selectors[curletter]
+            if (curletter > 0 && curletter < 256
+                && isdigit(curletter) && !selectors[curletter]
                 && !groupaccels[curletter]) {
                 count = curses_get_count(curletter);
                 /* after count, we know some non-digit is already pending */

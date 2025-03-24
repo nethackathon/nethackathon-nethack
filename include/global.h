@@ -6,8 +6,6 @@
 #ifndef GLOBAL_H
 #define GLOBAL_H
 
-#include <stdio.h>
-
 /*
  * Files expected to exist in the playground directory (possibly inside
  * a dlb container file).
@@ -386,6 +384,7 @@ struct nomakedefs_s {
     const char *copyright_banner_c;
     const char *git_sha;
     const char *git_branch;
+    const char *git_prefix;
     const char *version_string;
     const char *version_id;
     unsigned long version_number;
@@ -430,6 +429,8 @@ extern struct nomakedefs_s nomakedefs;
 #define PL_CSIZ 32 /* sizeof pl_character */
 #define PL_FSIZ 32 /* fruit name */
 #define PL_PSIZ 63 /* player-given names for pets, other monsters, objects */
+/* room for "name-role-race-gend-algn" plus 1 character playmode code */
+#define PL_NSIZ_PLUS (PL_NSIZ + 4 * (1 + 3) + 1) /* 49 */
 
 #define MAXDUNGEON 16 /* current maximum number of dungeons */
 #define MAXLEVEL 32   /* max number of levels in one dungeon */
@@ -479,6 +480,9 @@ extern struct nomakedefs_s nomakedefs;
 #if !defined(CROSS_TO_WASM) /* no popen in WASM */
 #define PANICTRACE_GDB
 #endif
+#ifdef CROSS_TO_WASM
+#undef COMPRESS
+#endif
 #endif
 
 /* Supply nethack_enter macro if not supplied by port */
@@ -508,7 +512,6 @@ extern struct nomakedefs_s nomakedefs;
 #define C(c) (0x1f & (c))
 #endif
 
-#define unctrl(c) ((c) <= C('z') ? (0x60 | (c)) : (c))
 #define unmeta(c) (0x7f & (c))
 
 /* Game log message type flags */

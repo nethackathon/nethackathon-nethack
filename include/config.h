@@ -266,14 +266,16 @@
 
 #ifdef CRASHREPORT
 # ifndef DUMPLOG_CORE
-#  define DUMPLOG_CORE	    // required to get ^P info
+#  define DUMPLOG_CORE     // required to get ^P info
 # endif
 # ifdef MACOS
 #  define PANICTRACE
 # endif
 # ifdef __linux__
 #  define PANICTRACE
-#  define NOSTATICFN
+#  ifndef NOSTATICFN	   // may be defined on command line
+#   define NOSTATICFN
+#  endif
 # endif
 // This test isn't quite right: CNG is only available from Windows 2000 on.
 // But we'll check that at runtime.
@@ -463,7 +465,7 @@
  */
 #define INSURANCE /* allow crashed game recovery */
 
-#ifndef MAC
+#if !defined(MAC) && !defined(SHIM_GRAPHICS)
 #define CHDIR /* delete if no chdir() available */
 #endif
 
@@ -629,23 +631,16 @@ typedef unsigned char uchar;
  * glyph" code, then the escape codes for color and the glyph character
  * itself, and then the "end glyph" code.
  *
- * To compile NetHack with this, add tile.c to WINSRC and tile.o to WINOBJ
- * in the hints file or Makefile.
- * Set boolean option vt_tiledata and/or vt_sounddata in your config file
- * to turn either of these on.
- * Note that gnome-terminal at least doesn't work with this. */
+ * To compile NetHack with this, add tile.c to WINSRC and tile.o to WINOBJ in
+ * the hints file or Makefile.  Set boolean option vt_tiledata and/or
+ * vt_sounddata in your config file to turn either of these on.  Note that some
+ * terminals (e.g. old versions of gnome-terminal) don't work with this. */
 /* #define TTY_TILES_ESCCODES */
 /* #define TTY_SOUND_ESCCODES */
 
 /* An experimental minimalist inventory list capability under tty if you have
  * at least 28 additional rows beneath the status window on your terminal  */
 /* #define TTY_PERM_INVENT */
-
-/* NetHack will execute an external program whenever a new message-window
- * message is shown.  The program to execute is given in environment variable
- * NETHACK_MSGHANDLER.  It will get the message as the only parameter.
- * Only available with POSIX_TYPES, GNU C, or WIN32 */
-/* #define MSGHANDLER */
 
 /* enable status highlighting via STATUS_HILITE directives in run-time
    config file and the 'statushilites' option */

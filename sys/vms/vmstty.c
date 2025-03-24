@@ -158,7 +158,7 @@ vms_getchar(void)
     static volatile int recurse = 0; /* SMG is not AST re-entrant! */
 #endif
 
-    if (gp.program_state.done_hup) {
+    if (program_state.done_hup) {
         /* hangup has occurred; do not attempt to get further user input */
         return ESC;
     }
@@ -513,7 +513,7 @@ setftty(void)
     sg.sm.tt2_char = tt2_char_active;
     setctty();
 
-    start_screen();
+    term_start_screen();
     settty_needed = TRUE;
 }
 
@@ -601,7 +601,7 @@ getwindowsz(void)
 
 #ifdef ENHANCED_SYMBOLS
 /*
- * set in tty_start_screen() and allows
+ * set in term_start_screen() and allows
  * OS-specific changes that may be
  * required for support of utf8.
  * Currently a placeholder for VMS.

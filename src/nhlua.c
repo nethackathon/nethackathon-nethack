@@ -64,6 +64,7 @@ staticfn int nhl_an(lua_State *);
 staticfn int nhl_rn2(lua_State *);
 staticfn int nhl_random(lua_State *);
 staticfn int nhl_level_difficulty(lua_State *);
+staticfn int nhl_is_genocided(lua_State *);
 staticfn void init_nhc_data(lua_State *);
 staticfn int nhl_push_anything(lua_State *, int, void *);
 staticfn int nhl_meta_u_index(lua_State *);
@@ -486,10 +487,10 @@ RESTORE_WARNING_UNREACHABLE_CODE
    and set the x and y values.
    return TRUE if there are such params in the stack.
    Note that this does not adjust the values of x and y at all from what is
-   specified in the level file; so, it returns absolute coordinates rather than
-   map-relative coordinates. Callers of this function must decide if they want
-   to interpret the values as absolute or as map-relative, and adjust
-   accordingly.
+   specified in the level file; so, it returns absolute coordinates rather
+   than map-relative coordinates. Callers of this function must decide if
+   they want to interpret the values as absolute or as map-relative, and
+   adjust accordingly.
  */
 boolean
 nhl_get_xy_params(lua_State *L, lua_Integer *x, lua_Integer *y)
@@ -700,11 +701,12 @@ nhl_getlin(lua_State *L)
 }
 
 /*
- selected = menu("prompt", default, pickX, { "a" = "option a", "b" = "option b", ...})
+ selected = menu("prompt",default,pickX,{"a"="option a", "b"="option b",...})
  pickX = 0,1,2, or "none", "one", "any" (PICK_X in code)
 
  selected = menu("prompt", default, pickX,
-                { {key:"a", text:"option a"}, {key:"b", text:"option b"}, ... } ) */
+                 {{key:"a", text:"option a"},{key:"b", text:"option b"},... })
+ */
 staticfn int
 nhl_menu(lua_State *L)
 {
@@ -953,6 +955,27 @@ nhl_level_difficulty(lua_State *L)
     return 1;
 }
 
+/* local x = nh.is_genocided("vampire") */
+staticfn int
+nhl_is_genocided(lua_State *L)
+{
+    int argc = lua_gettop(L);
+
+    if (argc == 1) {
+        const char *paramstr = luaL_checkstring(L, 1);
+        int mgend;
+        int i = name_to_mon(paramstr, &mgend);
+
+        lua_pushboolean(L, (i != NON_PM)
+                        && (svm.mvitals[i].mvflags & G_GENOD)
+                        ? TRUE : FALSE);
+    } else {
+        nhl_error(L, "Wrong args");
+    }
+    return 1;
+}
+
+
 RESTORE_WARNING_UNREACHABLE_CODE
 
 /* get mandatory integer value from table */
@@ -1091,8 +1114,8 @@ nhl_dnum_name(lua_State *L)
     if (argc == 1) {
         lua_Integer dnum = luaL_checkinteger(L, 1);
 
-        if (dnum >= 0 && dnum < gn.n_dgns)
-            lua_pushstring(L, gd.dungeons[dnum].dname);
+        if (dnum >= 0 && dnum < svn.n_dgns)
+            lua_pushstring(L, svd.dungeons[dnum].dname);
         else
             lua_pushstring(L, "");
     } else
@@ -1584,8 +1607,8 @@ nhl_gamestate(lua_State *L)
         d_level cur_uz = u.uz, cur_uz0 = u.uz0;
 
         /* restore game state */
-        gm.moves = gg.gmst_moves;
-        pline("Resetting time to move #%ld.", gm.moves);
+        svm.moves = gg.gmst_moves;
+        pline("Resetting time to move #%ld.", svm.moves);
         gg.gmst_moves = 0L;
 
         gl.lastinvnr = 51;
@@ -1602,11 +1625,11 @@ nhl_gamestate(lua_State *L)
         assert(gg.gmst_ubak != NULL);
         (void) memcpy((genericptr_t) &u, gg.gmst_ubak, sizeof u);
         assert(gg.gmst_disco != NULL);
-        (void) memcpy((genericptr_t) &gd.disco, gg.gmst_disco,
-                      sizeof gd.disco);
+        (void) memcpy((genericptr_t) &svd.disco, gg.gmst_disco,
+                      sizeof svd.disco);
         assert(gg.gmst_mvitals != NULL);
-        (void) memcpy((genericptr_t) &gm.mvitals, gg.gmst_mvitals,
-                      sizeof gm.mvitals);
+        (void) memcpy((genericptr_t) &svm.mvitals, gg.gmst_mvitals,
+                      sizeof svm.mvitals);
         /* some restored state would confuse the level change in progress */
         u.uz = cur_uz, u.uz0 = cur_uz0;
         init_uhunger();
@@ -1614,7 +1637,7 @@ nhl_gamestate(lua_State *L)
         gg.gmst_stored = FALSE;
     } else if (!reststate && !gg.gmst_stored) {
         /* store game state */
-        gg.gmst_moves = gm.moves;
+        gg.gmst_moves = svm.moves;
         while ((otmp = gi.invent) != NULL) {
             wornmask = otmp->owornmask;
             setnotworn(otmp);
@@ -1626,12 +1649,12 @@ nhl_gamestate(lua_State *L)
         gl.lastinvnr = 51; /* next inv letter to try to use will be 'a' */
         gg.gmst_ubak = (genericptr_t) alloc(sizeof u);
         (void) memcpy(gg.gmst_ubak, (genericptr_t) &u, sizeof u);
-        gg.gmst_disco = (genericptr_t) alloc(sizeof gd.disco);
-        (void) memcpy(gg.gmst_disco, (genericptr_t) &gd.disco,
-                      sizeof gd.disco);
-        gg.gmst_mvitals = (genericptr_t) alloc(sizeof gm.mvitals);
-        (void) memcpy(gg.gmst_mvitals, (genericptr_t) &gm.mvitals,
-                      sizeof gm.mvitals);
+        gg.gmst_disco = (genericptr_t) alloc(sizeof svd.disco);
+        (void) memcpy(gg.gmst_disco, (genericptr_t) &svd.disco,
+                      sizeof svd.disco);
+        gg.gmst_mvitals = (genericptr_t) alloc(sizeof svm.mvitals);
+        (void) memcpy(gg.gmst_mvitals, (genericptr_t) &svm.mvitals,
+                      sizeof svm.mvitals);
         gg.gmst_stored = TRUE;
     } else {
         impossible("nhl_gamestate: inconsistent state (%s vs %s)",
@@ -1721,6 +1744,7 @@ static const struct luaL_Reg nhl_functions[] = {
     { "rn2", nhl_rn2 },
     { "random", nhl_random },
     { "level_difficulty", nhl_level_difficulty },
+    { "is_genocided", nhl_is_genocided },
     { "parse_config", nhl_parse_config },
     { "get_config", nhl_get_config },
     { "get_config_errors", l_get_config_errors },
@@ -1840,7 +1864,7 @@ nhl_meta_u_index(lua_State *L)
         lua_pushstring(L, gu.urole.name.m);
         return 1;
     } else if (!strcmp(tkey, "moves")) {
-        lua_pushinteger(L, gm.moves);
+        lua_pushinteger(L, svm.moves);
         return 1;
     } else if (!strcmp(tkey, "uhave_amulet")) {
         lua_pushinteger(L, u.uhave.amulet);
@@ -1995,12 +2019,14 @@ nhl_pcall_handle(lua_State *L, int nargs, int nresults, const char *name,
         case NHLpa_panic:
             panic("Lua error %d:%s %s", nud->sid,
                   nud->name ? nud->name : "(unknown)", lua_tostring(L, -1));
+            /*NOTREACHED*/
+            break;
         case NHLpa_impossible:
             impossible("Lua error: %d:%s %s", nud->sid,
                        nud->name ? nud->name : "(unknown)",
                        lua_tostring(L, -1));
                 /* Drop the error.  If the caller cares, use nhl_pcall(). */
-	    lua_pop(L, 1);
+            lua_pop(L, 1);
         }
     }
     return rv;
@@ -2335,12 +2361,14 @@ static struct e ct_base_base[] = {
     { EOT, NULL }
 };
 
-/* NHL_BASE_ERROR - not really safe - might not want Lua to kill the process */
+/* NHL_BASE_ERROR - not really safe--might not want Lua to kill the process */
 static struct e ct_base_error[] = {
-    { IFFLAG, "assert" },   /* ok, calls error */
-    { IFFLAG, "error" },    /* ok, calls G->panic */
-    { NEVER, "print" }, /*not ok - calls lua_writestring/lua_writeline -> stdout*/
-    { NEVER, "warn" }, /*not ok - calls lua_writestringerror -> stderr*/
+    { IFFLAG, "assert" }, /* ok, calls error */
+    { IFFLAG, "error" },  /* ok, calls G->panic */
+    { NEVER, "print" },   /* not ok - calls lua_writestring/lua_writeline
+                           * which write to stdout */
+    { NEVER, "warn" },    /* not ok - calls lua_writestringerror which writes
+                           * to stderr */
     { EOT, NULL }
 };
 
@@ -2548,13 +2576,15 @@ is pop sufficient? XXX or wrong - look at the balance
  */
 #define HOOKTBLNAME "org.nethack.nethack.sb.fs"
 #ifdef notyet
-static int (*io_open)(lua_State *) = NULL; /* XXX this may have to be in g TBD */
+static int (*io_open)(lua_State *) = NULL; /* XXX this may have to be in
+                                            * struct g (gi now) TBD */
 #endif
 
 void
 nhl_pushhooked_open_table(lua_State *L)
 {
     int hot = lua_getfield(L, LUA_REGISTRYINDEX, HOOKTBLNAME);
+
     if (hot == LUA_TNONE) {
         lua_newtable(L);
         lua_pushvalue(L, -1);

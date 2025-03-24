@@ -1,4 +1,4 @@
-/* NetHack 3.7	winX.c	$NHDT-Date: 1643491577 2022/01/29 21:26:17 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.110 $ */
+/* NetHack 3.7	winX.c	$NHDT-Date: 1717967337 2024/06/09 21:08:57 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.136 $ */
 /* Copyright (c) Dean Luick, 1992                                 */
 /* NetHack may be freely redistributed.  See license for details. */
 
@@ -146,8 +146,6 @@ struct window_procs X11_procs = {
 #ifdef CHANGE_COLOR /* only a Mac option currently */
     donull, donull,
 #endif
-    /* other defs that really should go away (they're tty specific) */
-    X11_start_screen, X11_end_screen,
 #ifdef GRAPHIC_TOMBSTONE
     X11_outrip,
 #else
@@ -993,7 +991,8 @@ X11_putstr(winid window, int attr, const char *str)
         X11_destroy_nhwindow(window);
         *wp = window_list[new_win];
         window_list[new_win].type = NHW_NONE; /* allow re-use */
-        /* fall through */
+        FALLTHROUGH;
+        /*FALLTHRU*/
     case NHW_TEXT:
         add_to_text_window(wp, attr, str);
         break;
@@ -1282,7 +1281,7 @@ X11_update_inventory(int arg)
 
     if (iflags.perm_invent) {
         /* skip any calls to update_inventory() before in_moveloop starts */
-        if (gp.program_state.in_moveloop || gp.program_state.gameover) {
+        if (program_state.in_moveloop || program_state.gameover) {
             updated_inventory = 1; /* hack to avoid mapping&raising window */
             if (!arg) {
                 (void) display_inventory((char *) 0, FALSE);
@@ -1393,20 +1392,6 @@ X11_number_pad(int state) /* called from options.c */
 {
     nhUse(state);
 
-    return;
-}
-
-/* called from setftty() in unixtty.c */
-void
-X11_start_screen(void)
-{
-    return;
-}
-
-/* called from settty() in unixtty.c */
-void
-X11_end_screen(void)
-{
     return;
 }
 
@@ -1798,7 +1783,7 @@ X11_hangup(Widget w, XEvent *event, String *params, Cardinal *num_params)
 static void
 X11_bail(const char *mesg)
 {
-    gp.program_state.something_worth_saving = 0;
+    program_state.something_worth_saving = 0;
     clearlocks();
     X11_exit_nhwindows(mesg);
     nh_terminate(EXIT_SUCCESS);
@@ -1815,7 +1800,7 @@ askname_delete(Widget w, XEvent *event, String *params, Cardinal *num_params)
     nhUse(num_params);
 
     nh_XtPopdown(w);
-    (void) strcpy(gp.plname, "Mumbles"); /* give them a name... ;-) */
+    (void) strcpy(svp.plname, "Mumbles"); /* give them a name... ;-) */
     exit_x_event = TRUE;
 }
 
@@ -1840,11 +1825,11 @@ askname_done(Widget w, XtPointer client_data, XtPointer call_data)
     }
 
     /* Truncate name if necessary */
-    if (len >= sizeof gp.plname - 1)
-        len = sizeof gp.plname - 1;
+    if (len >= sizeof svp.plname - 1)
+        len = sizeof svp.plname - 1;
 
-    (void) strncpy(gp.plname, s, len);
-    gp.plname[len] = '\0';
+    (void) strncpy(svp.plname, s, len);
+    svp.plname[len] = '\0';
     XtFree(s);
 
     nh_XtPopdown(XtParent(dialog));
@@ -1892,7 +1877,7 @@ X11_askname(void)
                           (XtCallbackProc) 0);
 
     SetDialogPrompt(dialog, nhStr("What is your name?")); /* set prompt */
-    SetDialogResponse(dialog, gp.plname, PL_NSIZ); /* set default answer */
+    SetDialogResponse(dialog, svp.plname, PL_NSIZ); /* set default answer */
 
     XtRealizeWidget(popup);
     positionpopup(popup, TRUE); /* center,bottom */
@@ -2041,7 +2026,7 @@ X11_getlin(
     /* we get here after the popup has exited;
        put prompt and response into the message window (and into
        core's dumplog history) unless play hasn't started yet */
-    if (gp.program_state.in_moveloop || gp.program_state.gameover) {
+    if (program_state.in_moveloop || program_state.gameover) {
         /* single space has meaning (to remove a previously applied name) so
            show it clearly; don't care about legibility of multiple spaces */
         const char *visanswer = !input[0] ? "<empty>"
@@ -2219,8 +2204,15 @@ yn_key(Widget w, XEvent *event, String *params, Cardinal *num_params)
         } else {
             if (yn_getting_num) {
                 if (digit(ch)) {
+                    long dgt = (long) (ch - '0');
+
                     yn_ndigits++;
-                    yn_val = (yn_val * 10) + (long) (ch - '0');
+                    /* yn_val = (10 * yn_val) + (ch - '0'); */
+                    yn_val = AppendLongDigit(yn_val, dgt);
+                    if (yn_val < 0L) {
+                        yn_ndigits = 0;
+                        yn_val = 0;
+                    }
                     return; /* wait for more input */
                 }
                 if (yn_ndigits && (ch == '\b' || ch == 127 /*DEL*/)) {

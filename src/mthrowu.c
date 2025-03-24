@@ -1,4 +1,4 @@
-/* NetHack 3.7	mthrowu.c	$NHDT-Date: 1629497158 2021/08/20 22:05:58 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.117 $ */
+/* NetHack 3.7	mthrowu.c	$NHDT-Date: 1737392015 2025/01/20 08:53:35 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.173 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Pasi Kallinen, 2016. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -28,21 +28,21 @@ static NEARDATA const char *breathwep[] = {
 /* hallucinatory ray types */
 static const char *const hallublasts[] = {
     "asteroids", "beads", "bubbles", "butterflies", "champagne", "chaos",
-    "coins", "cotton candy", "crumbs", "dark matter", "darkness", "dust specks",
-    "emoticons", "emotions", "entropy", "flowers", "foam", "fog", "gamma rays",
-    "gelatin", "gemstones", "ghosts", "glass shards", "glitter", "good vibes",
-    "gravel", "gravity", "gravy", "grawlixes", "holy light", "hornets",
-    "hot air", "hyphens", "hypnosis", "infrared", "insects", "laser beams",
-    "leaves", "lightening", "logic gates", "magma", "marbles", "mathematics",
-    "megabytes", "metal shavings", "metapatterns", "meteors", "mist", "mud",
-    "music", "nanites", "needles", "noise", "nostalgia", "oil", "paint",
-    "photons", "pixels", "plasma", "polarity", "powder", "powerups",
-    "prismatic light", "pure logic", "purple", "radio waves", "rainbows",
-    "rock music", "rocket fuel", "rope", "sadness", "salt", "sand", "scrolls",
-    "sludge", "smileys", "snowflakes", "sparkles", "specularity", "spores",
-    "stars", "steam", "tetrahedrons", "text", "the past", "tornadoes",
-    "toxic waste", "ultraviolet light", "viruses", "water", "waveforms", "wind",
-    "X-rays", "zorkmids"
+    "coins", "cotton candy", "crumbs", "dark matter", "darkness", "data",
+    "dust specks", "emoticons", "emotions", "entropy", "flowers", "foam",
+    "fog", "gamma rays", "gelatin", "gemstones", "ghosts", "glass shards",
+    "glitter", "good vibes", "gravel", "gravity", "gravy", "grawlixes",
+    "holy light", "hornets", "hot air", "hyphens", "hypnosis", "infrared",
+    "insects", "jargon", "laser beams", "leaves", "lightening", "logic gates",
+    "magma", "marbles", "mathematics", "megabytes", "metal shavings",
+    "metapatterns", "meteors", "mist", "mud", "music", "nanites", "needles",
+    "noise", "nostalgia", "oil", "paint", "photons", "pixels", "plasma",
+    "polarity", "powder", "powerups", "prismatic light", "pure logic",
+    "purple", "radio waves", "rainbows", "rock music", "rocket fuel", "rope",
+    "sadness", "salt", "sand", "scrolls", "sludge", "smileys", "snowflakes",
+    "sparkles", "specularity", "spores", "stars", "steam", "tetrahedrons",
+    "text", "the past", "tornadoes", "toxic waste", "ultraviolet light",
+    "viruses", "water", "waveforms", "wind", "X-rays", "zorkmids"
 };
 
 /* Return a random hallucinatory blast. */
@@ -121,8 +121,8 @@ thitu(
         if (is_acid && Acid_resistance) {
             pline("It doesn't seem to hurt you.");
             monstseesu(M_SEEN_ACID);
-        } else if (obj && stone_missile(obj) && passes_rocks(gy.youmonst.data)) {
-
+        } else if (obj && stone_missile(obj)
+                   && passes_rocks(gy.youmonst.data)) {
             /* use 'named' as an approximation for "hitting from above";
                we avoid "passes through you" for horizontal flight path
                because missile stops and that wording would suggest that
@@ -196,7 +196,9 @@ drop_throw(
 /* calculate multishot volley count for mtmp throwing otmp (if not ammo) or
    shooting otmp with mwep (if otmp is ammo and mwep appropriate launcher) */
 staticfn int
-monmulti(struct monst *mtmp, struct obj *otmp, struct obj *mwep)
+monmulti(
+    struct monst *mtmp,
+    struct obj *otmp, struct obj *mwep)
 {
     int multishot = 1;
 
@@ -238,11 +240,11 @@ monmulti(struct monst *mtmp, struct obj *otmp, struct obj *mwep)
 
         /* racial bonus */
         if ((is_elf(mtmp->data) && otmp->otyp == ELVEN_ARROW
-            && mwep->otyp == ELVEN_BOW)
+             && mwep && mwep->otyp == ELVEN_BOW)
             || (is_orc(mtmp->data) && otmp->otyp == ORCISH_ARROW
-                && mwep->otyp == ORCISH_BOW)
+                && mwep && mwep->otyp == ORCISH_BOW)
             || (is_gnome(mtmp->data) && otmp->otyp == CROSSBOW_BOLT
-                && mwep->otyp == CROSSBOW))
+                && mwep && mwep->otyp == CROSSBOW))
             multishot++;
     }
 
@@ -319,8 +321,8 @@ ohitmon(
     struct obj *otmp,   /* missile; might be destroyed by drop_throw */
     int range,          /* how much farther will object travel if it misses;
                          * use -1 to signify to keep going even after hit,
-                         * unless it's gone (used for rolling_boulder_traps) */
-    boolean verbose)/* give message(s) even when you can't see what happened */
+                         * unless it's gone (for rolling_boulder_traps) */
+    boolean verbose)/* give messages even when you can't see what happened */
 {
     int damage, tmp;
     boolean vis, ismimic, objgone;
@@ -453,7 +455,7 @@ ohitmon(
                           (nonliving(mtmp->data) || is_vampshifter(mtmp)
                            || !canspotmon(mtmp)) ? "destroyed" : "killed");
                 /* don't blame hero for unknown rolling boulder trap */
-                if (!gc.context.mon_moving && (otmp->otyp != BOULDER
+                if (!svc.context.mon_moving && (otmp->otyp != BOULDER
                                             || range >= 0 || otmp->otrapped))
                     xkilled(mtmp, XKILL_NOMSG);
                 else
@@ -484,7 +486,7 @@ ohitmon(
             mtmp->mblinded = tmp;
         }
 
-        if (!DEADMONSTER(mtmp) && !gc.context.mon_moving)
+        if (!DEADMONSTER(mtmp) && !svc.context.mon_moving)
             setmangry(mtmp, TRUE);
 
         objgone = drop_throw(otmp, 1, gb.bhitpos.x, gb.bhitpos.y);
@@ -528,7 +530,7 @@ ucatchgem(
     (/* missile hits edge of screen */                                 \
      !isok(gb.bhitpos.x + dx, gb.bhitpos.y + dy)                       \
      /* missile hits the wall */                                       \
-     || IS_ROCK(levl[gb.bhitpos.x + dx][gb.bhitpos.y + dy].typ)        \
+     || IS_OBSTRUCTED(levl[gb.bhitpos.x + dx][gb.bhitpos.y + dy].typ)        \
      /* missile hit closed door */                                     \
      || closed_door(gb.bhitpos.x + dx, gb.bhitpos.y + dy)              \
      /* missile might hit iron bars */                                 \
@@ -655,6 +657,7 @@ m_throw(
                     hitu = 0;
                     break;
                 }
+                FALLTHROUGH;
                 /*FALLTHRU*/
             case CREAM_PIE:
             case BLINDING_VENOM:
@@ -851,6 +854,7 @@ spitmm(struct monst *mtmp, struct attack *mattk, struct monst *mtarg)
             break;
         default:
             impossible("bad attack type in spitmm");
+            FALLTHROUGH;
             /*FALLTHRU*/
         case AD_ACID:
             otmp = mksobj(ACID_VENOM, TRUE, FALSE);
@@ -1024,7 +1028,7 @@ thrwmu(struct monst *mtmp)
 
         if (canseemon(mtmp)) {
             onm = xname(otmp);
-            pline_xy(mtmp->mx, mtmp->my, "%s %s %s.", Monnam(mtmp),
+            pline_mon(mtmp, "%s %s %s.", Monnam(mtmp),
                   /* "thrusts" or "swings", or "bashes with" if adjacent */
                   mswings_verb(otmp, (rang <= 2) ? TRUE : FALSE),
                   obj_is_pname(otmp) ? the(onm) : an(onm));
@@ -1080,7 +1084,7 @@ breamu(struct monst *mtmp, struct attack *mattk)
 staticfn boolean
 blocking_terrain(coordxy x, coordxy y)
 {
-    if (!isok(x, y) || IS_ROCK(levl[x][y].typ) || closed_door(x, y)
+    if (!isok(x, y) || IS_OBSTRUCTED(levl[x][y].typ) || closed_door(x, y)
         || is_waterwall(x, y) || levl[x][y].typ == LAVAWALL)
         return TRUE;
     return FALSE;

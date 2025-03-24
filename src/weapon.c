@@ -1,4 +1,4 @@
-/* NetHack 3.7	weapon.c	$NHDT-Date: 1690488665 2023/07/27 20:11:05 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.111 $ */
+/* NetHack 3.7	weapon.c	$NHDT-Date: 1725227810 2024/09/01 21:56:50 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.128 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2011. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -11,7 +11,7 @@
 #include "hack.h"
 
 staticfn void give_may_advance_msg(int);
-staticfn void finish_towel_change(struct obj *obj, int);
+staticfn void finish_towel_change(struct obj *obj, int) NONNULLARG1;
 staticfn boolean could_advance(int);
 staticfn boolean peaked_skill(int);
 staticfn int slots_required(int);
@@ -66,8 +66,10 @@ static NEARDATA const char *const barehands_or_martial[] = {
                ? barehands_or_martial[martial_bonus()]  \
                : odd_skill_names[-skill_names_indices[type]])
 
-static NEARDATA const char kebabable[] = { S_XORN, S_DRAGON, S_JABBERWOCK,
-                                           S_NAGA, S_GIANT,  '\0' };
+/* targets that provide attacker with small to-hit bonus when using a spear */
+static NEARDATA const char kebabable[] = {
+    S_XORN, S_DRAGON, S_JABBERWOCK, S_NAGA, S_GIANT,  '\0'
+};
 
 staticfn void
 give_may_advance_msg(int skill)
@@ -77,7 +79,7 @@ give_may_advance_msg(int skill)
                  : (skill <= P_LAST_WEAPON) ? "weapon "
                      : (skill <= P_LAST_SPELL) ? "spell casting "
                          : "fighting ");
-    handle_tip(TIP_ENHANCE);
+    (void) handle_tip(TIP_ENHANCE);
 }
 
 /* weapon's skill category name for use as generalized description of weapon;
@@ -184,7 +186,7 @@ hitval(struct obj *otmp, struct monst *mon)
 }
 
 /* Historical note: The original versions of Hack used a range of damage
- * which was similar to, but not identical to the damage used in Advanced
+ * which was similar to, but not identical to, the damage used in Advanced
  * Dungeons and Dragons.  I figured that since it was so close, I may as well
  * make it exactly the same as AD&D, adding some more weapons in the process.
  * This has the advantage that it is at least possible that the player would
@@ -714,7 +716,7 @@ possibly_unwield(struct monst *mon, boolean polyspot)
         mon->weapon_check = NO_WEAPON_WANTED;
         /* if we're going to call distant_name(), do so before extract_self */
         if (cansee(mon->mx, mon->my)) {
-            pline("%s drops %s.", Monnam(mon), distant_name(obj, doname));
+            pline_mon(mon, "%s drops %s.", Monnam(mon), distant_name(obj, doname));
             newsym(mon->mx, mon->my);
         }
         obj_extract_self(obj);
@@ -825,7 +827,7 @@ mon_wield_item(struct monst *mon)
                     pline("%s cannot wield that %s.", mon_nam(mon),
                           xname(obj));
                 } else {
-                    pline("%s tries to wield %s.", Monnam(mon), doname(obj));
+                    pline_mon(mon, "%s tries to wield %s.", Monnam(mon), doname(obj));
                     pline("%s %s!", Yname2(mw_tmp), welded_buf);
                 }
                 mw_tmp->bknown = 1;
@@ -839,9 +841,9 @@ mon_wield_item(struct monst *mon)
         if (canseemon(mon)) {
             boolean newly_welded;
 
-            pline_xy(mon->mx, mon->my,
-                     "%s wields %s%c", Monnam(mon), doname(obj),
-                     exclaim ? '!' : '.');
+            pline_mon(mon, "%s wields %s%c",
+                      Monnam(mon), doname(obj),
+                      exclaim ? '!' : '.');
             /* 3.6.3: mwelded() predicate expects the object to have its
                W_WEP bit set in owormmask, but the pline here and for
                artifact_light don't want that because they'd have '(weapon
@@ -976,10 +978,10 @@ finish_towel_change(struct obj *obj, int newspe)
 
 /* increase a towel's wetness */
 void
-wet_a_towel(struct obj *obj,
-            int amt, /* positive: new value; negative: increment by -amt;
-                        zero: no-op */
-            boolean verbose)
+wet_a_towel(
+    struct obj *obj,
+    int amt, /* positive: new val; negative: increment by -amt; zero: no-op */
+    boolean verbose)
 {
     int newspe = (amt <= 0) ? obj->spe - amt : amt;
 
@@ -1146,7 +1148,11 @@ skill_advance(int skill)
         P_SKILL(skill) >= P_MAX_SKILL(skill) ? "most" : "more",
         P_NAME(skill));
 
-    skill_based_spellbook_id();
+    /* wizards discover spellbook IDs depending on spell 'school' skill limits;
+       this allows them to successfully write books for unknown spells without
+       the Luck bias they used to have over other roles */
+    if (skill >= P_FIRST_SPELL && skill <= P_LAST_SPELL)
+        skill_based_spellbook_id();
 }
 
 static const struct skill_range {
@@ -1179,7 +1185,7 @@ enhance_weapon_skill(void)
     int clr = NO_COLOR;
 
     /* player knows about #enhance, don't show tip anymore */
-    gc.context.tips[TIP_ENHANCE] = TRUE;
+    svc.context.tips[TIP_ENHANCE] = TRUE;
 
     if (wizard && y_n("Advance skills without practice?") == 'y')
         speedy = TRUE;
@@ -1460,7 +1466,9 @@ weapon_hit_bonus(struct obj *weapon)
     } else if (type <= P_LAST_WEAPON) {
         switch (P_SKILL(type)) {
         default:
-            impossible(bad_skill, P_SKILL(type)); /* fall through */
+            impossible(bad_skill, P_SKILL(type));
+            FALLTHROUGH;
+            /* FALLTHRU */
         case P_ISRESTRICTED:
         case P_UNSKILLED:
             bonus = -4;
@@ -1481,7 +1489,9 @@ weapon_hit_bonus(struct obj *weapon)
             skill = P_SKILL(wep_type);
         switch (skill) {
         default:
-            impossible(bad_skill, skill); /* fall through */
+            impossible(bad_skill, skill);
+            FALLTHROUGH;
+            /* FALLTHRU */
         case P_ISRESTRICTED:
         case P_UNSKILLED:
             bonus = -9;
@@ -1555,7 +1565,8 @@ weapon_dam_bonus(struct obj *weapon)
         switch (P_SKILL(type)) {
         default:
             impossible("weapon_dam_bonus: bad skill %d", P_SKILL(type));
-        /* fall through */
+            FALLTHROUGH;
+        /* FALLTHRU */
         case P_ISRESTRICTED:
         case P_UNSKILLED:
             bonus = -2;
@@ -1703,7 +1714,8 @@ skill_init(const struct def_skill *class_skill)
        (despite the function name, this works for spell skills too) */
     unrestrict_weapon_skill(spell_skilltype(gu.urole.spelspec));
 
-    skill_based_spellbook_id();
+    if (!u.uroleplay.pauper) /* paupers lack advanced access to books */
+        skill_based_spellbook_id();
 }
 
 void

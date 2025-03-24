@@ -1,4 +1,4 @@
-/* NetHack 3.7	sit.c	$NHDT-Date: 1627414178 2021/07/27 19:29:38 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.73 $ */
+/* NetHack 3.7	sit.c	$NHDT-Date: 1718136168 2024/06/11 20:02:48 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.95 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2012. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -36,8 +36,27 @@ take_gold(void)
 staticfn void
 throne_sit_effect(void)
 {
-    if (rnd(6) > 4) {
-        switch (rnd(13)) {
+    coordxy tx = u.ux, ty = u.uy;
+
+    if (rnd(6) > 4) { /* [why so convoluted? it's the same as '!rn2(3)'] */
+        int effect = rnd(13);
+
+        if (wizard && !iflags.debug_fuzzer) {
+            char buf[BUFSZ];
+            int which;
+
+            buf[0] = '\0';
+            getlin("Throne sit effect (1..13) [0=random]", buf);
+            if (buf[0] == '\033') {
+                pline("%s", Never_mind);
+                return; /* caller will still cause a move to elapse */
+            }
+            which = atoi(buf);
+            if (which >= 1 && which <= 13)
+                effect = which;
+        }
+
+        switch (effect) {
         case 1:
             (void) adjattrib(rn2(A_MAX), -rn1(4, 3), FALSE);
             losehp(rnd(10), "cursed throne", KILLED_BY_AN);
@@ -91,7 +110,7 @@ throne_sit_effect(void)
                 verbalize("Thine audience hath been summoned, %s!",
                           flags.female ? "Dame" : "Sire");
                 while (cnt--)
-                    (void) makemon(courtmon(), u.ux, u.uy, NO_MM_FLAGS);
+                    (void) makemon(courtmon(), tx, ty, NO_MM_FLAGS);
                 break;
             }
         case 8:
@@ -116,7 +135,7 @@ throne_sit_effect(void)
             break;
         case 10:
             if (Luck < 0 || (HSee_invisible & INTRINSIC)) {
-                if (gl.level.flags.nommap) {
+                if (svl.level.flags.nommap) {
                     pline("A terrible drone fills your head!");
                     make_confused((HConfusion & TIMEOUT) + (long) rnd(30),
                                   FALSE);
@@ -139,6 +158,7 @@ throne_sit_effect(void)
                     default:
                     case 2: /* more than 1 eye */
                         eye = makeplural(eye);
+                        FALLTHROUGH;
                         /*FALLTHRU*/
                     case 1: /* one eye (Cyclops, floating eye) */
                         Your("%s %s...", eye, vtense(eye, "tingle"));
@@ -185,11 +205,21 @@ throne_sit_effect(void)
             You_feel("somehow out of place...");
     }
 
-    if (!rn2(3) && IS_THRONE(levl[u.ux][u.uy].typ)) {
-        /* may have teleported */
-        levl[u.ux][u.uy].typ = ROOM, levl[u.ux][u.uy].flags = 0;
-        pline_The("throne vanishes in a puff of logic.");
-        newsym(u.ux, u.uy);
+    /* 3.7: when the random chance for removal is hit, ask for confirmation
+       if in wizard mode, and remove the throne even if hero was teleported
+       away from it.  [This used to remove a throne at hero's current
+       location if there happened to be one, so for the teleport case that
+       only happened when teleporting back to the same point where hero
+       started from.]  "Analyzing a throne" doesn't really make any sense
+       but if the answer is yes than it will vanish in a puff of logic. */
+    if (!rn2(3) && (!wizard || y_n("Analyze throne?") == 'y')) {
+        levl[tx][ty].typ = ROOM, levl[tx][ty].flags = 0;
+        map_background(tx, ty, FALSE);
+        newsym_force(tx, ty);
+        /* "[God] promptly vanishes in a puff of logic" is from
+           Douglas Adams' _The_Hitchhiker's_Guide_to_the_Galaxy_. */
+        pline_The("throne %s in a puff of logic.",
+                  cansee(tx, ty) ? "vanishes" : "has vanished");
     }
 }
 
@@ -246,7 +276,8 @@ dosit(void)
         You("are already sitting on %s.", mon_nam(u.usteed));
         return ECMD_OK;
     }
-    if (u.uundetected && is_hider(gy.youmonst.data) && u.umonnum != PM_TRAPPER)
+    if (u.uundetected && is_hider(gy.youmonst.data)
+        && u.umonnum != PM_TRAPPER) /* trapper can stay hidden on floor */
         u.uundetected = 0; /* no longer on the ceiling */
 
     if (!can_reach_floor(FALSE)) {
@@ -267,6 +298,9 @@ dosit(void)
         return ECMD_OK;
     } else if (is_pool(u.ux, u.uy) && !Underwater) { /* water walking */
         goto in_water;
+    } else if (Upolyd && u.umonnum == PM_GREMLIN
+               && (levl[u.ux][u.uy].typ == FOUNTAIN || is_pool(u.ux, u.uy))) {
+        goto in_water;
     }
 
     if (OBJ_AT(u.ux, u.uy)
@@ -274,7 +308,7 @@ dosit(void)
         && !(uteetering_at_seen_pit(trap) || uescaped_shaft(trap))) {
         struct obj *obj;
 
-        obj = gl.level.objects[u.ux][u.uy];
+        obj = svl.level.objects[u.ux][u.uy];
         if (gy.youmonst.data->mlet == S_DRAGON && obj->oclass == COIN_CLASS) {
             You("coil up around your %shoard.",
                 (obj->quan + money_cnt(gi.invent) < u.ulevel * 1000)
@@ -282,7 +316,10 @@ dosit(void)
         } else if (obj->otyp == TOWEL) {
             pline("It's probably not a good time for a picnic...");
         } else {
-            You("sit on %s.", the(xname(obj)));
+            if (slithy(gy.youmonst.data))
+                You("coil up around %s.", the(xname(obj)));
+            else
+                You("sit on %s.", the(xname(obj)));
             if (obj->otyp == CORPSE && amorphous(&mons[obj->corpsenm]))
                 pline("It's squishy...");
             else if (obj->otyp == CREAM_PIE) {
@@ -291,7 +328,8 @@ dosit(void)
                    pline("Squelch!");
                 }
                 useupf(obj, obj->quan);
-            } else if (!(Is_box(obj) || objects[obj->otyp].oc_material == CLOTH))
+            } else if (!(Is_box(obj)
+                         || objects[obj->otyp].oc_material == CLOTH))
                 pline("It's not very comfortable...");
         }
     } else if (trap != 0 || (u.utrap && (u.utraptype >= TT_LAVA))) {
@@ -342,10 +380,18 @@ dosit(void)
     } else if (is_pool(u.ux, u.uy) && !eggs_in_water(gy.youmonst.data)) {
  in_water:
         You("sit in the %s.", hliquid("water"));
-        if (!rn2(10) && uarm)
-            (void) water_damage(uarm, "armor", TRUE);
-        if (!rn2(10) && uarmf && uarmf->otyp != WATER_WALKING_BOOTS)
-            (void) water_damage(uarm, "armor", TRUE);
+        if (Upolyd && u.umonnum == PM_GREMLIN) {
+            if (split_mon(&gy.youmonst, (struct monst *) 0)) {
+                if (levl[u.ux][u.uy].typ == FOUNTAIN)
+                    dryup(u.ux, u.uy, TRUE, FALSE);
+            }
+            /* splitting--or failing to do so--protects gear from the water */
+        } else {
+            if (!rn2(10) && uarm)
+                (void) water_damage(uarm, "armor", TRUE);
+            if (!rn2(10) && uarmf && uarmf->otyp != WATER_WALKING_BOOTS)
+                (void) water_damage(uarm, "armor", TRUE);
+        }
     } else if (IS_SINK(typ)) {
         You(sit_message, defsyms[S_sink].explanation);
         Your("%s gets wet.",
@@ -475,6 +521,7 @@ attrcurse(void)
             ret = FIRE_RES;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 2:
         if (HTeleportation & INTRINSIC) {
@@ -483,6 +530,7 @@ attrcurse(void)
             ret = TELEPORT;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 3:
         if (HPoison_resistance & INTRINSIC) {
@@ -491,6 +539,7 @@ attrcurse(void)
             ret = POISON_RES;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 4:
         if (HTelepat & INTRINSIC) {
@@ -501,6 +550,7 @@ attrcurse(void)
             ret = TELEPAT;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 5:
         if (HCold_resistance & INTRINSIC) {
@@ -509,6 +559,7 @@ attrcurse(void)
             ret = COLD_RES;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 6:
         if (HInvis & INTRINSIC) {
@@ -517,6 +568,7 @@ attrcurse(void)
             ret = INVIS;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 7:
         if (HSee_invisible & INTRINSIC) {
@@ -532,6 +584,7 @@ attrcurse(void)
             ret = SEE_INVIS;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 8:
         if (HFast & INTRINSIC) {
@@ -540,6 +593,7 @@ attrcurse(void)
             ret = FAST;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 9:
         if (HStealth & INTRINSIC) {
@@ -548,6 +602,7 @@ attrcurse(void)
             ret = STEALTH;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 10:
         /* intrinsic protection is just disabled, not set back to 0 */
@@ -557,6 +612,7 @@ attrcurse(void)
             ret = PROTECTION;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     case 11:
         if (HAggravate_monster & INTRINSIC) {
@@ -565,6 +621,7 @@ attrcurse(void)
             ret = AGGRAVATE_MONSTER;
             break;
         }
+        FALLTHROUGH;
         /*FALLTHRU*/
     default:
         break;

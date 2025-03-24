@@ -1,4 +1,4 @@
-/* NetHack 3.7	uhitm.c	$NHDT-Date: 1713334817 2024/04/17 06:20:17 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.444 $ */
+/* NetHack 3.7	uhitm.c	$NHDT-Date: 1736575153 2025/01/10 21:59:13 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.461 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2012. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -21,7 +21,7 @@ staticfn boolean hitum_cleave(struct monst *, struct attack *) NO_NNARGS;
 staticfn boolean double_punch(void);
 staticfn boolean hitum(struct monst *, struct attack *) NONNULLARG1;
 staticfn void hmon_hitmon_barehands(struct _hitmon_data *,
-		             struct monst *) NONNULLARG12;
+                             struct monst *) NONNULLARG12;
 staticfn void hmon_hitmon_weapon_ranged(struct _hitmon_data *, struct monst *,
                              struct obj *) NONNULLARG123;
 staticfn void hmon_hitmon_weapon_melee(struct _hitmon_data *, struct monst *,
@@ -88,7 +88,7 @@ mhitm_mgc_atk_negated(
             if (mdef == &gy.youmonst)
                 You("avoid harm.");
             else if (gv.vis && canseemon(mdef))
-                pline("%s avoids harm.", Monnam(mdef));
+                pline_mon(mdef, "%s avoids harm.", Monnam(mdef));
         }
         return TRUE;
     }
@@ -195,7 +195,7 @@ attack_checks(
     if (engulfing_u(mtmp))
         return FALSE;
 
-    if (gc.context.forcefight) {
+    if (svc.context.forcefight) {
         /* Do this in the caller, after we checked that the monster
          * didn't die from the blow.  Reason: putting the 'I' there
          * causes the hero to forget the square's contents since
@@ -285,7 +285,7 @@ attack_checks(
                       notseen ? "is present" : "appears");
             else if (Blind || (is_pool(mtmp->mx, mtmp->my) && !Underwater))
                 pline("Wait!  There's a hidden monster there!");
-            else if ((obj = gl.level.objects[mtmp->mx][mtmp->my]) != 0)
+            else if ((obj = svl.level.objects[mtmp->mx][mtmp->my]) != 0)
                 pline("Wait!  There's %s hiding under %s!",
                       notseen ? something : (const char *) an(lmonbuf),
                       doname(obj));
@@ -314,7 +314,7 @@ attack_checks(
 
             Sprintf(qbuf, "Really attack %s?", mon_nam(mtmp));
             if (!paranoid_query(ParanoidHit, qbuf)) {
-                gc.context.move = 0;
+                svc.context.move = 0;
                 return TRUE;
             }
         }
@@ -429,12 +429,12 @@ force_attack(struct monst *mtmp, boolean pets_too)
 {
     boolean attacked, save_Forcefight;
 
-    save_Forcefight = gc.context.forcefight;
+    save_Forcefight = svc.context.forcefight;
     /* always set forcefight On for hostiles and peacefuls, maybe for pets */
     if (pets_too || !mtmp->mtame)
-        gc.context.forcefight = TRUE;
+        svc.context.forcefight = TRUE;
     attacked = do_attack(mtmp);
-    gc.context.forcefight = save_Forcefight;
+    svc.context.forcefight = save_Forcefight;
     return attacked;
 }
 
@@ -455,7 +455,7 @@ do_attack(struct monst *mtmp)
      * you'll usually just swap places if this is a movement command
      */
     /* Intelligent chaotic weapons (Stormbringer) want blood */
-    if (is_safemon(mtmp) && !gc.context.forcefight) {
+    if (is_safemon(mtmp) && !svc.context.forcefight) {
         if (!u_wield_art(ART_STORMBRINGER)) {
             /* There are some additional considerations: this won't work
              * if in a shop or Punished or you miss a random roll or
@@ -469,7 +469,7 @@ do_attack(struct monst *mtmp)
              */
             boolean foo = (Punished || !rn2(7)
                            || (is_longworm(mtmp->data) && mtmp->wormno)
-                           || (IS_ROCK(levl[u.ux][u.uy].typ)
+                           || (IS_OBSTRUCTED(levl[u.ux][u.uy].typ)
                                && !passes_walls(mtmp->data))),
                     inshop = FALSE;
             char *p;
@@ -477,7 +477,7 @@ do_attack(struct monst *mtmp)
             /* only check for in-shop if don't already have reason to stop */
             if (!foo) {
                 for (p = in_rooms(mtmp->mx, mtmp->my, SHOPBASE); *p; p++)
-                    if (tended_shop(&gr.rooms[*p - ROOMOFFSET])) {
+                    if (tended_shop(&svr.rooms[*p - ROOMOFFSET])) {
                         inshop = TRUE;
                         break;
                     }
@@ -485,7 +485,7 @@ do_attack(struct monst *mtmp)
             if (inshop || foo) {
                 char buf[BUFSZ];
 
-                if (!gc.context.travel && !gc.context.run)
+                if (!svc.context.travel && !svc.context.run)
                     if (canspotmon(mtmp) && mtmp->isshk)
                         return ECMD_TIME | dopay();
 
@@ -570,7 +570,7 @@ do_attack(struct monst *mtmp)
      * and it returned 0 (it's okay to attack), and the monster didn't
      * evade.
      */
-    if (gc.context.forcefight && !DEADMONSTER(mtmp) && !canspotmon(mtmp)
+    if (svc.context.forcefight && !DEADMONSTER(mtmp) && !canspotmon(mtmp)
         && !glyph_is_invisible(levl[u.ux + u.dx][u.uy + u.dy].glyph)
         && !engulfing_u(mtmp))
         map_invisible(u.ux + u.dx, u.uy + u.dy);
@@ -1212,6 +1212,12 @@ hmon_hitmon_misc_obj(
                 obj->owt = weight(obj);
                 if (hmd->thrown)
                     place_object(obj, mon->mx, mon->my);
+            } else if (obj->corpsenm == PM_PYROLISK) {
+                useup_eggs(obj);
+                explode(mon->mx, mon->my, -11, d(3, 6), 0, EXPL_FIERY);
+                hmd->doreturn = TRUE;
+                hmd->retval = !DEADMONSTER(mon);
+                return;
             } else {
                 pline("Splat!");
                 useup_eggs(obj);
@@ -1726,7 +1732,7 @@ hmon_hitmon(
     hmd.silverobj = FALSE;
     hmd.lightobj = FALSE;
     hmd.material = obj ? objects[obj->otyp].oc_material
-                       : 0; /* 0 == NO_MATERIAL */
+                       : NO_MATERIAL;
     hmd.jousting = 0;
     hmd.hittxt = FALSE;
     hmd.get_dmg_bonus = TRUE;
@@ -1807,8 +1813,10 @@ hmon_hitmon(
 
     hmon_hitmon_msg_hit(&hmd, mon, obj);
 
-    if (hmd.dryit) /* dryit implies wet towel, so 'obj' is still intact */
+    if (hmd.dryit) { /* dryit implies wet towel, so 'obj' is still intact */
+        assert(obj != NULL);
         dry_a_towel(obj, -1, TRUE);
+    }
 
     if (hmd.silvermsg)
         hmon_hitmon_msg_silver(&hmd, mon, obj);
@@ -1820,8 +1828,10 @@ hmon_hitmon(
        obj->opoisoned was cleared above and any message referring to
        "poisoned <obj>" has now been given; we want just "<obj>" for
        last message, so reformat while obj is still accessible */
-    if (hmd.unpoisonmsg)
+    if (hmd.unpoisonmsg) {
+        assert(obj != NULL);
         Strcpy(hmd.saved_oname, cxname(obj));
+    }
 
     /* [note: thrown obj might go away during killed()/xkilled() call
        (via 'thrownobj'; if swallowed, it gets added to engulfer's
@@ -2236,7 +2246,7 @@ mhitm_ad_rust(
             return;
         if (completelyrusts(pd)) { /* PM_IRON_GOLEM */
             if (gv.vis && canseemon(mdef))
-                pline("%s %s to pieces!", Monnam(mdef),
+                pline_mon(mdef, "%s %s to pieces!", Monnam(mdef),
                       !mlifesaver(mdef) ? "falls" : "starts to fall");
             monkilled(mdef, (char *) 0, AD_RUST);
             if (!DEADMONSTER(mdef)) {
@@ -2316,7 +2326,7 @@ mhitm_ad_dcay(
             /* note: the life-saved case is hypothetical because
                life-saving doesn't work for golems */
             if (gv.vis && canseemon(mdef))
-                pline("%s %s to pieces!", Monnam(mdef),
+                pline_mon(mdef, "%s %s to pieces!", Monnam(mdef),
                       !mlifesaver(mdef) ? "falls" : "starts to fall");
             monkilled(mdef, (char *) 0, AD_DCAY);
             if (!DEADMONSTER(mdef)) {
@@ -2418,7 +2428,7 @@ mhitm_ad_drli(
             if (!is_death) /* Stormbringer uses monhp_per_lvl (1d8) */
                 mhm->damage = d(2, 6);
             if (gv.vis && canspotmon(mdef))
-                pline("%s becomes weaker!", Monnam(mdef));
+                pline_mon(mdef, "%s becomes weaker!", Monnam(mdef));
             if (mdef->mhpmax - mhm->damage > (int) mdef->m_lev) {
                 mdef->mhpmax -= mhm->damage;
             } else {
@@ -2512,12 +2522,12 @@ mhitm_ad_fire(
             return;
         }
         if (gv.vis && canseemon(mdef))
-            pline("%s is %s!", Monnam(mdef), on_fire(pd, mattk));
+            pline_mon(mdef, "%s is %s!", Monnam(mdef), on_fire(pd, mattk));
         if (completelyburns(pd)) { /* paper golem or straw golem */
             /* note: the life-saved case is hypothetical because
                life-saving doesn't work for golems */
             if (gv.vis && canseemon(mdef))
-                pline("%s %s!", Monnam(mdef),
+                pline_mon(mdef, "%s %s!", Monnam(mdef),
                       !mlifesaver(mdef) ? "burns completely"
                                         : "is totally engulfed in flames");
             monkilled(mdef, (char *) 0, AD_FIRE);
@@ -2589,7 +2599,7 @@ mhitm_ad_cold(
             return;
         }
         if (gv.vis && canseemon(mdef))
-            pline("%s is covered in frost!", Monnam(mdef));
+            pline_mon(mdef, "%s is covered in frost!", Monnam(mdef));
         if (resists_cold(mdef) || defended(mdef, AD_COLD)) {
             if (gv.vis && canseemon(mdef))
                 pline_The("frost doesn't seem to chill %s!", mon_nam(mdef));
@@ -2647,7 +2657,7 @@ mhitm_ad_elec(
             return;
         }
         if (gv.vis && canseemon(mdef))
-            pline("%s gets zapped!", Monnam(mdef));
+            pline_mon(mdef, "%s gets zapped!", Monnam(mdef));
         if (resists_elec(mdef) || defended(mdef, AD_ELEC)) {
             if (gv.vis && canseemon(mdef))
                 pline_The("zap doesn't shock %s!", mon_nam(mdef));
@@ -2696,7 +2706,7 @@ mhitm_ad_acid(
                       Monnam(mdef), hliquid("acid"));
             mhm->damage = 0;
         } else if (gv.vis && canseemon(mdef)) {
-            pline("%s is covered in %s!", Monnam(mdef), hliquid("acid"));
+            pline_mon(mdef, "%s is covered in %s!", Monnam(mdef), hliquid("acid"));
             pline("It burns %s!", mon_nam(mdef));
         }
         if (!rn2(30))
@@ -2807,7 +2817,7 @@ mhitm_ad_tlpt(
         int tmphp;
 
         hitmsg(magr, mattk);
-        if (!mhitm_mgc_atk_negated(magr, mdef, FALSE)) {
+        if (mhitm_mgc_atk_negated(magr, mdef, FALSE)) {
             You("are not affected.");
         } else {
             if (flags.verbose)
@@ -2852,7 +2862,7 @@ mhitm_ad_tlpt(
             ; /* no negation message */
         } else if (mhitm_mgc_atk_negated(magr, mdef, TRUE)) {
             if (gv.vis)
-                pline("%s is not affected.", Monnam(mdef));
+                pline_mon(mdef, "%s is not affected.", Monnam(mdef));
         } else {
             char mdef_Monnam[BUFSZ];
             boolean wasseen = canspotmon(mdef);
@@ -2966,7 +2976,7 @@ mhitm_ad_curs(
                 if (Blind) {
                     You_hear("laughter.");
                 } else {
-                    pline("%s chuckles.", Monnam(magr));
+                    pline_mon(magr, "%s chuckles.", Monnam(magr));
                 }
             }
             if (u.umonnum == PM_CLAY_GOLEM) {
@@ -2990,7 +3000,7 @@ mhitm_ad_curs(
                 if (gv.vis && canseemon(mdef)) {
                     pline("Some writing vanishes from %s head!",
                           s_suffix(mon_nam(mdef)));
-                    pline("%s is destroyed!", Monnam(mdef));
+                    pline_mon(mdef, "%s is destroyed!", Monnam(mdef));
                 }
                 mondied(mdef);
                 if (!DEADMONSTER(mdef)) {
@@ -3010,7 +3020,7 @@ mhitm_ad_curs(
                 if (!gv.vis)
                     You_hear("laughter.");
                 else if (canseemon(magr))
-                    pline("%s chuckles.", Monnam(magr));
+                    pline_mon(magr, "%s chuckles.", Monnam(magr));
             }
         }
     }
@@ -3181,7 +3191,7 @@ mhitm_ad_drin(
 
         if (gn.notonhead || !has_head(pd)) {
             if (gv.vis && canspotmon(mdef))
-                pline("%s doesn't seem harmed.", Monnam(mdef));
+                pline_mon(mdef, "%s doesn't seem harmed.", Monnam(mdef));
             /* Not clear what to do for green slimes */
             mhm->damage = 0;
             /* don't bother with additional DRIN attacks since they wouldn't
@@ -3300,8 +3310,8 @@ mhitm_ad_wrap(
                                    && !Is_waterlevel(&u.uz);
 
                     urgent_pline("%s drowns you...", Monnam(magr));
-                    gk.killer.format = KILLED_BY_AN;
-                    Sprintf(gk.killer.name, "%s by %s",
+                    svk.killer.format = KILLED_BY_AN;
+                    Sprintf(svk.killer.name, "%s by %s",
                             moat ? "moat" : "pool of water",
                             an(pmname(magr->data, Mgender(magr))));
                     done(DROWNING);
@@ -3312,10 +3322,11 @@ mhitm_ad_wrap(
                 mhm->damage = 0;
                 if (flags.verbose) {
                     if (coil)
-                        pline("%s brushes against you.", Monnam(magr));
+                        pline_mon(magr, "%s brushes against you.",
+                                  Monnam(magr));
                     else
-                        pline("%s brushes against your %s.", Monnam(magr),
-                              body_part(LEG));
+                        pline_mon(magr, "%s brushes against your %s.",
+                                  Monnam(magr), body_part(LEG));
                 }
             }
         } else
@@ -3501,6 +3512,7 @@ mhitm_ad_slim(
             mhm->damage = 0;
         }
     }
+    nhUse(pd);
 }
 
 void
@@ -3542,7 +3554,7 @@ mhitm_ad_ench(
                     break;
                 }
             }
-            if (drain_item(obj, FALSE)) {
+            if (obj && drain_item(obj, FALSE)) {
                 pline("%s less effective.", Yobjnam2(obj, "seem"));
             }
         }
@@ -3585,7 +3597,7 @@ mhitm_ad_slow(
             mon_adjust_speed(mdef, -1, (struct obj *) 0);
             mdef->mstrategy &= ~STRAT_WAITFORU;
             if (mdef->mspeed != oldspeed && gv.vis && canspotmon(mdef))
-                pline("%s slows down.", Monnam(mdef));
+                pline_mon(mdef, "%s slows down.", Monnam(mdef));
         }
     }
 }
@@ -3622,7 +3634,7 @@ mhitm_ad_conf(
          */
         if (!magr->mcan && !mdef->mconf && !magr->mspec_used) {
             if (gv.vis && canseemon(mdef))
-                pline("%s looks confused.", Monnam(mdef));
+                pline_mon(mdef, "%s looks confused.", Monnam(mdef));
             mdef->mconf = 1;
             mdef->mstrategy &= ~STRAT_WAITFORU;
         }
@@ -3692,7 +3704,8 @@ mhitm_ad_famn(
         goto mhitm_famn;
     } else if (mdef == &gy.youmonst) {
         /* mhitu */
-        pline("%s reaches out, and your body shrivels.", Monnam(magr));
+        pline_mon(magr, "%s reaches out, and your body shrivels.",
+                  Monnam(magr));
         exercise(A_CON, FALSE);
         if (!is_fainted())
             morehungry(rn1(40, 40));
@@ -3722,7 +3735,8 @@ mhitm_ad_pest(
         goto mhitm_pest;
     } else if (mdef == &gy.youmonst) {
         /* mhitu */
-        pline("%s reaches out, and you feel fever and chills.", Monnam(magr));
+        pline_mon(magr, "%s reaches out, and you feel fever and chills.",
+                  Monnam(magr));
         (void) diseasemu(pa);
         /* plus the normal damage */
     } else {
@@ -3750,7 +3764,7 @@ mhitm_ad_deth(
         goto mhitm_deth;
     } else if (mdef == &gy.youmonst) {
         /* mhitu */
-        pline("%s reaches out with its deadly touch.", Monnam(magr));
+        pline_mon(magr, "%s reaches out with its deadly touch.", Monnam(magr));
         if (is_undead(pd)) {
             /* still does some damage */
             mhm->damage = (mhm->damage + 1) / 2;
@@ -3766,6 +3780,7 @@ mhitm_ad_deth(
                 mhm->damage = 0;
                 return;
             }
+            FALLTHROUGH;
             /*FALLTHRU*/
         default: /* case 16: ... case 5: */
             You_feel("your life force draining away...");
@@ -3812,7 +3827,7 @@ mhitm_ad_halu(
         /* mhitm */
         if (!magr->mcan && haseyes(pd) && mdef->mcansee) {
             if (gv.vis && canseemon(mdef))
-                pline("%s looks %sconfused.", Monnam(mdef),
+                pline_mon(mdef, "%s looks %sconfused.", Monnam(mdef),
                       mdef->mconf ? "more " : "");
             mdef->mconf = 1;
             mdef->mstrategy &= ~STRAT_WAITFORU;
@@ -3860,7 +3875,7 @@ do_stone_mon(
     }
     if (!resists_ston(mdef)) {
         if (gv.vis && canseemon(mdef))
-            pline("%s turns to stone!", Monnam(mdef));
+            pline_mon(mdef, "%s turns to stone!", Monnam(mdef));
         monstone(mdef);
  post_stone:
         if (!DEADMONSTER(mdef)) {
@@ -3928,7 +3943,7 @@ mhitm_ad_phys(
                     mhm->hitflags |= M_ATTK_MISS;
                 } else {
                     set_ustuck(magr);
-                    pline("%s grabs you!", Monnam(magr));
+                    pline_mon(magr, "%s grabs you!", Monnam(magr));
                     mhm->hitflags |= M_ATTK_HIT;
                 }
             } else if (u.ustuck == magr) {
@@ -3946,8 +3961,9 @@ mhitm_ad_phys(
                 if (otmp->otyp == CORPSE
                     && touch_petrifies(&mons[otmp->corpsenm])) {
                     mhm->damage = 1;
-                    pline("%s hits you with the %s corpse.", Monnam(magr),
-                          mons[otmp->corpsenm].pmnames[NEUTRAL]);
+                    pline_mon(magr, "%s hits you with the %s corpse.",
+                              Monnam(magr),
+                              mons[otmp->corpsenm].pmnames[NEUTRAL]);
                     if (!Stoned) {
                         if (do_stone_u(magr)) {
                             mhm->hitflags = M_ATTK_HIT;
@@ -4044,7 +4060,7 @@ mhitm_ad_phys(
                 if (!artifact_hit(magr, mdef, mwep, &mhm->damage,
                                   mhm->dieroll)) {
                     if (gv.vis)
-                        pline("%s hits %s.", Monnam(magr),
+                        pline_mon(magr, "%s hits %s.", Monnam(magr),
                               mon_nam_too(mdef, magr));
                     mhm->hitflags |= M_ATTK_HIT;
                 }
@@ -4191,7 +4207,8 @@ mhitm_ad_heal(
             && !uarms && !uarmg && !uarmf && !uarmh) {
             boolean goaway = FALSE;
 
-            pline("%s hits!  (I hope you don't mind.)", Monnam(magr));
+            pline_mon(magr, "%s hits!  (I hope you don't mind.)",
+                      Monnam(magr));
             if (Upolyd) {
                 u.mh += rnd(7);
                 if (!rn2(7)) {
@@ -4240,7 +4257,7 @@ mhitm_ad_heal(
             mhm->damage = 0;
         } else {
             if (Role_if(PM_HEALER)) {
-                if (!Deaf && !(gm.moves % 5)) {
+                if (!Deaf && !(svm.moves % 5)) {
                     SetVoice(magr, 0, 80, 0);
                     verbalize("Doc, I can't help you unless you cooperate.");
                 }
@@ -4284,7 +4301,7 @@ mhitm_ad_stun(
         if (magr->mcan)
             return;
         if (canseemon(mdef))
-            pline("%s %s for a moment.", Monnam(mdef),
+            pline_mon(mdef, "%s %s for a moment.", Monnam(mdef),
                   makeplural(stagger(pd, "stagger")));
         mdef->mstun = 1;
         mhitm_ad_phys(magr, mattk, mdef, mhm);
@@ -4323,7 +4340,7 @@ mhitm_ad_legs(
             pline("%s tries to reach your %s %s!", Monst_name, sidestr, leg);
             mhm->damage = 0;
         } else if (magr->mcan) {
-            pline("%s nuzzles against your %s %s!", Monnam(magr),
+            pline_mon(magr, "%s nuzzles against your %s %s!", Monnam(magr),
                   sidestr, leg);
             mhm->damage = 0;
         } else {
@@ -4382,7 +4399,7 @@ mhitm_ad_dgst(
         /* eating a Rider or its corpse is fatal */
         if (is_rider(pd)) {
             if (gv.vis && canseemon(magr))
-                pline("%s %s!", Monnam(magr),
+                pline_mon(magr, "%s %s!", Monnam(magr),
                       (pd == &mons[PM_FAMINE])
                           ? "belches feebly, shrivels up and dies"
                           : (pd == &mons[PM_PESTILENCE])
@@ -4420,7 +4437,7 @@ mhitm_ad_dgst(
          */
         num = monsndx(pd);
         if (magr->mtame && !magr->isminion
-            && !(gm.mvitals[num].mvflags & G_NOCORPSE)) {
+            && !(svm.mvitals[num].mvflags & G_NOCORPSE)) {
             struct obj *virtualcorpse = mksobj(CORPSE, FALSE, FALSE);
             int nutrit;
 
@@ -4516,7 +4533,7 @@ mhitm_ad_sedu(
                       is disabled, it would be changed to another damage
                       type, but when defending, it remains as-is */
                    || dmgtype(gy.youmonst.data, AD_SSEX)) {
-            pline("%s %s.", Monnam(magr),
+            pline_mon(magr, "%s %s.", Monnam(magr),
                   Deaf ? "says something but you can't hear it"
                   : magr->minvent
                     ? "brags about the goods some dungeon explorer provided"
@@ -4554,8 +4571,9 @@ mhitm_ad_sedu(
                 (void) rloc(magr, RLOC_MSG);
             if (is_animal(magr->data) && *buf) {
                 if (canseemon(magr))
-                    pline("%s tries to %s away with %s.", Monnam(magr),
-                          locomotion(magr->data, "run"), buf);
+                    pline_mon(magr, "%s tries to %s away with %s.",
+                              Monnam(magr),
+                              locomotion(magr->data, "run"), buf);
             }
             monflee(magr, 0, FALSE, FALSE);
             mhm->hitflags = M_ATTK_AGR_DONE; /* return 3??? */
@@ -4908,9 +4926,9 @@ gulpum(struct monst *mdef, struct attack *mattk)
                 if (is_rider(pd)) {
                     pline("Unfortunately, digesting any of it is fatal.");
                     end_engulf();
-                    Sprintf(gk.killer.name, "unwisely tried to eat %s",
+                    Sprintf(svk.killer.name, "unwisely tried to eat %s",
                             pmname(pd, Mgender(mdef)));
-                    gk.killer.format = NO_KILLER_PREFIX;
+                    svk.killer.format = NO_KILLER_PREFIX;
                     done(DIED);
                     return M_ATTK_MISS; /* lifesaved */
                 }
@@ -4938,7 +4956,7 @@ gulpum(struct monst *mdef, struct attack *mattk)
                 } else {
                     tmp = 1 + (pd->cwt >> 8);
                     if (corpse_chance(mdef, &gy.youmonst, TRUE)
-                        && !(gm.mvitals[monsndx(pd)].mvflags & G_NOCORPSE)) {
+                        && !(svm.mvitals[monsndx(pd)].mvflags & G_NOCORPSE)) {
                         /* nutrition only if there can be a corpse */
                         u.uhunger += (pd->cnutrit + 1) / 2;
                     } else {
@@ -5133,6 +5151,28 @@ mhitm_knockback(
     if (rn2(6))
         return FALSE;
 
+    /* decide where the first step will place the target; not accurate
+       for being knocked out of saddle but doesn't need to be; used for
+       test_move() and for message before actual hurtle */
+    defx = u_def ? u.ux : mdef->mx;
+    defy = u_def ? u.uy : mdef->my;
+    dx = sgn(defx - (u_agr ? u.ux : magr->mx));
+    dy = sgn(defy - (u_agr ? u.uy : magr->my));
+
+    /* can't move most targets into or out of a doorway diagonally */
+    if (u_def) {
+        if (!test_move(defx, defy, dx, dy, TEST_MOVE))
+            return FALSE;
+    } else {
+        /* subset of test_move() */
+        if (!isok(defx + dx, defy + dy))
+            return FALSE;
+        if (IS_DOOR(levl[defx][defy].typ)
+            && (defx - magr->mx && defy - magr->my)
+            && !doorless_door(defx, defy))
+            return FALSE;
+    }
+
     /* if hero is stuck to a cursed saddle, knock the steed back */
     if (u_def && u.usteed) {
         if ((otmp = which_armor(u.usteed, W_SADDLE)) != 0 && otmp->cursed) {
@@ -5184,13 +5224,6 @@ mhitm_knockback(
         return FALSE;
     }
 
-    /* decide where the first step will place the target; not accurate
-       for being knocked out of saddle but doesn't need to be; used for
-       message before actual hurtle */
-    defx = u_def ? u.ux : mdef->mx;
-    defy = u_def ? u.uy : mdef->my;
-    dx = sgn(defx - (u_agr ? u.ux : magr->mx));
-    dy = sgn(defy - (u_agr ? u.uy : magr->my));
     /* subtly vary the message text if monster won't actually move */
     knockedhow = dismount ? "out of your saddle"
                  : will_hurtle(mdef, defx + dx, defy + dy) ? "backward"
@@ -5379,10 +5412,12 @@ hmonas(struct monst *mon)
         case AT_CLAW:
             if (uwep && !cantwield(gy.youmonst.data) && !weapon_used)
                 goto use_weapon;
+            FALLTHROUGH;
             /*FALLTHRU*/
         case AT_TUCH:
             if (uwep && gy.youmonst.data->mlet == S_LICH && !weapon_used)
                 goto use_weapon;
+            FALLTHROUGH;
             /*FALLTHRU*/
         case AT_KICK:
         case AT_BITE:
@@ -5626,6 +5661,7 @@ hmonas(struct monst *mon)
                  || gy.youmonst.data->mlet == S_ORC
                  || gy.youmonst.data->mlet == S_GNOME) && !weapon_used)
                 goto use_weapon;
+            FALLTHROUGH;
             /*FALLTHRU*/
 
         case AT_NONE:
@@ -5900,11 +5936,9 @@ passive(
                 You("are suddenly very cold!");
                 mdamageu(mon, tmp);
                 /* monster gets stronger with your heat! */
-                mon->mhp += tmp / 2;
-                if (mon->mhpmax < mon->mhp)
-                    mon->mhpmax = mon->mhp;
+                healmon(mon, (tmp + rn2(2)) / 2, (tmp + 1) / 2);
                 /* at a certain point, the monster will reproduce! */
-                if (mon->mhpmax > ((int) (mon->m_lev + 1) * 8))
+                if (mon->mhpmax > (((int) mon->m_lev) + 1) * 8)
                     (void) split_mon(mon, &gy.youmonst);
             }
             break;
@@ -6010,6 +6044,8 @@ passive_obj(
             }
             break;
         }
+        FALLTHROUGH;
+        /* FALLTHRU */
     default:
         break;
     }
@@ -6020,40 +6056,92 @@ passive_obj(
 
 DISABLE_WARNING_FORMAT_NONLITERAL
 
-/* Note: caller must ascertain mtmp is mimicking... */
+/* used by stumble_onto_mimic() and bhitm() cases WAN_LOCKING, WAN_OPENING */
 void
-stumble_onto_mimic(struct monst *mtmp)
+that_is_a_mimic(
+    struct monst *mtmp, /* a hidden mimic (nonnull) */
+    boolean reveal_it) /* True: remove its disguise */
 {
-    const char *fmt = "Wait!  That's %s!", *generic = "a monster", *what = 0;
+    static char generic[] = "a monster";
+    char fmtbuf[BUFSZ];
+    const char *what = NULL;
 
-    if (!u.ustuck && !mtmp->mflee && dmgtype(mtmp->data, AD_STCK)
-        /* must be adjacent; attack via polearm could be from farther away */
-        && m_next2u(mtmp))
-        set_ustuck(mtmp);
-
+    Strcpy(fmtbuf, "Wait!  That's %s!");
     if (Blind) {
         if (!Blind_telepat)
             what = generic; /* with default fmt */
         else if (M_AP_TYPE(mtmp) == M_AP_MONSTER)
             what = a_monnam(mtmp); /* differs from what was sensed */
     } else {
-        int glyph = levl[u.ux + u.dx][u.uy + u.dy].glyph;
+        coordxy x = u.ux + u.dx, y = u.uy + u.dy;
+        int glyph = glyph_at(x, y);
 
-        if (glyph_is_cmap(glyph) && (glyph_to_cmap(glyph) == S_hcdoor
-                                     || glyph_to_cmap(glyph) == S_vcdoor))
-            fmt = "The door actually was %s!";
-        else if (glyph_is_object(glyph) && glyph_to_obj(glyph) == GOLD_PIECE)
-            fmt = "That gold was %s!";
+        if (glyph_is_cmap(glyph)) {
+            int sym = glyph_to_cmap(glyph);
+
+            if (M_AP_TYPE(mtmp) == M_AP_FURNITURE
+                || (M_AP_TYPE(mtmp) == M_AP_OBJECT && sym == S_trapped_chest))
+                Snprintf(fmtbuf, sizeof fmtbuf, "That %s actually is %%s!",
+                         defsyms[sym].explanation);
+        } else if (glyph_is_object(glyph)) {
+            boolean fakeobj;
+            const char *otmp_name;
+            struct obj *otmp = NULL;
+
+            fakeobj = object_from_map(glyph, x, y, &otmp);
+            otmp_name = (otmp && otmp->otyp != STRANGE_OBJECT)
+                        ? simpleonames(otmp) : "strange object";
+            Snprintf(fmtbuf, sizeof fmtbuf, "%s %s %s %%s!",
+                     (otmp && is_plural(otmp)) ? "Those" : "That",
+                     otmp_name, otmp ? otense(otmp, "are") : "is");
+            if (fakeobj && otmp) {
+                otmp->where = OBJ_FREE; /* object_from_map set to OBJ_FLOOR */
+                dealloc_obj(otmp);
+            }
+        } else if (glyph_is_monster(glyph)) {
+            const char *mtmp_name;
+            int mndx = glyph_to_mon(glyph);
+
+            assert(mndx >= LOW_PM && mndx <= HIGH_PM);
+            mtmp_name = pmname(&mons[mndx], Mgender(mtmp));
+            Snprintf(fmtbuf, sizeof fmtbuf,
+                     "Wait!  That %s is really %%s!", mtmp_name);
+        }
 
         /* cloned Wiz starts out mimicking some other monster and
            might make himself invisible before being revealed */
         if (mtmp->minvis && !See_invisible)
             what = generic;
+        else if (M_AP_TYPE(mtmp) == M_AP_MONSTER)
+            what = x_monnam(mtmp, ARTICLE_A, (char *) NULL, EXACT_NAME, TRUE);
+        else if (mtmp->data->mlet == S_MIMIC
+                 && (M_AP_TYPE(mtmp) == M_AP_OBJECT
+                     || M_AP_TYPE(mtmp) == M_AP_FURNITURE)
+                 && (mtmp->msleeping || mtmp->mfrozen))
+            /* BUG: this will misclassify a paralyzed mimic as sleeping */
+            what = x_monnam(mtmp, ARTICLE_A, "sleeping", 0, FALSE);
         else
             what = a_monnam(mtmp);
     }
+
     if (what)
-        pline(fmt, what);
+        pline(fmtbuf, what);
+    if (reveal_it)
+        seemimic(mtmp);
+}
+
+RESTORE_WARNING_FORMAT_NONLITERAL
+
+/* Note: caller must ascertain mtmp is mimicking... */
+void
+stumble_onto_mimic(struct monst *mtmp)
+{
+    that_is_a_mimic(mtmp, TRUE);
+
+    if (!u.ustuck && !mtmp->mflee && dmgtype(mtmp->data, AD_STCK)
+        /* must be adjacent; attack via polearm could be from farther away */
+        && m_next2u(mtmp))
+        set_ustuck(mtmp);
 
     wakeup(mtmp, FALSE); /* clears mimicking */
     /* if hero is blind, wakeup() won't display the monster even though
@@ -6062,8 +6150,6 @@ stumble_onto_mimic(struct monst *mtmp)
         && !glyph_is_invisible(levl[mtmp->mx][mtmp->my].glyph))
         map_invisible(mtmp->mx, mtmp->my);
 }
-
-RESTORE_WARNING_FORMAT_NONLITERAL
 
 staticfn void
 nohandglow(struct monst *mon)
@@ -6148,7 +6234,7 @@ flash_hits_mon(
                 light_hits_gremlin(mtmp, amt);
             }
             if (!DEADMONSTER(mtmp)) {
-                if (!gc.context.mon_moving)
+                if (!svc.context.mon_moving)
                     setmangry(mtmp, TRUE);
                 if (tmp < 9 && !mtmp->isshk && rn2(4))
                     monflee(mtmp, rn2(4) ? rnd(100) : 0, FALSE, TRUE);
@@ -6178,12 +6264,18 @@ flash_hits_mon(
 void
 light_hits_gremlin(struct monst *mon, int dmg)
 {
-    pline("%s %s!", Monnam(mon),
-          (dmg > mon->mhp / 2) ? "wails in agony" : "cries out in pain");
+    if (!Deaf && mdistu(mon) <= 90) {
+        /* cry of pain can be heard somewhat farther than the waking radius */
+        pline_mon(mon, "%s %s!", Monnam(mon),
+                  (dmg > mon->mhp / 2) ? "wails in agony"
+                                       : "cries out in pain");
+    } else if (canseemon(mon)) {
+        pline_mon(mon, "%s recoils from the light!", Monnam(mon));
+    }
     mon->mhp -= dmg;
     wake_nearto(mon->mx, mon->my, 30);
     if (DEADMONSTER(mon)) {
-        if (gc.context.mon_moving)
+        if (svc.context.mon_moving)
             monkilled(mon, (char *) 0, AD_BLND);
         else
             killed(mon);

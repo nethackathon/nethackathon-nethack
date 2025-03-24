@@ -4,30 +4,18 @@ Prerequisite Requirements:
 
   o  MSYS2
         - https://www.msys2.org/
-        - Download the installer, and start the UCRT64 shell.
+        - Download and run the installer, and start the UCRT64 shell.
      then
           pacman -S mingw-w64-ucrt-x86_64-gcc
           pacman -S git
+          pacman -S make
           pacman -S vim (or your editor of choice)
           pacman -S man (otherwise "git help foo" will not work)
+          pacman -S perl-doc (otherwise "git nhhelp foo" will not work,
+                              so only needed if you use nhgitset.pl)
   o Lua
-        NetHack 3.7 for Windows requires 3rd party Lua source that is not part
-        of the NetHack distribution or repository.
-
-        A windows cmd command procedure for fetching prerequisite sources
-        is available, and can be run as follows from the top of the
-        NetHack source tree to obtain lua:
-            sys\windows\fetch.cmd lua
   o pdcursesmod (Only required if curses interface support is desired)
-        If you want to include curses interface support in NetHack 3.7 for
-        3rd part pdcursesmod source code is required and is not part of the
-        NetHack distribution or repository.
-
-        A windows cmd command procedure for fetching prerequisite
-        sources is available, and can be run as follows from the top of
-        the NetHack source tree to obtain pdcursesmod:
-            sys\windows\fetch.cmd pdcursesmod
-
+     Instructions for obtaining these are later in this file.
 
 /---------------------------------------------\
 |    Directories for a Windows NetHack build  |
@@ -81,23 +69,22 @@ Building
 Two different versions of NetHack will be built for Windows from the
 command line using the Makefile approach:
     A tty port utilizing the Win32 Console I/O subsystem Console,
-    and a curses interface in an executabled called NetHack.exe.
-        NetHack
+    and a curses interface in an executable called NetHack.exe.
+
     A Win32 native port built on the Windows API Graphical NetHack,
     and graphical curses in an executable called NetHackW.exe.
 
-The Makefile configurations will build both; NetHack.exe and NetHackW.exe
+The Makefile configurations will build both NetHack.exe and NetHackW.exe
 and will be able to use the same datafiles, save files and bones files.
 
 Since the last official release of NetHack, compilers and computer
 architectures have evolved and you can now choose whether to build
 a 32-bit x86 version, or a 64-bit x64 version.  The default Makefile
 is set up for a 32-bit x86 version, but that's only because it will
-run on the most number of existing Windows environments. Change it if you
+run on the largest number of existing Windows environments. Change it if you
 want. Be aware that NetHack's save files and bones files in the 3.7.0
-release have not yet evolved enough to allow them to interchange between
-the 32-bit version and the 64-bit version (or between different platforms).
-That may change in future.
+release are not interchangeable between the 32-bit version and the
+64-bit version (or between different platforms).
 
 I. Dispelling the Myths:
 
@@ -105,9 +92,11 @@ I. Dispelling the Myths:
     as it looks, however it will behoove you to read this entire section
     through before beginning the task.
 
-    We have provided Makefile.mingw32 in
-    sys/windows/Makefile.mingw32, which you use from the bash Windows command
-    shell included with MSYS2.
+    We have provided GNUmakefile in sys/windows/GNUmakefile, which you use
+    from the bash Windows command shell included with MSYS2. It is called
+    GNUmakefile because that is the first name searched for by the GNU
+    make utility thus preventing conflict with the Makefile used by the
+    Microsoft nmake utility.
 
 
 II. To compile your copy of NetHack on a Windows machine using MSYS2:
@@ -119,7 +108,7 @@ Setting Up
 
 2.  Execute the following command to place copies of the Makefiles in
     the src subfolder.
-        cp sys/windows/Makefile.mingw32* src
+        cp sys/windows/GNUmakefile* src
 
 3.  Change your current directory to the src subfolder of the nethack
     source tree. The following command assumes you are still in the
@@ -133,10 +122,12 @@ Compiling
 
     Your current directory should be the NetHack src directory.
 
-    Issue these following commands:
-        make -f Makefile.mingw32 clean
-        make -f Makefile.mingw32 depend
-        make -f Makefile.mingw32
+    Issue these following commands, which will find and use GNUmakefile
+    by default:
+
+        make clean
+        make depend
+        make
 
     If all goes well, intermediate NetHack files will be placed in the
     binary subfolder of the NetHack tree, and the final NetHack package
@@ -145,10 +136,8 @@ Compiling
 Notes:
 
 1.  To rebuild NetHack after changing something, change your current directory
-    to src and issue the appropriate command for your compiler:
-
-    For Microsoft compiler:
-        make -f Makefile.mingw32
+    to src and issue the following command:
+        make
 
 2.  An alternative to MSYS2 may be MinGW-w64 - winlibs standalone build.
     That has not been tested by us at time of writing.

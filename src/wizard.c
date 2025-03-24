@@ -1,4 +1,4 @@
-/* NetHack 3.7	wizard.c	$NHDT-Date: 1705357487 2024/01/15 22:24:47 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.105 $ */
+/* NetHack 3.7	wizard.c	$NHDT-Date: 1741407262 2025/03/07 20:14:22 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.116 $ */
 /* Copyright (c) Stichting Mathematisch Centrum, Amsterdam, 1985. */
 /*-Copyright (c) Robert Patrick Rankin, 2016. */
 /* NetHack may be freely redistributed.  See license for details. */
@@ -86,7 +86,7 @@ amulet(void)
         }
     }
 
-    if (!gc.context.no_of_wizards)
+    if (!svc.context.no_of_wizards)
         return;
     /* find Wizard, and wake him if necessary */
     for (mtmp = fmon; mtmp; mtmp = mtmp->nmon) {
@@ -135,9 +135,6 @@ mon_has_special(struct monst *mtmp)
  *      The strategy section decides *what* the monster is going
  *      to attempt, the tactics section implements the decision.
  */
-#define STRAT(w, x, y, typ)                            \
-    ((unsigned long) (w) | ((unsigned long) (x) << 16) \
-     | ((unsigned long) (y) << 8) | (unsigned long) (typ))
 
 #define M_Wants(mask) (mtmp->data->mflags3 & (mask))
 
@@ -247,17 +244,25 @@ target_on(int mask, struct monst *mtmp)
 
     otyp = which_arti(mask);
     if (!mon_has_arti(mtmp, otyp)) {
-        if (you_have(mask))
-            return STRAT(STRAT_PLAYER, u.ux, u.uy, mask);
-        else if ((otmp = on_ground(otyp)))
-            return STRAT(STRAT_GROUND, otmp->ox, otmp->oy, mask);
-        else if ((mtmp2 = other_mon_has_arti(mtmp, otyp)) != 0
+        if (you_have(mask)) {
+            mtmp->mgoal.x = u.ux;
+            mtmp->mgoal.y = u.uy;
+            return (STRAT_PLAYER | mask);
+        } else if ((otmp = on_ground(otyp))) {
+            mtmp->mgoal.x = otmp->ox;
+            mtmp->mgoal.y = otmp->oy;
+            return (STRAT_GROUND | mask);
+        } else if ((mtmp2 = other_mon_has_arti(mtmp, otyp)) != 0
                  /* when seeking the Amulet, avoid targeting the Wizard
                     or temple priests (to protect Moloch's high priest) */
                  && (otyp != AMULET_OF_YENDOR
-                     || (!mtmp2->iswiz && !inhistemple(mtmp2))))
-            return STRAT(STRAT_MONSTR, mtmp2->mx, mtmp2->my, mask);
+                     || (!mtmp2->iswiz && !inhistemple(mtmp2)))) {
+            mtmp->mgoal.x = mtmp2->mx;
+            mtmp->mgoal.y = mtmp2->my;
+            return (STRAT_MONSTR | mask);
+        }
     }
+    mtmp->mgoal.x = mtmp->mgoal.y = 0;
     return (unsigned long) STRAT_NONE;
 }
 
@@ -284,8 +289,8 @@ strategy(struct monst *mtmp)
     case 1: /* the wiz is less cautious */
         if (mtmp->data != &mons[PM_WIZARD_OF_YENDOR])
             return (unsigned long) STRAT_HEAL;
-    /* else fall through */
-
+        FALLTHROUGH;
+        /* FALLTHRU */
     case 2:
         dstrat = STRAT_HEAL;
         break;
@@ -295,7 +300,7 @@ strategy(struct monst *mtmp)
         break;
     }
 
-    if (gc.context.made_amulet)
+    if (svc.context.made_amulet)
         if ((strat = target_on(M3_WANTSAMUL, mtmp)) != STRAT_NONE)
             return strat;
 
@@ -396,9 +401,10 @@ tactics(struct monst *mtmp)
         /* if you're not around, cast healing spells */
         if (distu(mx, my) > (BOLT_LIM * BOLT_LIM))
             if (mtmp->mhp <= mtmp->mhpmax - 8) {
-                mtmp->mhp += rnd(8);
+                healmon(mtmp, rnd(8), 0);
                 return 1;
             }
+        FALLTHROUGH;
         /*FALLTHRU*/
 
     case STRAT_NONE: /* harass */
@@ -409,7 +415,7 @@ tactics(struct monst *mtmp)
     default: /* kill, maim, pillage! */
     {
         long where = (strat & STRAT_STRATMASK);
-        coordxy tx = STRAT_GOALX(strat), ty = STRAT_GOALY(strat);
+        coordxy tx = mtmp->mgoal.x, ty = mtmp->mgoal.y;
         int targ = (int) (strat & STRAT_GOAL);
         struct obj *otmp;
 
@@ -544,7 +550,7 @@ pick_nasty(
            master mind flayer -> mind flayer,
        but the substitutes are likely to be genocided too */
     alt = res;
-    if ((gm.mvitals[res].mvflags & G_GENOD) != 0
+    if ((svm.mvitals[res].mvflags & G_GENOD) != 0
         || (difcap > 0 && mons[res].difficulty >= difcap)
          /* note: nasty() -> makemon() ignores G_HELL|G_NOHELL;
             arch-lich and master lich are both flagged as hell-only;
@@ -552,7 +558,7 @@ pick_nasty(
             outside of Gehennom (unless the latter has been genocided) */
         || (mons[res].geno & (Inhell ? G_NOHELL : G_HELL)) != 0)
         alt = big_to_little(res);
-    if (alt != res && (gm.mvitals[alt].mvflags & G_GENOD) == 0) {
+    if (alt != res && (svm.mvitals[alt].mvflags & G_GENOD) == 0) {
         const char *mnam = mons[alt].pmnames[NEUTRAL],
                    *lastspace = strrchr(mnam, ' ');
 
@@ -656,6 +662,9 @@ nasty(struct monst *summoner)
                                         bypos.x, bypos.y, mmflags)) != 0) {
                         m_cls = mtmp->data->mlet;
                         if ((difcap > 0 && mtmp->data->difficulty >= difcap
+                             /* always capping for substitutes made wanton
+                                genocide become too strong in the endgame */
+                             && rn2(In_endgame(&u.uz) ? 3 : 7) /* usually */
                              && attacktype(mtmp->data, AT_MAGC))
                             || (s_cls == S_DEMON && m_cls == S_ANGEL)
                             || (s_cls == S_ANGEL && m_cls == S_DEMON))
@@ -664,10 +673,11 @@ nasty(struct monst *summoner)
                 }
 
                 if (mtmp) {
-                    /* create at most one arch-lich or Archon regardless
-                       of who is doing the summoning (note: Archon is
-                       not in nasties[] but could be chosen as random
-                       replacement for a genocided selection) */
+                    /* if creating an arch-lich or Archon, further directly
+                       selected nasties will have to be less difficult, and
+                       substitues for geno victims will usually be less
+                       (note: Archon is not in nasties[] but could be chosen
+                       as random replacement for a genocided selection) */
                     if (mtmp->data == &mons[PM_ARCH_LICH]
                         || mtmp->data == &mons[PM_ARCHON]) {
                         tmp = min(mons[PM_ARCHON].difficulty, /* A:26 */
@@ -702,7 +712,7 @@ resurrect(void)
     long elapsed;
     const char *verb;
 
-    if (!gc.context.no_of_wizards) {
+    if (!svc.context.no_of_wizards) {
         /* make a new Wizard */
         verb = "kill";
         mtmp = makemon(&mons[PM_WIZARD_OF_YENDOR], u.ux, u.uy, MM_NOWAIT);
@@ -718,7 +728,7 @@ resurrect(void)
             if (mtmp->iswiz
                 /* if he has the Amulet, he won't bring it to you */
                 && !mon_has_amulet(mtmp)
-                && (elapsed = gm.moves - mtmp->mlstmv) > 0L) {
+                && (elapsed = svm.moves - mtmp->mlstmv) > 0L) {
                 mon_catchup_elapsed_time(mtmp, elapsed);
                 if (elapsed >= LARGEST_INT)
                     elapsed = LARGEST_INT - 1;
@@ -793,10 +803,12 @@ intervene(void)
     }
 }
 
+/* Wizard of Yendor is being removed from play (dead or escaped the dungeon);
+   keep the bookkeeping for him up to date */
 void
-wizdead(void)
+wizdeadorgone(void)
 {
-    gc.context.no_of_wizards--;
+    svc.context.no_of_wizards--;
     if (!u.uevent.udemigod) {
         u.uevent.udemigod = TRUE;
         u.udg_cnt = rn1(250, 50);

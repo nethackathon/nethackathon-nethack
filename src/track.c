@@ -52,6 +52,19 @@ gettrack(coordxy x, coordxy y)
     return (coord *) 0;
 }
 
+/* return TRUE if x,y has hero tracks on it */
+boolean
+hastrack(coordxy x, coordxy y)
+{
+    int i;
+
+    for (i = 0; i < utcnt; i++)
+        if (utrack[i].x == x && utrack[i].y == y)
+            return TRUE;
+
+    return FALSE;
+}
+
 /* save the hero tracking info */
 void
 save_track(NHFILE *nhfp)
@@ -63,8 +76,10 @@ save_track(NHFILE *nhfp)
             bwrite(nhfp->fd, (genericptr_t) &utcnt, sizeof utcnt);
             bwrite(nhfp->fd, (genericptr_t) &utpnt, sizeof utpnt);
             for (i = 0; i < utcnt; i++) {
-                bwrite(nhfp->fd, (genericptr_t) &utrack[i].x, sizeof utrack[i].x);
-                bwrite(nhfp->fd, (genericptr_t) &utrack[i].y, sizeof utrack[i].y);
+                bwrite(nhfp->fd, (genericptr_t) &utrack[i].x,
+                       sizeof utrack[i].x);
+                bwrite(nhfp->fd, (genericptr_t) &utrack[i].y,
+                       sizeof utrack[i].y);
             }
         }
     }

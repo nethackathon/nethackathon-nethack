@@ -1,4 +1,4 @@
-/* NetHack 3.7	windows.c	$NHDT-Date: 1700012891 2023/11/15 01:48:11 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.109 $ */
+/* NetHack 3.7	windows.c	$NHDT-Date: 1737345149 2025/01/19 19:52:29 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.138 $ */
 /* Copyright (c) D. Cohrs, 1993. */
 /* NetHack may be freely redistributed.  See license for details. */
 
@@ -229,6 +229,8 @@ void
 def_raw_print(const char *s)
 {
     puts(s);
+    if (*s)
+        iflags.raw_printed++;
 }
 
 staticfn
@@ -619,8 +621,6 @@ static struct window_procs hup_procs = {
 #endif
     hup_get_color_string,
 #endif /* CHANGE_COLOR */
-    hup_void_ndecl,                                   /* start_screen */
-    hup_void_ndecl,                                   /* end_screen */
     hup_outrip, genl_preference_update, genl_getmsghistory,
     genl_putmsghistory,
     hup_void_ndecl,                                   /* status_init */
@@ -1220,13 +1220,14 @@ dump_fmtstr(
                 break;
             case 'n': /* player name */
                 if (fullsubs)
-                    Sprintf(tmpbuf, "%s", *gp.plname ? gp.plname : "unknown");
+                    Sprintf(tmpbuf, "%s",
+                            *svp.plname ? svp.plname : "unknown");
                 else
                     Strcpy(tmpbuf, "{hero name}");
                 break;
             case 'N': /* first character of player name */
                 if (fullsubs)
-                    Sprintf(tmpbuf, "%c", *gp.plname ? *gp.plname : 'u');
+                    Sprintf(tmpbuf, "%c", *svp.plname ? *svp.plname : 'u');
                 else
                     Strcpy(tmpbuf, "{hero initial}");
                 break;
@@ -1871,6 +1872,7 @@ dump_status_update(
         break;
     case BL_GOLD:
         text = decode_mixed(goldbuf, text);
+        FALLTHROUGH;
         /*FALLTHRU*/
     default:
         attrmask = (color >> 8) & 0x00FF;
@@ -1933,9 +1935,9 @@ dump_headers(void)
 
     fprintf(dumphtml_file, "<!DOCTYPE html>\n");
     fprintf(dumphtml_file, "<head>\n");
-    fprintf(dumphtml_file, "<title>NetHack (nethackathon) %s (%s)</title>\n",  version_string(vers, sizeof vers), gp.plname);
+    fprintf(dumphtml_file, "<title>NetHack (nethackathon) %s (%s)</title>\n",  version_string(vers, sizeof vers), svp.plname);
     fprintf(dumphtml_file, "<meta http-equiv=\"Content-Type\" content=\"text/html;charset=utf-8\" />\n");
-    fprintf(dumphtml_file, "<meta name=\"generator\" content=\"NetHack (nethackathon) %s (%s)\" />\n", vers, gp.plname);
+    fprintf(dumphtml_file, "<meta name=\"generator\" content=\"NetHack (nethackathon) %s (%s)\" />\n", vers, svp.plname);
     fprintf(dumphtml_file, "<meta name=\"date\" content=\"%s\" />\n", iso8601);
     fprintf(dumphtml_file, "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n");
     fprintf(dumphtml_file, "<link href=\"https://cdn.jsdelivr.net/gh/maxwell-k/dejavu-sans-mono-web-font@2.37/index.css\" title=\"Default\" rel=\"stylesheet\" type=\"text/css\" media=\"all\" />\n");
@@ -2319,7 +2321,7 @@ encglyph(int glyph)
 {
     static char encbuf[20]; /* 10+1 would suffice */
 
-    Sprintf(encbuf, "\\G%04X%04X", gc.context.rndencode, glyph);
+    Sprintf(encbuf, "\\G%04X%04X", svc.context.rndencode, glyph);
     return encbuf;
 }
 
@@ -2338,7 +2340,7 @@ decode_glyph(const char *str, int *glyph_ptr)
         } else
             break;
     }
-    if (rndchk == gc.context.rndencode) {
+    if (rndchk == svc.context.rndencode) {
         *glyph_ptr = dcount = 0;
         for (; *str && ++dcount <= 4; ++str) {
             if ((dp = strchr(hexdd, *str)) != 0) {
@@ -2543,12 +2545,11 @@ choose_classes_menu(const char *prompt,
     char buf[BUFSZ];
     const char *text = 0;
     boolean selected;
-    int ret, i, n, next_accelerator, accelerator;
+    int ret, i, n, next_accelerator, accelerator = 0;
     int clr = NO_COLOR;
 
     if (!class_list || !class_select)
         return 0;
-    accelerator = 0;
     next_accelerator = 'a';
     any = cg.zeroany;
     win = create_nhwindow(NHW_MENU);
@@ -2561,7 +2562,8 @@ choose_classes_menu(const char *prompt,
         case 0:
             idx = def_char_to_monclass(*class_list);
             if (!IndexOk(idx, def_monsyms)) {
-                panic("choose_classes_menu: invalid monclass '%c'", *class_list);
+                panic("choose_classes_menu: invalid monclass '%c'",
+                      *class_list);
                 /*NOTREACHED*/
             }
             text = def_monsyms[idx].explain;
@@ -2571,7 +2573,8 @@ choose_classes_menu(const char *prompt,
         case 1:
             idx = def_char_to_objclass(*class_list);
             if (!IndexOk(idx, def_oc_syms)) {
-                panic("choose_classes_menu: invalid objclass '%c'", *class_list);
+                panic("choose_classes_menu: invalid objclass '%c'",
+                      *class_list);
                 /*NOTREACHED*/
             }
             text = def_oc_syms[idx].explain;
@@ -2683,6 +2686,12 @@ add_menu(
     const char *str,            /* menu text */
     unsigned int itemflags)     /* itemflags such as MENU_ITEMFLAGS_SELECTED */
 {
+    if (!str) {
+        /* if 'str' is Null, just return without adding any menu entry */
+        debugpline0("add_menu(Null)");
+        return;
+    }
+
     if (iflags.use_menu_color) {
         if ((itemflags & MENU_ITEMFLAGS_SKIPMENUCOLORS) == 0)
             (void) get_menu_coloring(str, &color, &attr);
@@ -2703,7 +2712,7 @@ add_menu_heading(winid tmpwin, const char *buf)
         color = iflags.menu_headings.color;
 
     /* suppress highlighting during end-of-game disclosure */
-    if (gp.program_state.gameover)
+    if (program_state.gameover)
         attr = ATR_NONE, color = NO_COLOR;
 
     add_menu(tmpwin, &nul_glyphinfo, &any, '\0', '\0', attr, color,
@@ -2751,10 +2760,10 @@ getlin(const char *query, char *bufp)
 {
     boolean old_bot_disabled = gb.bot_disabled;
 
-    gp.program_state.in_getlin = 1;
+    program_state.in_getlin = 1;
     gb.bot_disabled = TRUE;
     (*windowprocs.win_getlin)(query, bufp);
     gb.bot_disabled = old_bot_disabled;
-    gp.program_state.in_getlin = 0;
+    program_state.in_getlin = 0;
 }
 /*windows.c*/
