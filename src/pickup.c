@@ -2645,23 +2645,26 @@ in_container(struct obj *obj)
         }
     }
     if (Icebox && !age_is_relative(obj)) {
-        if (obj->otyp == COOLER_BAG) {
-            obj->on_ice = 1;
-        } else {
-            // ICE_BOX
+        // ICE_BOX or COOLER_BAG
+        if (gc.current_container->otyp == ICE_BOX) {
+            // Set the age of the corpse to the difference between the current time and the time the corpse was spawned
             obj->age = svm.moves - obj->age; /* actual age */
-            /* stop any corpse timeouts when frozen */
-            if (obj->otyp == CORPSE) {
-                if (obj->timed) {
-                    (void) stop_timer(ROT_CORPSE, obj_to_any(obj));
+        }
+
+        /* stop any corpse/glob timeouts when frozen 
+         * we'll restart timers below (at a slower rate) cooler bags */
+        if (obj->otyp == CORPSE) {
+            if (obj->timed) {
+                (void) stop_timer(ROT_CORPSE, obj_to_any(obj));
+                if (gc.current_container->otyp == ICE_BOX) {
                     (void) stop_timer(REVIVE_MON, obj_to_any(obj));
                 }
-                /* if this is the corpse of a cancelled ice troll, uncancel it */
-                if (obj->corpsenm == PM_ICE_TROLL && has_omonst(obj))
-                    OMONST(obj)->mcan = 0;
-            } else if (obj->globby && obj->timed) {
-                (void) stop_timer(SHRINK_GLOB, obj_to_any(obj));
             }
+            /* if this is the corpse of a cancelled ice troll, uncancel it */
+            if (obj->corpsenm == PM_ICE_TROLL && has_omonst(obj))
+                OMONST(obj)->mcan = 0;
+        } else if (obj->globby && obj->timed && gc.current_container->otyp == ICE_BOX) {
+            (void) stop_timer(SHRINK_GLOB, obj_to_any(obj));
         }
     } else if (Is_mbag(gc.current_container) && mbag_explodes(obj, 0)) {
         livelog_printf(LL_ACHIEVE, "just blew up %s bag of holding", uhis());
@@ -2710,6 +2713,13 @@ in_container(struct obj *obj)
             sellobj(obj, gc.current_container->ox, gc.current_container->oy);
         (void) add_to_container(gc.current_container, obj);
         gc.current_container->owt = weight(gc.current_container);
+
+        if (gc.current_container->otyp == COOLER_BAG) {
+            // Restart corpse timeout, slower rate handled in start_corpse_timeout functions
+            if (obj->otyp == CORPSE) {
+                start_corpse_timeout(obj);
+            }
+        }
     }
     /* gold needs this, and freeinv() many lines above may cause
      * the encumbrance to disappear from the status, so just always
@@ -2828,13 +2838,17 @@ out_container(struct obj *obj)
 void
 removed_from_icebox(struct obj *obj)
 {
-    if (obj->otyp == COOLER_BAG) {
-        obj->on_ice = 0;
-        return;
-    }
     if (!age_is_relative(obj)) {
-        obj->age = svm.moves - obj->age; /* actual age */
+        if (gc.current_container->otyp == ICE_BOX) {
+            // Restore the age of the corpse from the difference stored when the corpse was frozen
+            obj->age = svm.moves - obj->age; /* actual age */
+        }
         if (obj->otyp == CORPSE) {
+            if (gc.current_container->otyp == COOLER_BAG) {
+                // Stop COOLER_BAG timers, we'll start normal timers below
+                long time_remaining = stop_timer(ROT_CORPSE, obj_to_any(obj));
+                obj->age = svm.moves - ROT_AGE + (time_remaining / 2);
+            }
             struct monst *m = get_mtraits(obj, FALSE);
             boolean iceT = m ? (m->data == &mons[PM_ICE_TROLL])
                              : (obj->corpsenm == PM_ICE_TROLL);

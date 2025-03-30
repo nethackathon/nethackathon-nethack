@@ -11,6 +11,7 @@ staticfn void mkbox_cnts(struct obj *);
 staticfn unsigned nextoid(struct obj *, struct obj *);
 staticfn void mksobj_init(struct obj **, boolean);
 staticfn int item_on_ice(struct obj *);
+staticfn boolean item_in_cooler_bag(struct obj *);
 staticfn void shrinking_glob_gone(struct obj *);
 staticfn void obj_timer_checks(struct obj *, coordxy, coordxy, int);
 staticfn void dealloc_obj_real(struct obj *);
@@ -384,10 +385,6 @@ mkbox_cnts(struct obj *box)
                 item_type = CARROT;
             }
             otmp = mksobj(item_type, TRUE, FALSE);
-            otmp->age = 0L;
-            /* Instead of stopping the timer, let's use the on_ice property
-             * to slow down the timer for rotting */
-            otmp->on_ice = 1;
         } else if (box->otyp == BAG_OF_BAGS) {
             int bag_n = rn2(100);
             int bag_type;
@@ -1401,6 +1398,23 @@ rider_revival_time(struct obj *body, boolean retry)
 }
 
 /*
+ * Check if the item is in a cooler bag.
+ * Used by start_corpse_timeout() to adjust the corpse decay timer.
+ */
+staticfn boolean 
+item_in_cooler_bag(struct obj *item)
+{  
+    struct obj *otmp = item;
+    while (otmp->where == OBJ_CONTAINED) {
+        if (otmp->ocontainer->otyp == COOLER_BAG) {
+            return TRUE;
+        }
+        otmp = otmp->ocontainer;
+    }
+    return FALSE;
+}
+
+/*
  * Start a corpse decay or revive timer.
  * This takes the age of the corpse into consideration as of 3.4.0.
  */
@@ -1424,12 +1438,18 @@ start_corpse_timeout(struct obj *body)
 
     action = ROT_CORPSE;               /* default action: rot away */
     rot_adjust = gi.in_mklev ? 25 : 10; /* give some variation */
+
     age = max(svm.moves, 1) - body->age;
     if (age > ROT_AGE)
         when = rot_adjust;
     else
         when = ROT_AGE - age;
     when += (long) (rnz(rot_adjust) - rot_adjust);
+
+    if (item_in_cooler_bag(body)) {
+        // Like corpses on ice, corpses in a cooler bag take twice as long to rot.
+        when *= 2;
+    }
 
     if (is_rider(&mons[body->corpsenm])) {
         action = REVIVE_MON;
@@ -1457,7 +1477,7 @@ enum obj_on_ice {
     BURIED_UNDER_ICE = 2
 };
 
-/* used by shrink_glob(); is 'item' or enclosing container on or under ice? */
+/* used by shrink_glob() is 'item' or enclosing container on or under ice? */
 staticfn int
 item_on_ice(struct obj *item)
 {
@@ -1466,15 +1486,9 @@ item_on_ice(struct obj *item)
 
     otmp = item;
     /* if in a container, it might be nested so find outermost one since
-       that's the item whose location needs to be checked
-       If any container is a cooler bag, the item is on ice
-     */
-    while (otmp->where == OBJ_CONTAINED) {
+       that's the item whose location needs to be checked */
+    while (otmp->where == OBJ_CONTAINED)
         otmp = otmp->ocontainer;
-        if (otmp->otyp == COOLER_BAG) {
-          return SET_ON_ICE;
-        }
-    }
 
     if (get_obj_location(otmp, &ox, &oy, BURIED_TOO)) {
         switch (otmp->where) {
@@ -1555,7 +1569,8 @@ shrink_glob(
              /* leftover amount to use for new timer */
              moddelta = 25L - (delta % 25L);
 
-        if (globloc == SET_ON_ICE)
+        // glob shrinks slowly when set on ice or in a cooler bag
+        if (globloc == SET_ON_ICE || item_in_cooler_bag(obj))
             delta = (delta + 2L) / 3L;
 
         if (delta >= (long) obj->owt) {
