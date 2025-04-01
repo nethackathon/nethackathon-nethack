@@ -351,8 +351,9 @@ WEAPON("lance", NoDes,
 WEAPON("mace", NoDes,
        1, 0, 0, 40,  30,   5,  6,  6, 0, B,   P_MACE, IRON, HI_METAL,
                                                         MACE),
+        /* +1 small */
 WEAPON("silver mace", NoDes,
-       1, 0, 0, 2,  36,   50,  6,  6, 0, B,   P_MACE, SILVER, HI_SILVER,
+       1, 0, 0, 2,  36,   60,  6,  6, 0, B,   P_MACE, SILVER, HI_SILVER,
                                                         SILVER_MACE),
         /* +1 small */
 WEAPON("morning star", NoDes,
