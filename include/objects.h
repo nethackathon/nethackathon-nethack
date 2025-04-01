@@ -351,6 +351,9 @@ WEAPON("lance", NoDes,
 WEAPON("mace", NoDes,
        1, 0, 0, 40,  30,   5,  6,  6, 0, B,   P_MACE, IRON, HI_METAL,
                                                         MACE),
+WEAPON("silver mace", NoDes,
+       1, 0, 0, 2,  36,   50,  6,  6, 0, B,   P_MACE, SILVER, HI_SILVER,
+                                                        SILVER_MACE),
         /* +1 small */
 WEAPON("morning star", NoDes,
        1, 0, 0, 12, 120,  10,  4,  6, 0, B,   P_MORNING_STAR, IRON, HI_METAL,
@@ -1020,10 +1023,10 @@ OBJECT(OBJ("Bell of Opening", "silver bell"),
 #undef WEPTOOL
 
 /* Comestibles ... */
-#define FOOD(name, prob, delay, wt, unk, tin, nutrition, color, sn) \
+#define FOOD(name, prob, delay, wt, unk, tin, nutrition, color, sn, cost) \
     OBJECT(OBJ(name, NoDes),                                            \
            BITS(1, 1, unk, 0, 0, 0, 0, 0, 0, 0, 0, P_NONE, tin), 0,     \
-           FOOD_CLASS, prob, delay, wt, nutrition / 20 + 5, 0, 0, 0, 0, \
+           FOOD_CLASS, prob, delay, wt, cost, 0, 0, 0, 0, \
            nutrition, color, sn)
 /* All types of food (except tins & corpses) must have a delay of at least 1.
  * Delay on corpses is computed and is weight dependent.
@@ -1033,21 +1036,27 @@ OBJECT(OBJ("Bell of Opening", "silver bell"),
  * +0 tins contain monster meat.
  * +1 tins (of spinach) make you stronger (like Popeye).
  * Meatballs/sticks/rings are only created from objects via stone to flesh.
+ * Because of the bird flu, eggs are much more expensive.
+ * Royal jelly should be worth more due to its strength-boosting properties.
+ * Eucalyptus leaves and wolfsbane sprigs are worth more because they're useful.
+ * Lembas wafers are worth a little more because of nutrition/weight ratio. 
+ * Also, make little dogs and kittens worth more because they're cute (they can't actually be sold).
+ * The cost of everything else is unchanged, nutrition / 20 + 5.
  */
 /* meat */
 FOOD("tripe ration",        140,  2, 10, 0, FLESH, 200, CLR_BROWN,
-                                                        TRIPE_RATION),
+                                                        TRIPE_RATION, 15),
 FOOD("corpse",                0,  1,  0, 0, FLESH,   0, CLR_BROWN,
-                                                        CORPSE),
+                                                        CORPSE, 5),
 FOOD("egg",                  85,  1,  1, 1, FLESH,  80, CLR_WHITE,
-                                                        EGG),
+                                                        EGG, 100),
 FOOD("meatball",              0,  1,  1, 0, FLESH,   5, CLR_BROWN,
-                                                        MEATBALL),
+                                                        MEATBALL, 5),
 FOOD("meat stick",            0,  1,  1, 0, FLESH,   5, CLR_BROWN,
-                                                        MEAT_STICK),
+                                                        MEAT_STICK, 5),
 /* formerly "huge chunk of meat" */
 FOOD("enormous meatball",     0, 20,400, 0, FLESH,2000, CLR_BROWN,
-                                                        ENORMOUS_MEATBALL),
+                                                        ENORMOUS_MEATBALL, 105),
 /* special case because it's not mergeable */
 OBJECT(OBJ("meat ring", NoDes),
        BITS(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, FLESH),
@@ -1055,58 +1064,58 @@ OBJECT(OBJ("meat ring", NoDes),
 /* pudding 'corpses' will turn into these and combine;
    must be in same order as the pudding monsters */
 FOOD("glob of gray ooze",     0,  2, 20, 0, FLESH,  20, CLR_GRAY,
-                                                       GLOB_OF_GRAY_OOZE),
+                                                       GLOB_OF_GRAY_OOZE, 6),
 FOOD("glob of brown pudding", 0,  2, 20, 0, FLESH,  20, CLR_BROWN,
-                                                       GLOB_OF_BROWN_PUDDING),
+                                                       GLOB_OF_BROWN_PUDDING, 6),
 FOOD("glob of green slime",   0,  2, 20, 0, FLESH,  20, CLR_GREEN,
-                                                       GLOB_OF_GREEN_SLIME),
+                                                       GLOB_OF_GREEN_SLIME, 6),
 FOOD("glob of black pudding", 0,  2, 20, 0, FLESH,  20, CLR_BLACK,
-                                                       GLOB_OF_BLACK_PUDDING),
+                                                       GLOB_OF_BLACK_PUDDING, 6),
 
 /* fruits & veggies */
-FOOD("kelp frond",            0,  1,  1, 0, VEGGY,  30, CLR_GREEN, KELP_FROND),
+FOOD("kelp frond",            0,  1,  1, 0, VEGGY,  30, CLR_GREEN, KELP_FROND, 6),
 FOOD("eucalyptus leaf",       3,  1,  1, 0, VEGGY,   1, CLR_GREEN,
-                                                          EUCALYPTUS_LEAF),
-FOOD("apple",                15,  1,  2, 0, VEGGY,  50, CLR_RED, APPLE),
-FOOD("orange",               10,  1,  2, 0, VEGGY,  80, CLR_ORANGE, ORANGE),
+                                                          EUCALYPTUS_LEAF, 20),
+FOOD("apple",                15,  1,  2, 0, VEGGY,  50, CLR_RED, APPLE, 7),
+FOOD("orange",               10,  1,  2, 0, VEGGY,  80, CLR_ORANGE, ORANGE, 9),
 FOOD("pear",                 10,  1,  2, 0, VEGGY,  50, CLR_BRIGHT_GREEN,
-                                                          PEAR),
+                                                          PEAR, 7),
 FOOD("melon",                10,  1,  5, 0, VEGGY, 100, CLR_BRIGHT_GREEN,
-                                                          MELON),
-FOOD("banana",               10,  1,  2, 0, VEGGY,  80, CLR_YELLOW, BANANA),
-FOOD("carrot",               15,  1,  2, 0, VEGGY,  50, CLR_ORANGE, CARROT),
+                                                          MELON, 10),
+FOOD("banana",               10,  1,  2, 0, VEGGY,  80, CLR_YELLOW, BANANA, 9),
+FOOD("carrot",               15,  1,  2, 0, VEGGY,  50, CLR_ORANGE, CARROT, 7),
 FOOD("sprig of wolfsbane",    7,  1,  1, 0, VEGGY,  40, CLR_GREEN,
-                                                          SPRIG_OF_WOLFSBANE),
+                                                          SPRIG_OF_WOLFSBANE, 20),
 FOOD("clove of garlic",       7,  1,  1, 0, VEGGY,  40, CLR_WHITE,
-                                                          CLOVE_OF_GARLIC),
+                                                          CLOVE_OF_GARLIC, 7),
 /* name of slime mold is changed based on player's OPTION=fruit:something
    and bones data might have differently named ones from prior games */
 FOOD("slime mold",           75,  1,  5, 0, VEGGY, 250, HI_ORGANIC,
-                                                          SLIME_MOLD),
+                                                          SLIME_MOLD, 17),
 
 /* people food */
 FOOD("lump of royal jelly",   0,  1,  2, 0, VEGGY, 200, CLR_YELLOW,
-                                                        LUMP_OF_ROYAL_JELLY),
-FOOD("cream pie",            25,  1, 10, 0, VEGGY, 100, CLR_WHITE, CREAM_PIE),
+                                                        LUMP_OF_ROYAL_JELLY, 150),
+FOOD("cream pie",            25,  1, 10, 0, VEGGY, 100, CLR_WHITE, CREAM_PIE, 10),
 FOOD("candy bar",            13,  1,  2, 0, VEGGY, 100, CLR_BRIGHT_BLUE,
-                                                                CANDY_BAR),
+                                                                CANDY_BAR, 10),
 FOOD("fortune cookie",       55,  1,  1, 0, VEGGY,  40, CLR_YELLOW,
-                                                              FORTUNE_COOKIE),
-FOOD("pancake",              25,  2,  2, 0, VEGGY, 200, CLR_YELLOW, PANCAKE),
+                                                              FORTUNE_COOKIE, 7),
+FOOD("pancake",              25,  2,  2, 0, VEGGY, 200, CLR_YELLOW, PANCAKE, 15),
 FOOD("lembas wafer",         20,  2,  5, 0, VEGGY, 800, CLR_WHITE,
-                                                                LEMBAS_WAFER),
+                                                                LEMBAS_WAFER, 60),
 FOOD("cram ration",          20,  3, 15, 0, VEGGY, 600, HI_ORGANIC,
-                                                                CRAM_RATION),
+                                                                CRAM_RATION, 35),
 FOOD("food ration",         380,  5, 20, 0, VEGGY, 800, HI_ORGANIC,
-                                                                FOOD_RATION),
-FOOD("K-ration",              0,  1, 10, 0, VEGGY, 400, HI_ORGANIC, K_RATION),
-FOOD("C-ration",              0,  1, 10, 0, VEGGY, 300, HI_ORGANIC, C_RATION),
+                                                                FOOD_RATION, 45),
+FOOD("K-ration",              0,  1, 10, 0, VEGGY, 400, HI_ORGANIC, K_RATION, 25),
+FOOD("C-ration",              0,  1, 10, 0, VEGGY, 300, HI_ORGANIC, C_RATION, 20),
 /* tins have type specified by obj->spe (+1 for spinach, other implies
    flesh; negative specifies preparation method {homemade,boiled,&c})
    and by obj->corpsenm (type of monster flesh) */
-FOOD("tin",                  75,  0, 10, 1, METAL,   0, HI_METAL, TIN),
-FOOD("little dog",            0,  1,150, 0, FLESH, 150, CLR_WHITE, BAGGED_PUPPY),
-FOOD("kitten",                0,  1,150, 0, FLESH, 150, CLR_WHITE, BAGGED_KITTEN),
+FOOD("tin",                  75,  0, 10, 1, METAL,   0, HI_METAL, TIN, 5),
+FOOD("little dog",            0,  1,150, 0, FLESH, 150, CLR_WHITE, BAGGED_PUPPY, 100),
+FOOD("kitten",                0,  1,150, 0, FLESH, 150, CLR_WHITE, BAGGED_KITTEN, 100),
 #undef FOOD
 
 /* potions ... */
