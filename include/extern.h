@@ -2381,7 +2381,7 @@ extern boolean is_worn_by_type(struct obj *) NONNULLARG1;
 extern int ck_bag(struct obj *) NONNULLARG1;
 extern void pet_escapes_bag(struct obj *bag, struct obj *content, struct monst *pet,
                             const char *petdesc) NONNULLARG123;
-extern void removed_from_icebox(struct obj *) NONNULLARG1;
+extern void removed_from_icebox(struct obj *, boolean) NONNULLARG1;
 /* reset_justpicked() is sometimes passed gi.invent
  * which can be null */
 extern void reset_justpicked(struct obj *) NO_NNARGS;

@@ -898,10 +898,10 @@ CONTAINER("Faberge egg",    "jeweled egg", 0, 1, 0, 1,  15,   10000, GLASS, HI_G
                                                                 FABERGE_EGG),
 CONTAINER("oilskin sack",   "bag", 0, 0, 0,  5,  15, 100, CLOTH, HI_CLOTH,
                                                                 OILSKIN_SACK),
-CONTAINER("insulated bag",   "fur-lined bag", 0, 0, 0,  5,  15, 100, PLASTIC, CLR_WHITE,
+CONTAINER("insulated bag",  "fur-lined bag", 0, 0, 0,  5,  15, 100, PLASTIC, CLR_WHITE,
                                                                 COOLER_BAG),
 CONTAINER("bag of holding", "bag", 0, 1, 0, 20,  15, 100, CLOTH, HI_CLOTH,
-                                                               BAG_OF_HOLDING),
+                                                                BAG_OF_HOLDING),
 CONTAINER("bag of tricks",  "bag", 0, 1, 1, 20,  15, 100, CLOTH, HI_CLOTH,
                                                                 BAG_OF_TRICKS),
 #undef CONTAINER

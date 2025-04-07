@@ -2303,8 +2303,12 @@ mloot_container(
                     pline("%s removes %s.", upstart(mpronounbuf),
                           doname(xobj));
             }
-            if (container->otyp == ICE_BOX || container->otyp == COOLER_BAG)
-                removed_from_icebox(xobj); /* resume rotting for corpse */
+            /* resume rotting for corpse */
+            if (container->otyp == ICE_BOX) {
+                removed_from_icebox(xobj, FALSE);
+            } else if (container->otyp == COOLER_BAG) {
+                removed_from_icebox(xobj, TRUE);
+            }
             /* obj_extract_self(xobj); -- already done above */
             (void) mpickobj(mon, xobj);
             res = 2;

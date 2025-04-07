@@ -62,7 +62,8 @@ staticfn void tipcontainer(struct obj *);
 /* if you can figure this out, give yourself a hearty pat on the back... */
 #define GOLD_CAPACITY(w, n) (((w) * -100L) - ((n) + 50L) - 1L)
 
-#define Icebox (gc.current_container->otyp == ICE_BOX || gc.current_container->otyp == COOLER_BAG)
+#define Icebox (gc.current_container->otyp == ICE_BOX)
+#define Cooler (gc.current_container->otyp == COOLER_BAG)
 
 static const char
     slightloadpfx[] = "You have a little trouble",
@@ -2575,7 +2576,7 @@ in_container(struct obj *obj)
         return 0;
     } else if (obj->owornmask & (W_ARMOR | W_ACCESSORY)) {
         Norep("You cannot %s %s you are wearing.",
-              Icebox ? "refrigerate" : "stash", something);
+              (Icebox || Cooler) ? "refrigerate" : "stash", something);
         return 0;
     } else if ((obj->otyp == LOADSTONE) && obj->cursed) {
         set_bknown(obj, 1);
@@ -2644,21 +2645,21 @@ in_container(struct obj *obj)
             sellobj(obj, u.ux, u.uy);
         }
     }
-    if (Icebox && !age_is_relative(obj)) {
-        // ICE_BOX or COOLER_BAG
-        if (gc.current_container->otyp == ICE_BOX) {
-            // Set the age of the corpse to the difference between the current time and the time the corpse was spawned
-            obj->age = svm.moves - obj->age; /* actual age */
-        }
+    if ((Icebox || Cooler) && !age_is_relative(obj)) {
+        long time_remaining = stop_timer(ROT_CORPSE, obj_to_any(obj));
 
-        /* stop any corpse/glob timeouts when frozen 
+        if (Cooler)
+            obj->age = svm.moves - ROT_AGE + (time_remaining / 2);
+        else
+            obj->age = svm.moves - obj->age; /* actual age */
+
+        /* stop any corpse/glob timeouts when frozen
          * we'll restart timers below (at a slower rate) cooler bags */
         if (obj->otyp == CORPSE) {
             if (obj->timed) {
                 (void) stop_timer(ROT_CORPSE, obj_to_any(obj));
-                if (gc.current_container->otyp == ICE_BOX) {
+                if (Icebox)
                     (void) stop_timer(REVIVE_MON, obj_to_any(obj));
-                }
             }
             /* if this is the corpse of a cancelled ice troll, uncancel it */
             if (obj->corpsenm == PM_ICE_TROLL && has_omonst(obj))
@@ -2714,8 +2715,9 @@ in_container(struct obj *obj)
         (void) add_to_container(gc.current_container, obj);
         gc.current_container->owt = weight(gc.current_container);
 
-        if (gc.current_container->otyp == COOLER_BAG) {
-            // Restart corpse timeout, slower rate handled in start_corpse_timeout functions
+        if (Cooler) {
+            /* Restart corpse timeout, slower rate handled in
+               start_corpse_timeout functions */
             if (obj->otyp == CORPSE) {
                 start_corpse_timeout(obj);
             }
@@ -2812,7 +2814,9 @@ out_container(struct obj *obj)
     gc.current_container->owt = weight(gc.current_container);
 
     if (Icebox)
-        removed_from_icebox(obj);
+        removed_from_icebox(obj, FALSE);
+    if (Cooler)
+        removed_from_icebox(obj, TRUE);
     if (unbag_pet(obj))
         return 1;
 
@@ -2836,19 +2840,17 @@ out_container(struct obj *obj)
 
 /* taking a corpse out of an ice box needs a couple of adjustments */
 void
-removed_from_icebox(struct obj *obj)
+removed_from_icebox(struct obj *obj, boolean cooler)
 {
     if (!age_is_relative(obj)) {
-        if (gc.current_container->otyp == ICE_BOX) {
-            // Restore the age of the corpse from the difference stored when the corpse was frozen
-            obj->age = svm.moves - obj->age; /* actual age */
-        }
+        long time_remaining = stop_timer(ROT_CORPSE, obj_to_any(obj));
+
+        if (!cooler)
+            obj->age = svm.moves - obj->age;
+        else
+            obj->age = svm.moves - ROT_AGE + (time_remaining / 2);
+        /* stop any corpse timeouts when frozen */
         if (obj->otyp == CORPSE) {
-            if (gc.current_container->otyp == COOLER_BAG) {
-                // Stop COOLER_BAG timers, we'll start normal timers below
-                long time_remaining = stop_timer(ROT_CORPSE, obj_to_any(obj));
-                obj->age = svm.moves - ROT_AGE + (time_remaining / 2);
-            }
             struct monst *m = get_mtraits(obj, FALSE);
             boolean iceT = m ? (m->data == &mons[PM_ICE_TROLL])
                              : (obj->corpsenm == PM_ICE_TROLL);
@@ -2949,6 +2951,7 @@ observe_quantum_cat(struct obj *box, boolean makecat, boolean givemsg)
 }
 
 #undef Icebox
+#undef Cooler
 
 /* used by askchain() to check for magic bag explosion */
 boolean
@@ -3938,8 +3941,11 @@ tipcontainer(struct obj *box) /* or bag */
             obj_extract_self(otmp);
             otmp->ox = box->ox, otmp->oy = box->oy;
 
-            if (box->otyp == ICE_BOX || box->otyp == COOLER_BAG) {
-                removed_from_icebox(otmp); /* resume rotting for corpse */
+            /* resume rotting for corpse */
+            if (box->otyp == ICE_BOX) {
+                removed_from_icebox(otmp, FALSE);
+            } else if (box->otyp == COOLER_BAG) {
+                removed_from_icebox(otmp, TRUE);
             } else if (cursed_mbag && is_boh_item_gone()) {
                 loss += mbag_item_gone(srcheld, otmp, FALSE);
                 /* abbreviated drop format is no longer appropriate */
@@ -3952,7 +3958,8 @@ tipcontainer(struct obj *box) /* or bag */
                 } else {
                     pline("%s%c", doname(otmp), nobj ? ',' : '.');
                     iflags.last_msg = PLNMSG_OBJNAM_ONLY;
-                }                continue;
+                }
+                continue;
             }
             if (maybeshopgoods) {
                 addtobill(otmp, FALSE, FALSE, TRUE);
