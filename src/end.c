@@ -637,6 +637,7 @@ disclose(int how, boolean taken)
         if (c == 'y') {
             /* caller has already ID'd everything; we pass 'want_reply=True'
                to force display_pickinv() to avoid using WIN_INVENT */
+            iflags.force_invmenu = FALSE;
             (void) display_inventory((char *) 0, TRUE);
             container_contents(gi.invent, TRUE, TRUE, FALSE);
         }
@@ -1773,8 +1774,9 @@ save_killers(NHFILE *nhfp)
 
     if (perform_bwrite(nhfp)) {
         for (kptr = &svk.killer; kptr; kptr = kptr->next) {
-            if (nhfp->structlevel)
+            if (nhfp->structlevel) {
                 bwrite(nhfp->fd, (genericptr_t) kptr, sizeof (struct kinfo));
+            }
         }
     }
     if (release_data(nhfp)) {
@@ -1792,8 +1794,9 @@ restore_killers(NHFILE *nhfp)
     struct kinfo *kptr;
 
     for (kptr = &svk.killer; kptr != (struct kinfo *) 0; kptr = kptr->next) {
-        if (nhfp->structlevel)
-            mread(nhfp->fd, (genericptr_t) kptr, sizeof(struct kinfo));
+        if (nhfp->structlevel) {
+            mread(nhfp->fd, (genericptr_t) kptr, sizeof (struct kinfo));
+        }
         if (kptr->next) {
             kptr->next = (struct kinfo *) alloc(sizeof (struct kinfo));
         }
