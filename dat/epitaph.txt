@@ -4,7 +4,6 @@
 # Epitaphs for random headstones
 #
 #
-<<<<<<< HEAD
 Here lies Alice, killed by 3.7
 Here lies jonosmalls, killed by a corrupted save file
 Here lies Cloudmillion, killed by an imaginary ray of fire
@@ -26,7 +25,6 @@ The Earth Elemental Steps On Your Head, To Make Sure You're Dead
 Matt, what do you think about Dwarf Fortress?
 Why didn't anyone tell me Minotaurs don't respect Elbereth?
 Here lies the Buzzy Family
-=======
 Rest in peace
 R.I.P.
 Rest In Pieces
@@ -422,4 +420,3 @@ Ya really had me going baby, but now I'm gone.
 Yes Dear, just a few more minutes...
 You said it wasn't poisonous!
 You set my heart aflame.  You gave me heartburn.
->>>>>>> ba4f90eefbe2e60f2e10442243c0818a91e0dd56
