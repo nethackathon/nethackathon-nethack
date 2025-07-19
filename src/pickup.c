@@ -3074,7 +3074,7 @@ bag_pet(void)
         return 0;
     }
     if (!can_reach_floor(FALSE)) {
-        cant_reach_floor(petx, pety, FALSE, FALSE);
+        cant_reach_floor(petx, pety, FALSE, FALSE, FALSE);
         return 0;
     }
     if (!mtmp->mtame) {
