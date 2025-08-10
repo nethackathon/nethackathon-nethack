@@ -1309,7 +1309,7 @@ extern void objects_globals_init(void);
 DISABLE_WARNING_UNREACHABLE_CODE
 
 int
-main(int argc UNUSED, char *argv[] UNUSED)
+main(int argc, char *argv[])
 {
     int i, tilenum;
     char filename[30];
@@ -1393,6 +1393,8 @@ main(int argc UNUSED, char *argv[] UNUSED)
     free_tilerefs();
     exit(EXIT_SUCCESS);
     /*NOTREACHED*/
+    nhUse(argc);
+    nhUse(argv);
     return 0;
 }
 
@@ -1489,7 +1491,7 @@ add_tileref(
     const char *prefix)
 {
     struct tiles_used temp = { 0 };
-    static const char ellipsis[] UNUSED = "...";
+    static const char ellipsis[] = "...";
     char buf[BUFSZ];
 
     if (!tilelist[n]) {
@@ -1517,6 +1519,7 @@ add_tileref(
              (strlen(temp.references) >= (sizeof temp.references - 7) - 1)
                  ? buf
                  : "");
+    nhUse(ellipsis);
 }
 
 void
