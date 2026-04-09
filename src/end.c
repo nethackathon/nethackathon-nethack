@@ -548,7 +548,7 @@ dump_everything(
     init_symbols(); /* revert to default symbol set */
 
     /* let folks know this was a nethackathon game */
-    Sprintf(pbuf, "NetHackathon, Spring 2025");
+    Sprintf(pbuf, "NetHackathon, Spring 2026");
     putstr(0, ATR_SUBHEAD, pbuf);
     putstr(NHW_DUMPTXT, 0, "");
 
