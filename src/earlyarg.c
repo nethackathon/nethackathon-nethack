@@ -182,6 +182,11 @@ early_options(int *argc_p, char ***argv_p, char **hackdir_p)
     char **argv, *arg, *origarg;
     int argc, oldargc, ndx = 0, consumed = 0;
 
+#ifdef ENHANCED_SYMBOLS
+    if (argcheck(*argc_p, *argv_p, ARG_DUMPGLYPHIDS) == 2)
+        opt_terminate();
+#endif
+
     config_error_init(FALSE, "command line", FALSE);
 
     /* treat "nethack ?" as a request for usage info; due to shell
@@ -424,6 +429,12 @@ scores_only(int argc, char **argv, const char *dir)
     (void) whoami(); /* set up default plname[] */
 #endif
     prscore(argc, argv);
+#ifdef MSWIN_GRAPHICS
+    /* NetHackW can also support WINDOWPORT(curses) now, so check */
+    if (WINDOWPORT(mswin)) {
+        wait_synch();
+    }
+#endif
 
     nh_terminate(EXIT_SUCCESS); /* bypass opt_terminate() */
     /*NOTREACHED*/
@@ -705,7 +716,7 @@ dump_enums(void)
         objclass_classes_enum,
         objclass_syms_enum,
         arti_enum,
-	mcastu_enum,
+        mcastu_enum,
         NUM_ENUM_DUMPS
     };
 
@@ -737,7 +748,7 @@ dump_enums(void)
         objclass_classes_dump,
         objclass_syms_dump,
         arti_enum_dump,
-	mcastu_enum_dump,
+        mcastu_enum_dump,
     };
 
     static const struct de_params {

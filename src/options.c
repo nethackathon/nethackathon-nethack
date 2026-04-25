@@ -1978,6 +1978,8 @@ optfn_map_mode(
          */
         op = string_for_opt(opts, negated);
         if (op != empty_optstr && !negated) {
+            int save_map_mode = iflags.wc_map_mode;
+
             if (!strcmpi(op, "tiles"))
                 iflags.wc_map_mode = MAP_MODE_TILES;
             else if (!strncmpi(op, "ascii4x6", sizeof "ascii4x6" - 1))
@@ -2011,6 +2013,11 @@ optfn_map_mode(
                 config_error_add("Unknown %s parameter '%s'",
                                  allopt[optidx].name, op);
                 return optn_err;
+            }
+            if (wc_supported("map_mode")) {
+                if (!iflags.wc_map_mode
+                    || save_map_mode != iflags.wc_map_mode)
+                    preference_update("map_mode");
             }
         } else if (negated) {
             bad_negation(allopt[optidx].name, TRUE);
@@ -5313,12 +5320,24 @@ optfn_boolean(
             return optn_ok;
 
         switch (optidx) {
-        case opt_time:
-#ifdef SCORE_ON_BOTL
+        case opt_terrainstatus:
+            classify_terrain(); /* bring iflags.terrain_typ up to date */
+            FALLTHROUGH;
+            /*FALLTHRU*/
+        case opt_weaponstatus:
+        case opt_armorstatus:
+            if (!wc2_supported(allopt[optidx].name)) {
+                /* not actually an error */
+                config_error_add("'%s' is not supported.",
+                                 allopt[optidx].name);
+                return optn_ok;
+            }
+            FALLTHROUGH;
+            /*FALLTHRU*/
         case opt_showscore:
-#endif
         case opt_showvers:
         case opt_showexp:
+        case opt_time:
             if (VIA_WINDOWPORT())
                 status_initialize(REASSESS_ONLY);
             disp.botl = TRUE;
@@ -5482,9 +5501,6 @@ can_set_perm_invent(void)
 
 #ifdef TTY_PERM_INVENT
     if ((WINDOWPORT(tty)
-#ifdef WIN32
-         || WINDOWPORT(safestartup)
-#endif
          ) && !go.opt_initial) {
         perm_invent_toggled(FALSE);
         /* perm_invent_toggled()
@@ -7332,12 +7348,10 @@ initoptions_finish(void)
      * Option processing can take place before a user-decided WindowPort
      * is even initialized, so check for that too.
      */
-    if (!WINDOWPORT(safestartup)) {
-        if (iflags.hilite_delta && !wc2_supported("statushilites")) {
-            raw_printf("Status highlighting not supported for %s interface.",
-                       windowprocs.name);
-            iflags.hilite_delta = 0;
-        }
+    if (iflags.hilite_delta && !wc2_supported("statushilites")) {
+        raw_printf("Status highlighting not supported for %s interface.",
+                    windowprocs.name);
+        iflags.hilite_delta = 0;
     }
 #endif
     update_rest_on_space();
@@ -7355,7 +7369,8 @@ initoptions_finish(void)
 #ifdef ENHANCED_SYMBOLS
     if (glyphid_cache_status())
         free_glyphid_cache();
-    apply_customizations(gc.currentgraphics, do_custom_symbols);
+    apply_customizations(gc.currentgraphics,
+                         do_custom_symbols | do_custom_colors);
 #endif
     go.opt_initial = FALSE;
     return;
@@ -8685,8 +8700,8 @@ doset_simple_menu(void)
 int
 doset_simple(void)
 {
-    int pickedone = 0,
-        opt_crt_flags = docrtNocls;
+    int pickedone = 0;
+    boolean flush = FALSE;
 
     if (iflags.menu_requested) {
         /* doset() checks for 'm' and calls doset_simple(); clear the
@@ -8701,40 +8716,13 @@ doset_simple(void)
     give_opt_msg = FALSE;
     do {
         pickedone = doset_simple_menu();
+        flush = go.opt_need_redraw;
 
-        /* some option choices warrant immediate updating beyond the
-           option value itself */
-        if (go.opt_need_glyph_reset) {
-            reset_glyphmap(gm_optionchange);
-        }
-        if (go.opt_need_redraw) {
-            check_gold_symbol();
-            reglyph_darkroom();
-            if (go.opt_symset_changed)
-                opt_crt_flags &= ~docrtRefresh;
-            docrt_flags(opt_crt_flags);
+        reset_needed_visuals();
+        if (flush) {
             flush_screen(1);
+            flush = FALSE;
         }
-        if (go.opt_need_promptstyle)
-            adjust_menu_promptstyle(WIN_INVEN, &iflags.menu_headings);
-        if (go.opt_update_basic_palette) {
-#ifdef CHANGE_COLOR
-            change_palette();
-#endif
-            go.opt_update_basic_palette = FALSE;
-        }
-        if (go.opt_reset_customcolors || go.opt_reset_customsymbols) {
-            if (go.opt_reset_customcolors)
-                reset_customcolors();
-            if (go.opt_reset_customsymbols)
-                reset_customsymbols();
-            docrt_flags(opt_crt_flags);
-        }
-        /* status may need updating if terminal is tall enough that
-           doset_simple menu doesn't cover up status or wide enough for
-           curses to honor player's choice of align_status:Right|Left */
-        if (disp.botl || disp.botlx)
-            bot();
     } while (pickedone > 0);
     give_opt_msg = TRUE;
     return ECMD_OK;
@@ -8862,7 +8850,7 @@ doset(void) /* changing options via menu by Per Liboriussen */
                     enhance_menu_text(buf, sizeof buf, pass, bool_p,
                                       &allopt[i]);
                 add_menu(tmpwin, &nul_glyphinfo, &any, 0, 0,
-                         ATR_NONE, clr, buf, MENU_ITEMFLAGS_NONE);
+                         ATR_NONE, clr, buf, MENU_ITEMFLAGS_SKIPINVERT);
             }
 
     add_menu_str(tmpwin, "");
@@ -9067,7 +9055,7 @@ doset_add_menu(
     indent = !any.a_int ? "    " : "";
     Sprintf(buf, fmtstr, indent, option, value);
     add_menu(win, &nul_glyphinfo, &any, 0, 0,
-             ATR_NONE, clr, buf, MENU_ITEMFLAGS_NONE);
+             ATR_NONE, clr, buf, MENU_ITEMFLAGS_SKIPINVERT);
 }
 
 
@@ -9827,6 +9815,7 @@ static struct wc_Opt wc_options[] = {
     { (char *) 0, 0L }
 };
 static struct wc_Opt wc2_options[] = {
+    { "armorstatus", WC2_EXTRASTATUS },
     { "fullscreen", WC2_FULLSCREEN },
     { "guicolor", WC2_GUICOLOR },
     { "hilite_status", WC2_HILITE_STATUS },
@@ -9841,7 +9830,9 @@ static struct wc_Opt wc2_options[] = {
     { "statuslines", WC2_STATUSLINES },
     { "term_cols", WC2_TERM_SIZE },
     { "term_rows", WC2_TERM_SIZE },
+    { "terrainstatus", WC2_EXTRASTATUS },
     { "use_darkgray", WC2_DARKGRAY },
+    { "weaponstatus", WC2_EXTRASTATUS },
     { "windowborders", WC2_WINDOWBORDERS },
     { "wraptext", WC2_WRAPTEXT },
     { (char *) 0, 0L }
