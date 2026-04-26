@@ -8,7 +8,7 @@ is included in the distributed Makefiles.
 [.370 hints]
 
 
-There are two .370 series hints files provided with NetHack:
+There are two .500 series hints files provided with NetHack:
     linux.500    for use on Linux
     macOS.500    for use on macOS
 
