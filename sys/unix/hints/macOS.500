@@ -649,7 +649,7 @@ $(BUNDLE_INFOPLIST):
 	@echo '<key>CFBundlePackageType</key>' >>$@
 	@echo '<string>APPL</string>' >>$@
 	@echo '<key>CFBundleGetInfoString</key>' >>$@
-	@echo '<string>$(BUNDLE_GAMENAME) 3.7 for MacOS</string>' >>$@
+	@echo '<string>$(BUNDLE_GAMENAME) 5.0 for MacOS</string>' >>$@
 	@echo '<key>CFBundleIdentifier</key>' >>$@
 	@echo '<string>org.nethack.macos</string>' >>$@
 	@echo '<key>CFBundleExecutable</key>' >>$@
@@ -661,9 +661,9 @@ $(BUNDLE_INFOPLIST):
 	@echo '<key>CFBundleName</key>' >>$@
 	@echo '<string>$(BUNDLE_NAME)</string>' >>$@
 	@echo '<key>CFBundleVersion</key>' >>$@
-	@echo '<string>3.7.0b73</string>' >>$@
+	@echo '<string>NetHack 5.0.0b73</string>' >>$@
 	@echo '<key>CFBundleShortVersionString</key>' >>$@
-	@echo '<string>3.7.0</string>' >>$@
+	@echo '<string>NetHack 5.0.0</string>' >>$@
 	@echo '<key>NSHumanReadableCopyright</key>' >>$@
 	@echo '<string>©By Stichting Mathematisch Centrum and M. Stephenson 1985-2026</string>' >>$@
 	@echo '<key>LSApplicationCategoryType</key>' >>$@

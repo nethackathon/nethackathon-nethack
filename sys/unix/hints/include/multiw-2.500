@@ -1,5 +1,5 @@
 #------------------------------------------------------------------------------
-# NetHack 3.7  multiw-2.500 $NHDT-Date: 1599337709 2020/09/05 20:28:29 $  $NHDT-Branch: NetHack-3.7 $
+# NetHack 5.0  multiw-2.500 $NHDT-Date: 1599337709 2020/09/05 20:28:29 $  $NHDT-Branch: NetHack-5.0 $
 #
 # Sorts out support for multiple window ports (interfaces) to included in the build.
 #

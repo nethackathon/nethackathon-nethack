@@ -13,7 +13,7 @@
 
 
                        Original version - Eric S. Raymond
-     (Edited and expanded for NetHack 3.7.0 by Mike Stephenson and others)
+     (Edited and expanded for NetHack 5.0.0 by Mike Stephenson and others)
 
                                  April 16, 2026
 
@@ -126,7 +126,7 @@
      employ to great advantage.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -192,7 +192,7 @@
      NetHack continues this fine tradition.  Unlike  text  adventure  games
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -258,7 +258,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -324,7 +324,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -390,7 +390,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -456,7 +456,7 @@
           The number of turns elapsed so far, displayed  if  you  have  the
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -522,7 +522,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -588,7 +588,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -654,7 +654,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -720,7 +720,7 @@
           instead.   Only  these  one-step  movement  commands cause you to
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -786,7 +786,7 @@
           ing <Control>. ^<key> is  used  as  shorthand  elsewhere  in  the
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -852,7 +852,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -918,7 +918,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -984,7 +984,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1050,7 +1050,7 @@
           at an adjacent "remembered, unseen monster" marker.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1116,7 +1116,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1182,7 +1182,7 @@
      (R)UNIX is a registered trademark of The Open Group.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1248,7 +1248,7 @@
           menu_next_page,  and  menu_last_page  keys (`^', `<', `>', `|' by
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1314,7 +1314,7 @@
           doesn't and give that name to the result, while splitting  (count
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1380,7 +1380,7 @@
           Default key is `M-C'.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1446,7 +1446,7 @@
           List  any  monster  types  which have been genocided.  In explore
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1512,7 +1512,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1578,7 +1578,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1644,7 +1644,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1710,7 +1710,7 @@
           is `C-_'.  See also #travel.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1776,7 +1776,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1842,7 +1842,7 @@
           Swap wielded and secondary weapons.  Default key is `x'.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1908,7 +1908,7 @@
           parenthesis, the name of the option to toggle.  The  option  must
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -1974,7 +1974,7 @@
           menu.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2040,7 +2040,7 @@
           within  a modest radius.  No time elapses.  Autocompletes.  Debug
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2106,7 +2106,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2172,7 +2172,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2238,7 +2238,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2304,7 +2304,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2370,7 +2370,7 @@
      them).  Some monsters who can open doors can also use unlocking tools.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2436,7 +2436,7 @@
      been nullified, giving access to whatever  is  beyond  them.   In  the
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2502,7 +2502,7 @@
      play.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2568,7 +2568,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2634,7 +2634,7 @@
      attack,  when guessing where an unseen monster is or when deliberately
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2700,7 +2700,7 @@
      noid_confirmation:attack   option  to  require  a  response  of  "yes"
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2766,7 +2766,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2832,7 +2832,7 @@
      are encumbered, one of the conditions  Burdened,  Stressed,  Strained,
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2898,7 +2898,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -2964,7 +2964,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3030,7 +3030,7 @@
      aklys, lucern hammer, and bec-de-corbin) are defined in an appendix to
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3096,7 +3096,7 @@
      shots by using a numeric prefix before the `t' or  `f'  command.   For
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3162,7 +3162,7 @@
      first you need to have a weapon in each hand.   (Note  that  your  two
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3228,7 +3228,7 @@
      even further.  Most of these provide a one or two point improvement to
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3294,7 +3294,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3360,7 +3360,7 @@
      yourself  (just give a `.' or `s' for the direction).  Be warned, how-
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3426,7 +3426,7 @@
      your ken can be harmful to your health!
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3492,7 +3492,7 @@
      play the entire game without being able to see (a  self-imposed  chal-
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3558,7 +3558,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3624,7 +3624,7 @@
      set  the  goldX option if you prefer to have gold pieces be treated as
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3690,7 +3690,7 @@
      eating such items still counts against foodless conduct.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3756,7 +3756,7 @@
      monster (i.e. if you would get experience for the death).  This  is  a
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3822,7 +3822,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3888,7 +3888,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -3954,7 +3954,7 @@
      ning  NetHack  for  the first time, you should find a default template
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4020,7 +4020,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4086,7 +4086,7 @@
        begins; whatever follows will be common to all sections.   Otherwise
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4152,7 +4152,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4218,7 +4218,7 @@
      sign)  to  let  NetHack know that the rest is intended as a file name.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4284,7 +4284,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4350,7 +4350,7 @@
        weapon or both.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4416,7 +4416,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4482,7 +4482,7 @@
        extended  command,  it controls whether the menu shows all available
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4548,7 +4548,7 @@
        might  miss  some interesting and/or important information.  Persis-
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4614,7 +4614,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4680,7 +4680,7 @@
        class(es).  Combination starts with a prompt for object class(es) of
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4746,7 +4746,7 @@
        5 - One-or-other - show symbols on headers,  or  on  entries  if  no
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4812,7 +4812,7 @@
        port is the same as specifying 0.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4878,7 +4878,7 @@
        ing  1  and  negating number_pad is the same as specifying 0.  (Set-
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -4944,7 +4944,7 @@
                      `y', set Confirm too);
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5010,7 +5010,7 @@
        ing pets on the map.  Effectively a superset of the hilite_pet bool-
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5076,7 +5076,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5142,7 +5142,7 @@
        game).  This option exists partly as an  acknowledgement  that  some
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5208,7 +5208,7 @@
        sistent.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5274,7 +5274,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5340,7 +5340,7 @@
        on).
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5406,7 +5406,7 @@
        when a windowing version of NetHack is started without a parent win-
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5472,7 +5472,7 @@
        on  a doorway, it will consider the area on the side of the door you
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5538,7 +5538,7 @@
        right)
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5604,7 +5604,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5670,7 +5670,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5736,7 +5736,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5802,7 +5802,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5868,7 +5868,7 @@
        strokes that the operating system returns to NetHack to help compen-
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -5934,7 +5934,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6000,7 +6000,7 @@
        The menu control or accelerator keys can also be rebound via OPTIONS
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6066,7 +6066,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6132,7 +6132,7 @@
        ing  for  more  info, and exit the location asking loop.  Default is
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6198,7 +6198,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6264,7 +6264,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6330,7 +6330,7 @@
      cause  the  hitpoints  field  to display in the color red if your hit-
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6396,7 +6396,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6462,7 +6462,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6528,7 +6528,7 @@
      value,  and  the ^ prefix causes the following character to be treated
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6594,7 +6594,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6660,7 +6660,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6726,7 +6726,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6792,7 +6792,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6858,7 +6858,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6924,7 +6924,7 @@
        seen via the "#attributes" command.
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -6990,7 +6990,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -7056,7 +7056,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -7122,7 +7122,7 @@
      connection between "wizard mode" and the Wizard role).  Attempting  to
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -7188,7 +7188,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -7254,7 +7254,7 @@
      were distinct for specific types of monsters and objects  rather  than
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -7320,7 +7320,7 @@
      file layout which prevented score entries from being read back in cor-
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -7386,7 +7386,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -7452,7 +7452,7 @@
      Kompel, Dion Nicolaas, Derek S. Ray and Yitzhak Sapir  maintained  the
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -7518,7 +7518,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -7584,7 +7584,7 @@
      sends  a  particularly  intriguing  modification  to help out with the
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -7650,7 +7650,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -7716,7 +7716,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 
@@ -7782,7 +7782,7 @@
 
 
 
-     NetHack 3.7.0                                           April 16, 2026
+     NetHack 5.0.0                                           April 16, 2026
 
 
 

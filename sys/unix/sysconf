@@ -1,4 +1,4 @@
-# NetHack 3.7 sysconf $NHDT-Date: 1704043695 2023/12/31 17:28:15 $ $NHDT-Branch: keni-luabits2 $:$NHDT-Revision: 1.44 $
+# NetHack 5.0 sysconf $NHDT-Date: 1704043695 2023/12/31 17:28:15 $ $NHDT-Branch: keni-luabits2 $:$NHDT-Revision: 1.44 $
 # Copyright (c) 2015 by Kenneth Lorber, Kensington, Maryland
 # NetHack may be freely redistributed.  See license for details.
 #
@@ -130,7 +130,7 @@ MAXPLAYERS=10
 # Only available if NetHack was compiled with DUMPLOG
 # Allows following placeholders:
 #   %% literal '%'
-#   %v version (eg. "3.7.0-0")
+#   %v version (eg. "NetHack 5.0.0-0")
 #   %u game UID
 #   %t game start time, UNIX timestamp format
 #   %T current time, UNIX timestamp format
