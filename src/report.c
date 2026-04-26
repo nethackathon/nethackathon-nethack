@@ -1,4 +1,4 @@
-/* NetHack 3.7	report.c	$NHDT-Date: 1741406837 2025/03/07 20:07:17 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.16 $ */
+/* NetHack 5.0	report.c	$NHDT-Date: 1741406837 2025/03/07 20:07:17 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.16 $ */
 /* Copyright (c) Kenneth Lorber, Kensington, Maryland, 2024 */
 /* NetHack may be freely redistributed.  See license for details. */
 

@@ -56,7 +56,7 @@
 .ds h0 NetHack Guidebook
 .ds h1 \" empty
 .ds h2 %
-.ds vr NetHack 3.7.0
+.ds vr NetHack 5.0.0
 .ds f0 \*(vr
 .ds f1 \" empty
 .\"DO NOT REMOVE NH_DATESUB .ds f2 Date(%B %-d, %Y)
