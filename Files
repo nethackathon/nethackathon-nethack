@@ -132,17 +132,17 @@ mac-carbon.h  mac-qt.h      mac-term.h    macconf.h     macpopup.h
 mactty.h      macwin.h      mttypriv.h
 
 outdated/sys/amiga:
-(files for Amiga versions - untested for 3.7)
+(files for Amiga versions - untested for 5.0)
 Build.ami     Install.ami   Makefile.agc  Makefile.ami  NetHack.cnf
 ifchange      mkdmake       txt2iff.c     xpm2iff.c
 
 outdated/sys/atari:
-(files for Atari version - untested for 3.7)
+(files for Atari version - untested for 5.0)
 Install.tos   atarifnt.uue  nethack.mnu   setup.g       tos.c
 unx2atar.sed
 
 outdated/sys/be:
-(files for BeOS version - untested for 3.7)
+(files for BeOS version - untested for 5.0)
 README    bemain.c
 
 outdated/sys/mac:
@@ -159,7 +159,7 @@ Makefile.BC   Makefile.MSC  SCHEMA35.MSC  moveinit.pat  ovlinit.c
 schema1.BC    schema2.BC    schema3.MSC
 
 outdated/sys/os2:
-(files for OS/2 version - untested for 3.7)
+(files for OS/2 version - untested for 5.0)
 Install.os2   Makefile.os2  nhpmico.uu    os2.c
 
 outdated/sys/unix:
@@ -182,7 +182,7 @@ outdated/sys/vms:
 lev_lex.h
 
 outdated/sys/wince:
-(files for Windows CE and PocketPC - untested for 3.7)
+(files for Windows CE and PocketPC - untested for 5.0)
 Install.ce    bootstrp.mak  celib.c       cesetup.bat   cesound.c
 defaults.nh   keypad.uu     menubar.uu    mhaskyn.c     mhaskyn.h
 mhcmd.c       mhcmd.h       mhcolor.c     mhcolor.h     mhdlg.c
@@ -195,7 +195,7 @@ resource.h    winMS.h       winhack.c     winhack.rc    winhcksp.rc
 winmain.c
 
 outdated/sys/wince/ceinc:
-(header files for Windows CE and PocketPC - untested for 3.7)
+(header files for Windows CE and PocketPC - untested for 5.0)
 assert.h  errno.h   fcntl.h
 
 outdated/sys/wince/ceinc/sys:
@@ -212,12 +212,12 @@ qt3tableview.cpp     qt3tableview.h       tileedit.cpp
 tileedit.h
 
 outdated/win/gem:
-(files for GEM versions - untested for 3.7)
+(files for GEM versions - untested for 5.0)
 Install.gem  bitmfile.c   gem_rsc.uu   gem_rso.uu   gr_rect.c    gr_rect.h
 load_img.c   tile2img.c   title.uu     wingem.c     wingem1.c    xpm2img.c
 
 outdated/win/gnome:
-(files for GNOME versions - untested for 3.7)
+(files for GNOME versions - untested for 5.0)
 README      gn_xpms.h   gnaskstr.c  gnaskstr.h  gnbind.c    gnbind.h
 gnglyph.c   gnglyph.h   gnmain.c    gnmain.h    gnmap.c     gnmap.h
 gnmenu.c    gnmenu.h    gnmesg.c    gnmesg.h    gnomeprv.h  gnopts.c
