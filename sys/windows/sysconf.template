@@ -127,4 +127,4 @@ HIDEUSAGE=1
 #LOCKDIR=c:\ProgramData\NetHack\5.0
 
 # URL loaded for creating reports to the NetHack DevTeam
-#CRASHREPORTURL=https://nethack.org/links/cr-37BETA.html
+#CRASHREPORTURL=https://nethack.org/links/cr-5.0.0.html
