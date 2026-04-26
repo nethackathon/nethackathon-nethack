@@ -924,7 +924,7 @@ print_glyph(window, x, y, glyphinfo, bkglyphinfo)
                     int ttychar;  the character mapping for the original tty
                                   interface. Most or all window ports wanted
                                   and used this for various things so it is
-                                  provided in 3.7+
+                                  provided in 5.0+
                     short int symidx;     offset into syms array
                     unsigned glyphflags;  more detail about the entity
 
