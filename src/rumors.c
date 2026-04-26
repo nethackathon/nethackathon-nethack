@@ -303,7 +303,7 @@ rumor_check(void)
 
 DISABLE_WARNING_FORMAT_NONLITERAL
 
-/* 3.7: augments rumors_check(); test 'engrave' or 'epitaph' or 'bogusmon' */
+/* 5.0: augments rumors_check(); test 'engrave' or 'epitaph' or 'bogusmon' */
 staticfn void
 others_check(
     const char *ftype, /* header: "{Engravings|Epitaphs|Bogus monsters}:" */

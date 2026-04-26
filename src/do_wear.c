@@ -2501,7 +2501,7 @@ find_ac(void)
         uac -= u.ublessed;
     uac -= u.uspellprot;
 
-    /* put a cap on armor class [3.7: was +127,-128, now reduced to +/- 99 */
+    /* put a cap on armor class [5.0: was +127,-128, now reduced to +/- 99 */
     if (abs(uac) > AC_MAX)
         uac = sgn(uac) * AC_MAX;
 

@@ -1080,7 +1080,7 @@ domonnoise(struct monst *mtmp)
         } else
             switch (monsndx(ptr)) {
             case PM_HOBBIT:
-                /* 3.7: the 'complains' message used to be given if the
+                /* 5.0: the 'complains' message used to be given if the
                    hobbit's current hit points were at 10 below max or
                    less, but their max is normally less than 10 so it
                    would almost never occur */

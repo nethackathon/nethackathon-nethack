@@ -1525,7 +1525,7 @@ cheapest_item(int ibillct, Bill *ibill)
     long gmin = ibill[0].cost;
 
     /*
-     * 3.7: old version didn't determine cheapest item correctly if it
+     * 5.0: old version didn't determine cheapest item correctly if it
      * was either the partly used or partly intact portion of a partially
      * used stack.  Rather than modify it to use bp_to_obj() in order to
      * obtain quanities for every entry on eshkp->bill_p[], switch to
@@ -2107,7 +2107,7 @@ pay_billed_items(
     } while (via_menu);
 
     /*
-     * 3.7:  this used to make two passes through eshkp->bill_p[],
+     * 5.0:  this used to make two passes through eshkp->bill_p[],
      * the first for used up items and the second for unpaid ones.
      * Items which were partly used were processed on both passes.
      *

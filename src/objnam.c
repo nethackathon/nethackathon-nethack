@@ -4106,9 +4106,9 @@ readobjnam_preparse(struct _readobjnam_data *d)
                 break;
             d->gsize = 1;
         } else if (!strncmpi(d->bp, "medium ", l = 7)) {
-            /* 3.7: in 3.6, "medium" was only used during wishing and the
+            /* 5.0: in 3.6, "medium" was only used during wishing and the
                mid-size glob had no adjective when formatted, but as of
-               3.7, "medium" has become an explicit part of the name for
+               5.0, "medium" has become an explicit part of the name for
                combined globs of at least 5 individual ones (owt >= 100)
                and less than 15 (owt < 300) */
             d->gsize = 2;

@@ -1505,7 +1505,7 @@ seffect_remove_curse(struct obj **sobjp)
     if (scursed) {
         pline_The("scroll disintegrates.");
     } else {
-        /* 3.7: this used to use a straight
+        /* 5.0: this used to use a straight
                for (obj = invent; obj; obj = obj->nobj) {}
            traversal, but for the confused case, secondary weapon might
            become cursed and be dropped, moving it from the invent chain
@@ -3212,7 +3212,7 @@ create_particular_parse(
     d->which = name_to_mon(bufp, &gender_name_var);
     /*
      * With the introduction of male and female monster names
-     * in 3.7, preserve that detail.
+     * in 5.0, preserve that detail.
      *
      * If d->fem is already set to MALE or FEMALE at this juncture, it means
      * one of those terms was explicitly specified.

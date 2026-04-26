@@ -77,7 +77,7 @@ boulder_hits_pool(
                 levl[rx][ry].typ = ROOM, levl[rx][ry].flags = 0;
                 recalc_block_point(rx, ry);
             }
-            /* 3.7: normally DEADMONSTER() is used when traversing the fmon
+            /* 5.0: normally DEADMONSTER() is used when traversing the fmon
                list--dead monsters usually aren't still at specific map
                locations; however, if ice melts causing a giant to drown,
                that giant would still be on the map when it drops inventory;
@@ -1533,7 +1533,7 @@ goto_level(
      *   -2    5.21   4.17   0.0
      *   -3    2.08   0.0    0.0
      *
-     * 3.7.0: the chance for the "mysterious force" to kick in goes down
+     * 5.0.0: the chance for the "mysterious force" to kick in goes down
      * as it kicks in, starting at 25% per climb attempt and dropping off
      * gradually but substantially.  The drop off is greater when hero is
      * sent down farther so benefits lawfuls more than chaotics this time.
@@ -2438,7 +2438,7 @@ set_wounded_legs(long side, int timex)
         set_itimeout(&HWounded_legs, (long) timex);
     /* the leg being wounded and its timeout might differ from one
        attack to the next, but we don't track the legs separately;
-       3.7: both legs will ultimately heal together; this used to use
+       5.0: both legs will ultimately heal together; this used to use
        direct assignment instead of bitwise-OR so getting wounded in
        one leg mysteriously healed the other */
     EWounded_legs |= side;

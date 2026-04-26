@@ -1312,7 +1312,7 @@ gulpmu(struct monst *mtmp, struct attack *mattk)
         place_monster(mtmp, u.ux, u.uy);
         set_ustuck(mtmp);
         newsym(mtmp->mx, mtmp->my);
-        /* 3.7: dismount for all engulfers, not just for purple worms */
+        /* 5.0: dismount for all engulfers, not just for purple worms */
         if (u.usteed) {
             char buf[BUFSZ];
 

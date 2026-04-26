@@ -961,7 +961,7 @@ fall_asleep(int how_long, boolean wakeup_msg)
     if (wakeup_msg && gm.multi == how_long) {
         /* caller can follow with a direct call to Hear_again() if
            there's a need to override this when wakeup_msg is true */
-        /* 3.7: how_long is negative so wasn't actually incrementing the
+        /* 5.0: how_long is negative so wasn't actually incrementing the
            deafness timeout when it used to be passed as-is */
         incr_itimeout(&HDeaf, abs(how_long));
         disp.botl = TRUE;

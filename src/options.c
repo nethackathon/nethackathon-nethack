@@ -3679,7 +3679,7 @@ optfn_scores(
         if ((op = string_for_opt(opts, FALSE)) == empty_optstr)
             return optn_err;
 
-        /* 3.7: earlier versions left old values for unspecified arguments
+        /* 5.0: earlier versions left old values for unspecified arguments
            if player's scores:foo option only specified some of the three;
            in particular, attempting to use 'scores:own' rather than
            'scores:0 top/0 around/own' didn't work as intended */

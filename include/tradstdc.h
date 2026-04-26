@@ -157,7 +157,7 @@ typedef const char *vA;
    [nethack's core doesn't use VA_NEXT() so doesn't use VA_SHIFT()
    either, and this definition is just retained for completeness.
    lev_comp does use VA_NEXT(), but it passes all 'argX' arguments.
-   Note: as of 3.7.0, lev_comp doesn't exist anymore.]
+   Note: as of 5.0.0, lev_comp doesn't exist anymore.]
  */
 #define VA_SHIFT()                                                    \
     (arg1 = arg2, arg2 = arg3, arg3 = arg4, arg4 = arg5, arg5 = arg6, \

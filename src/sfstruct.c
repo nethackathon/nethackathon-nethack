@@ -308,7 +308,7 @@ static long floc = 0L;
 
 /*
  * historical structlevel savefile writing and reading routines follow.
- * These were moved here from save.c and restore.c between 3.6.3 and 3.7.0.
+ * These were moved here from save.c and restore.c between 3.6.3 and 5.0.0,.
  */
 
 staticfn int getidx(int, int);

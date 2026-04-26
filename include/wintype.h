@@ -167,7 +167,7 @@ typedef struct glyphinfo {
 #define MENU_ITEMFLAGS_SKIPINVERT     0x0000002U
 #define MENU_ITEMFLAGS_SKIPMENUCOLORS 0x0000004U
 
-/* 3.7+ enhanced menu flags that not all window ports are likely to
+/* 5.0+ enhanced menu flags that not all window ports are likely to
  * support initially.
  *
  * As behavior and appearance modification flags are added, the various

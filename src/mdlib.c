@@ -93,7 +93,7 @@ staticfn void opt_out_words(char *, int *) NONNULLPTRS;
 staticfn void build_savebones_compat_string(void);
 
 static int idxopttext, done_runtime_opt_init_once = 0;
-#define MAXOPT 60 /* 3.7: currently 40 lines get inserted into opttext[] */
+#define MAXOPT 60 /* 5.0: currently 40 lines get inserted into opttext[] */
 static char *opttext[MAXOPT] = { 0 };
 #define STOREOPTTEXT(line) \
     ((void) ((idxopttext < MAXOPT)                      \

@@ -224,7 +224,7 @@ worm_move(struct monst *worm)
             wgrowtime[wnum] = svm.moves + rnd(5);
         } else {
             int mmove = mcalcmove(worm, FALSE),
-                /* prior to 3.7.0, next-grow increment was 3..17 but since
+                /* prior to 5.0.0,, next-grow increment was 3..17 but since
                    it got checked every 4th turn when the speed 3 worm got
                    to move, it was effectively 0..5; also, its usage was
                    'wgrowtime += incr', so often 'wgrowtime' would be

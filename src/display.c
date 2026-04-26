@@ -2214,7 +2214,7 @@ flush_screen(int cursor_on_u)
     glyph_info bkglyphinfo = nul_glyphinfo;
     int bkglyph;
 
-    /* 3.7: don't update map, status, or perm_invent during save/restore */
+    /* 5.0: don't update map, status, or perm_invent during save/restore */
     if (_suppress_map_output())
         return;
 
@@ -3453,7 +3453,7 @@ t_warn(struct rm *lev)
     static const char warn_str[] = "wall_angle: %s: case %d: seenv = 0x%x";
     const char *wname;
 
-    /* 3.7: non-T_wall cases added after shop repair (via breaching a wall,
+    /* 5.0: non-T_wall cases added after shop repair (via breaching a wall,
        using locking magic to put a door there, then unlocking the door;
        D_CLOSED carried over to the wall) triggered warning for "unknown" */
     switch (lev->typ) {

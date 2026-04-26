@@ -422,7 +422,7 @@ extern struct nomakedefs_s nomakedefs;
 #include "color.h"
 
 /*
- * Version 3.7.x has aspirations of portable file formats. We
+ * Version 5.0.x has aspirations of portable file formats. We
  * make a distinction between MAIL functionality and MAIL_STRUCTURES
  * so that the underlying structures are consistent, whether MAIL is
  * defined or not.

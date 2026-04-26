@@ -433,7 +433,7 @@ objtyp_is_callable(int i)
 
     switch(objects[i].oc_class) {
     case AMULET_CLASS:
-        /* 3.7: calling these used to be allowed but that enabled the
+        /* 5.0: calling these used to be allowed but that enabled the
            player to tell whether two unID'd amulets of yendor were both
            fake or one was real by calling them distinct names and then
            checking discoveries to see whether first name was replaced

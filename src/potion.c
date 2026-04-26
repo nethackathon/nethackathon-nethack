@@ -582,7 +582,7 @@ dodrink(void)
      * was no longer dealing with an inventory item.  Unwearing
      * the current potion is intended to keep it in inventory.]
      *
-     * 3.7: switch back to relying on useup() unless the object is
+     * 5.0: switch back to relying on useup() unless the object is
      * actually worn.  Otherwise drinking a stack of unpaid potions
      * one by one in a shop makes each one a separate used-up item
      * for 'Ix' invent display and for itemized shop billing instead

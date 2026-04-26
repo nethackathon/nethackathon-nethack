@@ -556,7 +556,7 @@ look_at_monster(
 
 /* describe a pool location's contents; might return a static buffer so
    caller should use it or copy it before calling waterbody_name() again
-   [3.7: moved here from mkmaze.c] */
+   [5.0: moved here from mkmaze.c] */
 const char *
 waterbody_name(coordxy x, coordxy y)
 {

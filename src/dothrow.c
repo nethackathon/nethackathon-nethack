@@ -2082,7 +2082,7 @@ thitmonst(
     /* throwing real gems to co-aligned unicorns boosts Luck,
        to cross-aligned unicorns changes Luck by random amount;
        throwing worthless glass doesn't affect Luck but doesn't anger them;
-       3.7: treat rocks and gray stones as attacks rather than like glass
+       5.0: treat rocks and gray stones as attacks rather than like glass
        and also treat gems or glass shot via sling as attacks */
     if (obj->oclass == GEM_CLASS && is_unicorn(mon->data)
         && objects[obj->otyp].oc_material != MINERAL && !uslinging()) {

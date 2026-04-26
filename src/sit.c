@@ -214,7 +214,7 @@ throne_sit_effect(void)
             You_feel("somehow out of place...");
     }
 
-    /* 3.7: when the random chance for removal is hit, ask for confirmation
+    /* 5.0: when the random chance for removal is hit, ask for confirmation
        if in wizard mode, and remove the throne even if hero was teleported
        away from it.  [This used to remove a throne at hero's current
        location if there happened to be one, so for the teleport case that

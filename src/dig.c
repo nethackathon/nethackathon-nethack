@@ -455,7 +455,7 @@ dig(void)
         } else if (digtyp == DIGTYP_BOULDER
                    && (obj = sobj_at(BOULDER, dpx, dpy)) != 0) {
             fracture_rock(obj);
-            /*[3.7: this probably isn't necessary anymore]*/
+            /*[5.0: this probably isn't necessary anymore]*/
             if ((bobj = sobj_at(BOULDER, dpx, dpy)) != 0) {
                 /* another boulder here, restack it to the top */
                 obj_extract_self(bobj);

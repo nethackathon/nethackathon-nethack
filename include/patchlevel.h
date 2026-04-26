@@ -62,7 +62,7 @@
 /*#define VERSION_COMPATIBILITY 0x03070000L*/
 
 /****************************************************************************/
-/* Version 3.7.x */
+/* Version 5.0.x */
 
 /*
  *  NetHack 5.0.0, <insert date here>
@@ -95,7 +95,7 @@
  *      the official 3.6.6 binary was built.
  *  windows: switch from using keyhandling dll's to incorporating the three
  *      variations (default, ray, 340) in sys/winnt/nttty.c
- *  curses: cherry-picked selectsaved code from 3.7 for menu of save files
+ *  curses: cherry-picked selectsaved code from 5.0 for menu of save files
  *  NetHackW: fix delayed rendering of cursor when using farlook
  */
 

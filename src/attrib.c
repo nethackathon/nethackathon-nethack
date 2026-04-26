@@ -683,7 +683,7 @@ rnd_attr(void)
 {
     int i, x = rn2(100);
 
-    /* 3.7: the x -= ... calculation used to have an off by 1 error that
+    /* 5.0: the x -= ... calculation used to have an off by 1 error that
        resulted in the values being biased toward Str and away from Cha */
     for (i = 0; i < A_MAX; ++i)
         if ((x -= gu.urole.attrdist[i]) < 0)
