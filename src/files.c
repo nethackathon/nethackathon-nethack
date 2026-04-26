@@ -2103,7 +2103,7 @@ make_converted_name(const char *filename)
             size_t sz = strlen(folderbuf);
 
             Snprintf(eos(folderbuf), sizeof folderbuf - sz,
-                     "\\AppData\\Local\\NetHack\\3.7\\");
+                     "\\AppData\\Local\\NetHack\\5.0\\");
             dir = (const char *) folderbuf;
         }
 #endif /* UNIX || WIN32 */
