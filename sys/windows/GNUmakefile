@@ -357,7 +357,7 @@ endif
 
 ifeq "$(GCC_EXTRA_WARNINGS)" "Y"
 #
-# These match the warnings enabled on the linux.370 and macOS.370 hints builds
+# These match the warnings enabled on the linux.500 and macOS.500 hints builds
 #
 CFLAGSXTRA = -Wall -Wextra -Wreturn-type -Wunused -Wswitch -Wshadow \
 	     -Wwrite-strings -pedantic -Wmissing-declarations \
