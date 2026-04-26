@@ -3933,7 +3933,7 @@ and also
 .op autopickup_exception
 for ways to refine the behavior.
 .lp ""
-Note: prior to version 3.7.0, the default for
+Note: prior to version 5.0.0, the default for
 .op autopickup
 was \fIon\fP.
 .lp autoquiver
@@ -5670,7 +5670,7 @@ An entry that maps a sound file to a user-specified message pattern.
 Each SOUND entry is broken down into the following parts:
 .PS "sound index"
 .PL MESG
-message window mapping (the only one supported in 3.7.0);
+message window mapping (the only one supported in 5.0.0);
 .PL msgtype
 optional; message type to use, see \(lqConfiguring Message Types\(rq
 .PL pattern
@@ -6326,7 +6326,7 @@ Allows the following placeholders:
 .PL \f(CR%%\fP
 literal \(oq\f(CR%\fP\(cq
 .PL \f(CR%v\fP
-version (eg. \(lq\f(CR3.7.0\-0\fP\(rq)
+version (eg. \(lq\f(CR5.0.0\-0\fP\(rq)
 .PL \f(CR%u\fP
 game UID
 .PL \f(CR%t\fP
