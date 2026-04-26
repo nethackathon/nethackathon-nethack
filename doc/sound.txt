@@ -495,7 +495,7 @@ use the following guidelines:
                         These hints files might require updates to
                         include your new soundlib addition. You can
                         look at what was done for macsound support
-                        in sys/unix/hints/macOS.370 for inspiration.
+                        in sys/unix/hints/macOS.500 for inspiration.
 
        sys/unix/NetHack.xcodeproj/project.pbxproj
 
