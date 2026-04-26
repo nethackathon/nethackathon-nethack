@@ -1,4 +1,4 @@
-/* NetHack 3.7	video.c	$NHDT-Date: 1596498277 2020/08/03 23:44:37 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.16 $ */
+/* NetHack 5.0	video.c	$NHDT-Date: 1596498277 2020/08/03 23:44:37 $  $NHDT-Branch: NetHack-3.7 $:$NHDT-Revision: 1.16 $ */
 /*   Copyright (c) NetHack PC Development Team 1993, 1994, 2001     */
 /*   NetHack may be freely redistributed.  See license for details. */
 
