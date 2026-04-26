@@ -522,7 +522,7 @@ relink_light_sources(boolean ghostly)
 
     /*
      * Caveat:
-     *  There has been at least one instance during to-be-3.7 development
+     *  There has been at least one instance during to-be-5.0 development
      *  where the light_base linked list ended up with a circular link.
      *  If that happens, then once all the traversed elements have their
      *  LSF_NEEDS_FIXUP flag cleared, the traversal attempt will run wild.

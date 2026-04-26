@@ -7,7 +7,7 @@
 #include "dlb.h"
 
 /*      [Note:  this comment is fairly old, but still accurate for 3.1;
- *       it's no longer accurate for 3.7 but may still be of interest.]
+ *       it's no longer accurate for 5.0 but may still be of interest.]
  * Rumors have been entirely rewritten to speed up the access.  This is
  * essential when working from floppies.  Using fseek() the way that's done
  * here means rumors following longer rumors are output more often than those

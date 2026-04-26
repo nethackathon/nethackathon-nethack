@@ -27,12 +27,12 @@
  * Returns true if the hero can sense the given monster.  This includes
  * monsters that are hiding or mimicking other monsters.
  *
- * [3.7] Note: the map doesn't display any monsters when hero is swallowed
+ * [5.0] Note: the map doesn't display any monsters when hero is swallowed
  * (or display non-adjacent, non-submerged ones when hero is underwater),
  * so treat those situations as blocking telepathy, detection, and warning
  * even though conceptually they shouldn't do so.
  *
- * [3.7 also] The macros whose name begins with an underscore have been
+ * [5.0 also] The macros whose name begins with an underscore have been
  * converted to functions in order to have compilers generate smaller code.
  * The retained underscore versions are still used in display.c but should
  * only be used in other situations if the function calls actually produce
@@ -138,7 +138,7 @@
  * creature in an apparently empty spot.
  * Infravision is not relevant; we assume that invisible monsters are also
  * invisible to infravision.
- * [3.7: the macro definition erroneously started with 'mtmp->minvis' for
+ * [5.0: the macro definition erroneously started with 'mtmp->minvis' for
  * over 20 years.  The one place it's used called it as knowninvisible(mtmp)
  * so worked by coincidence when there was no argument expansion involved
  * on the first line.]

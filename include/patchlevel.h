@@ -7,8 +7,8 @@
 #define PATCHLEVEL_H
 
 /* NetHack 5.0.x */
-#define VERSION_MAJOR 3
-#define VERSION_MINOR 7
+#define VERSION_MAJOR 5
+#define VERSION_MINOR 0
 /*
  * PATCHLEVEL is updated for each release.
  */
@@ -17,7 +17,7 @@
  * Incrementing EDITLEVEL can be used to force invalidation of old bones
  * and save files.
  */
-#define EDITLEVEL 141
+#define EDITLEVEL 0
 
 /*
  * Development status possibilities.
@@ -30,7 +30,7 @@
 /*
  * Development status of this NetHack version.
  */
-#define NH_DEVEL_STATUS NH_STATUS_WIP
+#define NH_DEVEL_STATUS NH_STATUS_RELEASED
 
 #ifndef DEBUG  /* allow tool chains to define without causing warnings */
 #define DEBUG
@@ -75,7 +75,7 @@
 /*  Patch 7, February 16, 2023
  *
  *  during engraving, spaces were counted instead of non-space (cherry-pick of
- *      4e0a1e04 from NetHack-3.7)
+ *      4e0a1e04 from NetHack WIP)
  *  avoid potential buffer overflow in append_str()
  *  resolve missing dependency in NetHack.sln
  *  code in include/tradstdc.h was trying to suppress warn_unused result by

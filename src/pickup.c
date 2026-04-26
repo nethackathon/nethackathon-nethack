@@ -544,7 +544,7 @@ allow_category(struct obj *obj)
      *  1) object class (armor, potion, &c);
      *  2) unpaid shop item;
      *  3) bless/curse state (blessed, uncursed, cursed, BUC-unknown).
-     * Version 3.7 added a fourth:
+     * Version 5.0 added a fourth:
      *  4) 'novelty' ('P' for just picked up items).
      * When only one type is present, the situation is simple:
      * to be accepted, obj's status must match one of the entries.

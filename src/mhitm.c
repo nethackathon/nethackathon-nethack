@@ -919,7 +919,7 @@ gulpmm(
          *  -> relmon() used to call remove_monster() for the dead
          *  monster even when it wasn't the one on the map, so we
          *  needed to put magr back after mdef was killed and removed
-         *  from their shared spot.  But now [3.7] relmon() calls
+         *  from their shared spot.  But now [5.0] relmon() calls
          *  mon_leaving_level() and that checks whether the monster at
          *  dying monster's coordinates is that dying monster and only
          *  removes it when they match.  So magr is still at mdef's

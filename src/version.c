@@ -118,7 +118,7 @@ status_version(char *buf, size_t bufsz, boolean indent)
 #if 0
         /* note: it's possible for branch name to be a prefix of game name
            but that's unlikely enough that we won't bother with it; having
-           branch "nethack-3.7" be a superset of game "nethack" seems like
+           branch "nethack-5.0" be a superset of game "nethack" seems like
            including both is redundant, but having branch "net" be a subset
            of game "nethack" doesn't feel that way; optimizing "net" out
            seems like it would be a mistake */
