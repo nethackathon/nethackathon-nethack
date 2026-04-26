@@ -1,4 +1,4 @@
-# NetHack 3.7  linux.500 $NHDT-Date: 1693519390 2023/08/31 22:03:10 $  $NHDT-Branch: keni-crashweb2 $:$NHDT-Revision: 1.61 $
+# NetHack 5.0  linux.500 $NHDT-Date: 1693519390 2023/08/31 22:03:10 $  $NHDT-Branch: keni-crashweb2 $:$NHDT-Revision: 1.61 $
 # Copyright (c) Kenneth Lorber, Kensington, Maryland, 2007.
 # NetHack may be freely redistributed.  See license for details.
 #
@@ -20,7 +20,7 @@
 #        multiw-1.500 contains sections 1 to 2
 #-INCLUDE multiw-1.500
 
-HINTSVERSION := 370
+HINTSVERSION := 500
 
 ifdef MAKEFILE_TOP
 ifeq ($(MAKELEVEL),0)

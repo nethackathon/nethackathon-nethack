@@ -1,4 +1,4 @@
-# NetHack 3.7  macOS.500 $NHDT-Date: 1693359574 2023/08/30 01:39:34 $  $NHDT-Branch: keni-crashweb2 $:$NHDT-Revision: 1.138 $
+# NetHack 5.0  macOS.500 $NHDT-Date: 1693359574 2023/08/30 01:39:34 $  $NHDT-Branch: keni-crashweb2 $:$NHDT-Revision: 1.138 $
 # Copyright (c) Kenneth Lorber, Kensington, Maryland, 2015.
 # NetHack may be freely redistributed.  See license for details.
 #
@@ -20,7 +20,7 @@
 # note: '#-INCLUDE' is not just a comment; multiw-1 contains sections 1 to 2
 #-INCLUDE multiw-1.500
 
-HINTSVERSION := 370
+HINTSVERSION := 500
 
 ifdef MAKEFILE_TOP
 ifeq ($(MAKELEVEL),0)
