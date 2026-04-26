@@ -76,7 +76,7 @@ fixes3-2-2.txt     fixes3-2-3.txt     fixes3-3-0.txt     fixes3-3-1.txt
 fixes3-4-0.txt     fixes3-4-1.txt     fixes3-4-2.txt     fixes3-4-3.txt
 fixes3-5-0.txt     fixes3-6-0.txt     fixes3-6-1.txt     fixes3-6-2.txt
 fixes3-6-3.txt     fixes3-6-4.txt     fixes3-6-5.txt     fixes3-6-6.txt
-fixes3-6-7.txt     fixes3-7-0.txt     fixesX-X-X.txt     lua.adoc
+fixes3-6-7.txt     fixes5-0-0.txt     fixesX-X-X.txt     lua.adoc
 makedefs.6         makedefs.txt       mn.7               mn.txt
 mnh.7              mnh.txt            nethack.6          nethack.txt
 options.txt        recover.6          recover.txt        sound.txt
@@ -351,11 +351,8 @@ random.c
 (Berkeley uudecode file, which may be used in build process of any version)
 uudecode.c
 
-(file for MSDOS, OS/2, Amiga, and Atari versions - only MSDOS tested for 5.0)
-pcmain.c
-
-(file for MSDOS, OS/2, and Atari versions - only MSDOS tested for 5.0)
-NetHack.cnf  pctty.c
+(file for MSDOS, Amiga versions)
+NetHack.cnf  pcmain.c     pctty.c
 
 (file for MSDOS, OS/2, and VMS versions)
 termcap
@@ -363,7 +360,7 @@ termcap
 (file for VMS version)
 tclib.c
 
-(files for MSDOS, OS/2 and Atari versions - only MSDOS tested for 5.0)
+(files for MSDOS, Amiga versions)
 pcsys.c   pcunix.c
 
 (files for OS/2 version - untested for 5.0)
