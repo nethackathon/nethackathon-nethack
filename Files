@@ -202,14 +202,6 @@ outdated/sys/wince/ceinc/sys:
 (sys/stat.h for Windows CE and PocketPC - untested for 3.6.2)
 stat.h
 
-outdated/sys/windows:
-(files that are no longer maintained for current game code)
-travis-gcc.sh
-
-outdated/sys/windows/vs:
-(files that are no longer maintained for current game code)
-travisci.sh
-
 outdated/win/Qt3:
 (files for the Qt 3 widget library - X11, Windows, Mac OS X, or Qtopia)
 Info.plist           Install.Qt           knethack.lnk
@@ -359,10 +351,10 @@ random.c
 (Berkeley uudecode file, which may be used in build process of any version)
 uudecode.c
 
-(file for MSDOS, OS/2, Amiga, and Atari versions - only MSDOS tested for 3.7)
+(file for MSDOS, OS/2, Amiga, and Atari versions - only MSDOS tested for 5.0)
 pcmain.c
 
-(file for MSDOS, OS/2, and Atari versions - only MSDOS tested for 3.7)
+(file for MSDOS, OS/2, and Atari versions - only MSDOS tested for 5.0)
 NetHack.cnf  pctty.c
 
 (file for MSDOS, OS/2, and VMS versions)
@@ -371,10 +363,10 @@ termcap
 (file for VMS version)
 tclib.c
 
-(files for MSDOS, OS/2 and Atari versions - only MSDOS tested for 3.7)
+(files for MSDOS, OS/2 and Atari versions - only MSDOS tested for 5.0)
 pcsys.c   pcunix.c
 
-(files for OS/2 version - untested for 3.7)
+(files for OS/2 version - untested for 5.0)
 Makefile.lib  termcap.uu
 
 (files for UNIX and Be versions)
@@ -416,16 +408,16 @@ NetHack.xcscheme   makedefs.xcscheme  recover.xcscheme
 
 sys/unix/hints:
 (files for configuring UNIX NetHack versions)
-linux-minimal       linux.370           macOS.370
+linux-minimal       linux.500           macOS.500
 macosx.sh           solaris             solaris-playground
 unix
 
 sys/unix/hints/include:
 (files for configuring UNIX NetHack versions)
-compiler.370       cross-post.370     cross-pre1.370     cross-pre2.370
-gbdates-post.370   gbdates-pre.370    misc.370           multisnd-post.370
-multisnd1-pre.370  multisnd2-pre.370  multiw-1.370       multiw-2.370
-response.370
+compiler.500       cross-post.500     cross-pre1.500     cross-pre2.500
+gbdates-post.500   gbdates-pre.500    misc.500           multisnd-post.500
+multisnd1-pre.500  multisnd2-pre.500  multiw-1.500       multiw-2.500
+response.500
 
 sys/vms:
 (files for VMS version)
