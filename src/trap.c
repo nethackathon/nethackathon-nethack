@@ -2700,9 +2700,6 @@ trapeffect_rolling_boulder_trap(
                     trap->tseen = TRUE;
                 if (DEADMONSTER(mtmp))
                     trapkilled = TRUE;
-            } else {
-                deltrap(trap);
-                newsym(mtmp->mx, mtmp->my);
             }
             return trapkilled ? Trap_Killed_Mon : mtmp->mtrapped
                 ? Trap_Caught_Mon : Trap_Effect_Finished;
