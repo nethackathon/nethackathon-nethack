@@ -6777,6 +6777,72 @@ some bug fixes.
 NetHack 3.6.7 was released on February 16, 2023 containing a security fix and
 some bug fixes.
 .pg
+Development work for the major release to follow NetHack 3.6 begain in 2015
+around the same time as NetHack 3.6.0 was being released. That development
+work continued in parallel to each of the NetHack 3.6 releases from 2015
+through 2023, and continued until the end of April 2026.  For the first time,
+that development was shared publicly on GitHub and SourceForge as it occurred.
+It was done under the label NetHack-3.7 work-in-progress (WIP), although the
+version number for the next release had not yet been solidified.
+.pg
+Exposure of the development to the public brought many good things, and some
+challenges. People were able to observe and critize changes and new features
+almost immediately, and they often did. The GitHub pull request system made
+it straightforward for people to contribute directly to development.
+Contributions resolved many, many bugs in the game and we thank all the
+contributors.
+.pg
+In early 2026, with the game development getting stable enough to consider
+initiating an official release, the devteam reviewed the nature and number of
+changes in the game. It was clear that there was sufficient depth and 
+breadth to warrant a major release and version 5.0 was decided on.
+That's a new major release over 3.x, without opening up any ambiguity
+or confusion with existing variants that there might have been had it
+been released version 4.0.
+.pg
+NetHack 5.0.0 was released on ???? ??, 2026.
+.pg
+The source code for NetHack 5.0.0 was modified and modernized to be 
+compliant with standard C99.
+.pg
+NetHack 5.0 was the first version to replace the lex and yacc level
+and dungeon compilers of past versions, with a new Lua interpreter-based
+approach to provide those elements. Lua is also used for the quest texts
+in NetHack 5.0.0. The entire development team acknowledges the work
+done by \fBPasi Kallinen\fP to make that happen.
+.pg
+At the time of the NetHack 5.0 release, the core development team,
+active and alumni, included \fBWarwick Allison\fP, \fBMichael Allison\fP,
+\fBKen Arromdee\fP, \fBDavid Cohrs\fP, \fBJessie Collet\fP, \fBBart House\fP,
+\fBKevin Hugo\fP, \fBPasi Kallinen\fP, \fBKen Lorber\fP, \fBDean Luick\fP,
+\fBPat Rankin\fP, \fBDerek S. Ray\fP, \bBAlex Smith\fP, \fBPatric Mueller\fP,
+\fBMike Stephenson\fP, \fBJanet Walz\fP, \fBPaul Winner\fP. 
+.pg 
+\fBKen Lorber\fP, \fBPat Rankin\fP, \fBPatrick Mueller\fP and
+\fBMichael Allison\fP helped ensure that NetHack 5.0 would run
+on macOS.
+.pg
+\fBIngo Paschke\fP somehow managed to revive a NetHack 5.0 port for the Amiga,
+using a cross-compiler on a modern platform to do so. His work was shared so
+other's can straightforwardly produce NetHack 5.0 for the Amiga thanks to his
+efforts.
+.pg
+\fBRay Chason\fP contributed the majority of maintenance work for the
+NetHack 5.0 MS-DOS port, including porting the curses interface to it.
+\fBMichael Allison\fP ensured that NetHack 5.0 core changes continued to
+work with the msdos port and keep it alive.  Cross-compiling the MS-DOS
+port has helped make that possible and mostly painless.
+.pg
+People that contributed to the Windows port of NetHack 5.0 since the
+development of NetHack 5.0 begain over eleven years ago, included
+\fBMichael Allison\fP, \fBDavid Cohrs\fP, \fBBart House\fP,
+\fBPasi Kallinen\fP, \fBAlex Kompel\fP, \fBDion Nicolaas\fP,
+\fBDerek S. Ray\fP and \fBYitzhak Sapir\fP.
+.pg
+With sadness, the devteam would like to acknowledge and remember the past
+contributions from the late \fBRon Van Iwaarden\fP, who was the sole maintainer
+of NetHack for OS/2 for several past NetHack releases. Ron will be missed.
+.pg
 The official NetHack web site is maintained by \fBKen Lorber\fP
 at
 .UR https://www.nethack.org/ .
