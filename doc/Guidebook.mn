@@ -6798,7 +6798,7 @@ changes in the game. It was clear that there was sufficient depth and
 breadth to warrant a major release and version 5.0 was decided on.
 That's a new major release over 3.x, without opening up any ambiguity
 or confusion with existing variants that there might have been had it
-been released version 4.0.
+been released as version 4.0.
 .pg
 NetHack 5.0.0 was released on , 2026.
 .pg
@@ -6824,7 +6824,7 @@ on macOS.
 .pg
 \fBIngo Paschke\fP somehow managed to revive a NetHack 5.0 port for the Amiga,
 using a cross-compiler on a modern platform to do so. His work was shared so
-other's can straightforwardly produce NetHack 5.0 for the Amiga thanks to his
+others can straightforwardly produce NetHack 5.0 for the Amiga thanks to his
 efforts.
 .pg
 \fBRay Chason\fP contributed the majority of maintenance work for the
