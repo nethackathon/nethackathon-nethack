@@ -6132,7 +6132,7 @@ If your platform or terminal supports the display of UTF-8 character
 sequences, you can customize your game display by assigning Unicode
 codepoint values and \fIred-green-blue\fP colors to glyph
 representations. The customizations can be specified for use with a symset that
-has a UTF8 handler within the symbols file such as the enhanced1 set, or 
+has a UTF8 handler within the symbols file such as the enhanced1 set, or
 individually within your nethack.rc file.
 .pg
 The format for defining a glyph representation is:
@@ -6153,7 +6153,7 @@ U+224B and the color represented by R-G-B value 0-0-160:
 OPTIONS=glyph:G_pool/U+224B/0-0-160
 .ft
 .ED
-The list of acceptable glyphid's can be produced by 
+The list of acceptable glyphid's can be produced by
 \fBnethack \-\-dumpglyphids\fP.
 Individual NetHack glyphs can be specified using the G_ prefix,
 or you can use an S_ symbol for a glyphid and store the custom
@@ -6794,15 +6794,15 @@ contributors.
 .pg
 In early 2026, with the game development getting stable enough to consider
 initiating an official release, the devteam reviewed the nature and number of
-changes in the game. It was clear that there was sufficient depth and 
+changes in the game. It was clear that there was sufficient depth and
 breadth to warrant a major release and version 5.0 was decided on.
 That's a new major release over 3.x, without opening up any ambiguity
 or confusion with existing variants that there might have been had it
 been released version 4.0.
 .pg
-NetHack 5.0.0 was released on ???? ??, 2026.
+NetHack 5.0.0 was released on , 2026.
 .pg
-The source code for NetHack 5.0.0 was modified and modernized to be 
+The source code for NetHack 5.0.0 was modified and modernized to be
 compliant with standard C99.
 .pg
 NetHack 5.0 was the first version to replace the lex and yacc level
@@ -6816,8 +6816,8 @@ active and alumni, included \fBWarwick Allison\fP, \fBMichael Allison\fP,
 \fBKen Arromdee\fP, \fBDavid Cohrs\fP, \fBJessie Collet\fP, \fBBart House\fP,
 \fBKevin Hugo\fP, \fBPasi Kallinen\fP, \fBKen Lorber\fP, \fBDean Luick\fP,
 \fBPat Rankin\fP, \fBDerek S. Ray\fP, \bBAlex Smith\fP, \fBPatric Mueller\fP,
-\fBMike Stephenson\fP, \fBJanet Walz\fP, \fBPaul Winner\fP. 
-.pg 
+\fBMike Stephenson\fP, \fBJanet Walz\fP, \fBPaul Winner\fP.
+.pg
 \fBKen Lorber\fP, \fBPat Rankin\fP, \fBPatrick Mueller\fP and
 \fBMichael Allison\fP helped ensure that NetHack 5.0 would run
 on macOS.
