@@ -6777,7 +6777,7 @@ some bug fixes.
 NetHack 3.6.7 was released on February 16, 2023 containing a security fix and
 some bug fixes.
 .pg
-Development work for the major release to follow NetHack 3.6 begain in 2015
+Development work for the major release to follow NetHack 3.6 began in 2015
 around the same time as NetHack 3.6.0 was being released. That development
 work continued in parallel to each of the NetHack 3.6 releases from 2015
 through 2023, and continued until the end of April 2026.  For the first time,
@@ -6786,7 +6786,7 @@ It was done under the label NetHack-3.7 work-in-progress (WIP), although the
 version number for the next release had not yet been solidified.
 .pg
 Exposure of the development to the public brought many good things, and some
-challenges. People were able to observe and critize changes and new features
+challenges. People were able to observe and criticize changes and new features
 almost immediately, and they often did. The GitHub pull request system made
 it straightforward for people to contribute directly to development.
 Contributions resolved many, many bugs in the game and we thank all the
