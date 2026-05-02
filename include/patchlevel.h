@@ -67,7 +67,7 @@
 /*
  *  NetHack 5.0.0, May 2, 2026
  *
- *  Sources changed to C99.
+ *  Sources changed to be compliant with the C99 standard.
  *  level compiler, dungeon compiler, and quest text all replaced with
  *    Lua alternatives.
  *  Refer to doc/fixes5-0-0.txt for a complete list of fixes and changes.
