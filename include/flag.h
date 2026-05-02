@@ -156,6 +156,15 @@ struct flag {
     boolean showrace;  /* show hero glyph by race rather than by role */
     boolean travelcmd; /* allow travel command */
     int runmode;       /* update screen display during run moves */
+
+    int reserved1;
+    int reserved2;
+    int reserved3;
+    int reserved4;
+    int reserved5;
+    int reserved6;
+    int reserved7;
+    int reserved8;
 };
 
 /*

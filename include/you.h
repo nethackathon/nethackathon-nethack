@@ -160,6 +160,10 @@ struct u_conduct {     /* number of times... */
     long sokocheat;    /* violated special 'rules' in Sokoban */
     long pets;         /* obtained a pet */
     /* genocides already listed at end of game */
+    long reserved1;
+    long reserved2;
+    long reserved3;
+    long reserved4;
 };
 
 struct u_roleplay {
@@ -168,6 +172,9 @@ struct u_roleplay {
     boolean deaf;    /* permanently deaf */
     boolean pauper;  /* no starting inventory */
     boolean reroll;  /* starting inventory/attr rerolling enabled */
+    boolean reserved1;
+    boolean reserved2;
+    boolean reserved3;
     long numbones;   /* # of bones files loaded */
     long numrerolls; /* # of rerolls used */
 };
