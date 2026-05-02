@@ -299,9 +299,9 @@ been released as version 4.0.
 
 NetHack 5.0.0 was released on May 2, 2026.
 
-The source code for NetHack 5.0.0 was modified and modernized to be
-compliant with standard C99. The 5.0.0 release contained over 3100 fixes,
-changes, and updated features.
+The source code for NetHack 5.0.0 was modified and modernized to be compliant
+with the C99 standard. The 5.0.0 release contained over 3100 fixes,changes,
+and updated features.
 
 NetHack 5.0 was the first version to replace the lex and yacc level
 and dungeon compilers of past versions, with a new Lua interpreter-based
