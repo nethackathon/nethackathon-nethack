@@ -18,7 +18,7 @@ Along with the game improvements and bug fixes, NetHack 5.0 strives to make
 some general architectural improvements to the game or to its building
 process. Among them, 5.0 has:
 
- *  The source code is standard C99.
+ *  The source code is compliant with the C99 standard.
 
  *  removes barriers to building NetHack on one platform and operating system,
     for later execution on another (possibly quite different) platform and/or
