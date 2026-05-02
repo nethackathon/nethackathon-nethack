@@ -1221,6 +1221,12 @@ struct instance_globals_saved_u {
     dest_area updest;
 };
 
+struct instance_globals_saved_w {
+    /* reserved */
+    long wreserve;
+    int32_t wtreserved;
+};
+
 struct instance_globals_saved_x {
     /* mkmaze.c */
     int xmin, xmax; /* level boundaries x */
@@ -1274,6 +1280,7 @@ extern struct instance_globals_saved_r svr;
 extern struct instance_globals_saved_s svs;
 extern struct instance_globals_saved_t svt;
 extern struct instance_globals_saved_u svu;
+extern struct instance_globals_saved_w svw;
 extern struct instance_globals_saved_x svx;
 extern struct instance_globals_saved_y svy;
 extern struct sinfo program_state; /* flags describing game's current state */

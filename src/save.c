@@ -282,6 +282,8 @@ savegamestate(NHFILE *nhfp)
     urealtime.finish_time = getnow();
     urealtime.realtime += timet_delta(urealtime.finish_time,
                                       urealtime.start_timing);
+    Sfo_long(nhfp, &svw.wreserve, "wreserve");
+    Sfo_int32(nhfp, &svw.wtreserved, "wtreserved");
     Sfo_you(nhfp, &u, "gamestate-you");
     Sfo_char(nhfp, yyyymmddhhmmss(ubirthday), "gamestate-ubirthday", 14);
     Sfo_long(nhfp, &urealtime.realtime, "gamestate-realtime");
