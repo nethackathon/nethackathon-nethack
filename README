@@ -1,4 +1,4 @@
-         NetHack 5.0.0 work-in-progress -- General information
+         NetHack 5.0.0 -- General information
 
 NetHack 5.0 is an enhancement to the dungeon exploration game NetHack,
 which is a distant descendent of Rogue and Hack, and a direct descendent
@@ -17,6 +17,8 @@ be considered "spoilers", particularly in the "new features" section.
 Along with the game improvements and bug fixes, NetHack 5.0 strives to make
 some general architectural improvements to the game or to its building
 process. Among them, 5.0 has:
+
+ *  The source code is standard C99.
 
  *  removes barriers to building NetHack on one platform and operating system,
     for later execution on another (possibly quite different) platform and/or
