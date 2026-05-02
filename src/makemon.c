@@ -17,7 +17,6 @@ staticfn int align_shift(struct permonst *);
 staticfn int temperature_shift(struct permonst *);
 staticfn boolean mk_gen_ok(int, unsigned, unsigned);
 staticfn int QSORTCALLBACK cmp_init_mongen_order(const void *, const void *);
-staticfn void check_mongen_order(void);
 staticfn void init_mongen_order(void);
 staticfn boolean wrong_elem_type(struct permonst *);
 staticfn void m_initgrp(struct monst *, coordxy, coordxy, int, mmflags_nht);
@@ -1777,6 +1776,8 @@ cmp_init_mongen_order(const void *p1, const void *p2)
     return difficulty1 - difficulty2;
 }
 
+#if (NH_DEVEL_STATUS != NH_STATUS_RELEASED)
+staticfn void check_mongen_order(void);
 /* check that monsters are in correct difficulty order for mkclass() */
 staticfn void
 check_mongen_order(void)
@@ -1799,6 +1800,7 @@ check_mongen_order(void)
         }
     }
 }
+#endif
 
 /* initialize monster order for mkclass */
 staticfn void
