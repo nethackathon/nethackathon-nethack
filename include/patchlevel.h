@@ -59,13 +59,18 @@
  * to individual level files matter; changes to general game state don't)
  * but the extra complexity to support that is not worth the effort.]
  */
-/*#define VERSION_COMPATIBILITY 0x03070000L*/
+/*#define VERSION_COMPATIBILITY 0x05000000L*/
 
 /****************************************************************************/
 /* Version 5.0.x */
 
 /*
- *  NetHack 5.0.0, <insert date here>
+ *  NetHack 5.0.0, May 2, 2026
+ *
+ *  Sources changed to C99.
+ *  level compiler, dungeon compiler, and quest text all replaced with
+ *    Lua alternatives.
+ *  Refer to doc/fixes5-0-0.txt for a complete list of fixes and changes.
  *
  */
 
