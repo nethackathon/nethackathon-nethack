@@ -504,6 +504,7 @@ struct you {
     short mcham;             /* vampire mndx if shapeshifted to bat/cloud */
     short umovement;         /* instead of youmonst.movement */
     schar uachieved[N_ACH];  /* list of achievements in the order attained */
+    struct monst *umonst;    /* for future conversion of &gy.youmonst to u.umonst */
 }; /* end of `struct you' */
 
 
