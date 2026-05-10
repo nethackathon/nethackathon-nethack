@@ -37,7 +37,7 @@ extern struct passwd *getpwnam(const char *);
 #ifdef CHDIR
 static void chdirx(const char *, boolean);
 #endif /* CHDIR */
-static boolean whoami(void);
+boolean whoami(void);
 static void process_options(int, char **);
 
 #ifdef _M_UNIX
@@ -516,7 +516,7 @@ chdirx(const char *dir, boolean wr)
 #endif /* CHDIR */
 
 /* returns True iff we set plname[] to username which contains a hyphen */
-static boolean
+boolean
 whoami(void)
 {
     /*
@@ -804,17 +804,27 @@ get_nhuuid(void)
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     char *uuid = (char *) &stmp[0];
+#ifndef NONHUUID
+#ifdef __EMSCRIPTEN__
+    int uuid_available = 0;
+#endif
+#endif
 
     if (svn.nhuuid[0])
         return;
 
 #ifndef NONHUUID
-#ifdef NHUUID
-    uuid = emscripten_run_script_string("crypto.randomUUID()");
-    if (!uuid) {
-        uuid = (char *) &stmp[0];
+#ifdef __EMSCRIPTEN__
+    uuid_available = emscripten_run_script_int(
+		    "typeof crypto !== 'undefined'"
+		    " && typeof crypto.randomUUID === 'function'");
+    if (uuid_available) {
+        uuid = emscripten_run_script_string("crypto.randomUUID()");
+        if (!uuid) {
+            uuid = (char *) &stmp[0];
+        }
     }
-#endif  /* NHUUID */
+#endif  /* __EMSCRIPTEN__ */
 #endif  /* NONHUUID */
     Snprintf(svn.nhuuid, sizeof svn.nhuuid, "%s", uuid);
 }

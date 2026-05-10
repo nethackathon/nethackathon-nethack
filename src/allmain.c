@@ -598,6 +598,9 @@ maybe_do_tutorial(void)
         vision_recalc(0);
         docrt();
         iflags.nofollowers = FALSE;
+    } else {
+        /* no tutorial, so okay to process mention_decor now */
+        rcfile_only_this_option(opt_mention_decor);
     }
 }
 #endif /* #if 0 */
@@ -609,6 +612,9 @@ moveloop(boolean resuming)
 
     /*if (!resuming)
         maybe_do_tutorial();*/
+
+    /* process one deferred option post-tutorial */
+    rcfile_only_this_option(opt_mention_decor);
 
     for (;;) {
         moveloop_core();
