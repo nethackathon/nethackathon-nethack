@@ -214,6 +214,11 @@ moveloop_core(void)
             svc.context.mon_moving = TRUE;
             bagged_pets_hunger();
             gu.uhp_at_start_of_monster_turn = u.uhp;
+            /* call terrain_effects during mon_moving phase */
+            if (gp.pending_terrain_effects) {
+                terrain_effects();
+                gp.pending_terrain_effects = no_terrain_effects;
+            }
             do {
                 monscanmove = movemon();
                 if (u.umovement >= NORMAL_SPEED)
