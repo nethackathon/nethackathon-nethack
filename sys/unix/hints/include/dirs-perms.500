@@ -10,13 +10,14 @@ SOURCEINSTALL=1
 # -----------------------------------------
 ifeq "$(WHICH_OS)" "Linux"
 
-HACKDIR ?=$(PREFIX)/playground
-INSTDIR ?=$(HACKDIR)
-VARDIR ?=$(HACKDIR)
+PREFIX ?=/opt/nethack/chroot
+HACKDIR ?=/nethackathon
+INSTDIR ?=$(PREFIX)$(HACKDIR)
+VARDIR ?=$(INSTDIR)/var
 
-GAMEPERM ?= 0700
+GAMEPERM ?= 0755
 VARFILEPERM ?= 0600
-VARDIRPERM ?= 0700
+VARDIRPERM ?= 0755
 
 else   # macOS
 #
@@ -61,11 +62,11 @@ ifeq "$(WHICH_OS)" "Linux"
 # This is for the Linux system-wide install
 # -----------------------------------------
 
-PREFIX ?=$(wildcard ~)/nh/install
-HACKDIR ?=$(PREFIX)/games/lib/nethackdir
+PREFIX ?=/usr
+HACKDIR ?=$(PREFIX)/games/lib/nethackathondir
 SHELLDIR ?= $(PREFIX)/games
 INSTDIR ?=$(HACKDIR)
-VARDIR ?=$(HACKDIR)
+VARDIR ?=$(HACKDIR)/var
 MANDIR ?=/usr/share/man/man6
 
 VARDIRPERM ?= 0755
