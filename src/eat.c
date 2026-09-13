@@ -2150,7 +2150,7 @@ fprefx(struct obj *otmp)
     case TRIPE_RATION:
         if (is_art(otmp, ART_LIVER_OF_AHRIMAN)) {
             pline("This tastes like your grandma's liver pie!");
-        } else if (carnivorous(gy.youmonst.data) && !humanoid(u.umonst->data)) {
+        } else if (carnivorous(gy.youmonst.data) && !humanoid(gy.youmonst.data)) {
             pline("This tripe ration is surprisingly good!");
         } else if (maybe_polyd(is_orc(gy.youmonst.data), Race_if(PM_ORC))) {
             pline(Hallucination ? "Tastes great!  Less filling!"
